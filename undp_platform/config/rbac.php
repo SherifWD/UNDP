@@ -1,0 +1,92 @@
+<?php
+
+use App\Enums\UserRole;
+
+return [
+    'roles' => [
+        UserRole::REPORTER->value => [
+            'label' => UserRole::REPORTER->label(),
+            'description' => 'Can create and track own submissions only.',
+            'permissions' => [
+                'submissions.create',
+                'submissions.view.own',
+                'dashboards.view.own',
+                'projects.view',
+                'municipalities.view',
+                'media.upload',
+                'media.view.own',
+            ],
+        ],
+        UserRole::MUNICIPAL_FOCAL_POINT->value => [
+            'label' => UserRole::MUNICIPAL_FOCAL_POINT->label(),
+            'description' => 'Can validate submissions and access municipality-scoped analytics.',
+            'permissions' => [
+                'submissions.view.municipality',
+                'submissions.validate',
+                'submissions.approve',
+                'submissions.reject',
+                'submissions.rework',
+                'dashboards.view.municipality',
+                'reports.export.csv',
+                'projects.view',
+                'municipalities.view',
+                'media.view.municipality',
+            ],
+        ],
+        UserRole::UNDP_ADMIN->value => [
+            'label' => UserRole::UNDP_ADMIN->label(),
+            'description' => 'Full cross-municipality administration and reporting permissions.',
+            'permissions' => [
+                'users.view',
+                'users.create',
+                'users.update',
+                'users.toggle_status',
+                'roles.assign',
+                'audit.view',
+                'audit.export',
+                'submissions.view.all',
+                'submissions.validate',
+                'submissions.approve',
+                'submissions.reject',
+                'submissions.rework',
+                'dashboards.view.system',
+                'dashboards.view.municipality',
+                'reports.export.csv',
+                'reports.export.pdf',
+                'projects.view',
+                'projects.manage',
+                'municipalities.view',
+                'municipalities.manage',
+                'workflow.manage',
+                'media.upload',
+                'media.view.all',
+                'notifications.send',
+            ],
+        ],
+        UserRole::PARTNER_DONOR_VIEWER->value => [
+            'label' => UserRole::PARTNER_DONOR_VIEWER->label(),
+            'description' => 'Read-only access to approved aggregated data.',
+            'permissions' => [
+                'dashboards.view.partner',
+                'reports.export.csv',
+                'reports.export.pdf',
+                'projects.view',
+                'municipalities.view',
+                'submissions.view.approved_aggregated',
+            ],
+        ],
+        UserRole::AUDITOR->value => [
+            'label' => UserRole::AUDITOR->label(),
+            'description' => 'Read-only access to immutable audit trails and system evidence.',
+            'permissions' => [
+                'audit.view',
+                'audit.export',
+                'submissions.view.all',
+                'dashboards.view.system',
+                'reports.export.csv',
+                'reports.export.pdf',
+                'media.view.all',
+            ],
+        ],
+    ],
+];
