@@ -2,13 +2,18 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import AppShell from '../components/AppShell.vue';
 import api from '../api';
+import { useAuthStore } from '../stores/auth';
+import { useAsyncExport } from '../composables/useAsyncExport';
 
+const auth = useAuthStore();
+const asyncExport = useAsyncExport();
 const logs = ref([]);
 const loading = ref(false);
 const error = ref('');
 const selected = ref(null);
 const lastRefreshedAt = ref(null);
 let pollTimer = null;
+let eventSource = null;
 
 const filters = reactive({
     action: '',
@@ -40,32 +45,13 @@ const visiblePages = computed(() => {
     return pages;
 });
 
-const exportCsvUrl = computed(() => {
-    const params = new URLSearchParams({
-        type: 'audit_logs',
-        action: filters.action || '',
-        role: filters.role || '',
-        user_id: filters.user_id || '',
-        status: filters.status || '',
-        municipality_id: filters.municipality_id || '',
-        project_id: filters.project_id || '',
-        date_from: filters.date_from || '',
-        date_to: filters.date_to || '',
-    });
+const exportStatusLabel = computed(() => {
+    if (!asyncExport.task.value) {
+        return '';
+    }
 
-    return `/api/exports/csv?${params.toString()}`;
-});
-
-const exportPdfUrl = computed(() => {
-    const params = new URLSearchParams({
-        status: filters.status || '',
-        municipality_id: filters.municipality_id || '',
-        project_id: filters.project_id || '',
-        date_from: filters.date_from || '',
-        date_to: filters.date_to || '',
-    });
-
-    return `/api/exports/pdf?${params.toString()}`;
+    const task = asyncExport.task.value;
+    return `Export ${task.status} (${task.progress}%)`;
 });
 
 const loadLogs = async (page = pagination.current_page, silent = false) => {
@@ -129,17 +115,76 @@ const goToPage = async (page) => {
     await loadLogs(page);
 };
 
+const startAuditCsvExport = async () => {
+    await asyncExport.startExport({
+        format: 'csv',
+        type: 'audit_logs',
+        action: filters.action || null,
+        role: filters.role || null,
+        user_id: filters.user_id || null,
+        status: filters.status || null,
+        municipality_id: filters.municipality_id || null,
+        project_id: filters.project_id || null,
+        date_from: filters.date_from || null,
+        date_to: filters.date_to || null,
+    });
+};
+
+const startSummaryPdfExport = async () => {
+    await asyncExport.startExport({
+        format: 'pdf',
+        type: 'summary',
+        status: filters.status || null,
+        municipality_id: filters.municipality_id || null,
+        project_id: filters.project_id || null,
+        date_from: filters.date_from || null,
+        date_to: filters.date_to || null,
+    });
+};
+
+const connectRealtime = () => {
+    if (!window.EventSource || !auth.token) {
+        return false;
+    }
+
+    const token = encodeURIComponent(auth.token);
+    eventSource = new EventSource(`/api/live/events?channel=audit&token=${token}`);
+
+    eventSource.addEventListener('update', () => {
+        loadLogs(pagination.current_page, true);
+    });
+
+    eventSource.addEventListener('end', () => {
+        eventSource?.close();
+        eventSource = null;
+    });
+
+    eventSource.onerror = () => {
+        eventSource?.close();
+        eventSource = null;
+    };
+
+    return true;
+};
+
 onMounted(async () => {
     await loadLogs(1);
 
+    connectRealtime();
+
     pollTimer = setInterval(() => {
         loadLogs(pagination.current_page, true);
-    }, 20000);
+    }, 60000);
 });
 
 onBeforeUnmount(() => {
     if (pollTimer) {
         clearInterval(pollTimer);
+    }
+
+    if (eventSource) {
+        eventSource.close();
+        eventSource = null;
     }
 });
 </script>
@@ -166,12 +211,22 @@ onBeforeUnmount(() => {
                 <button class="btn btn--ghost" @click="setQuickFilter('today')">Today</button>
                 <button class="btn btn--ghost" @click="setQuickFilter('last7')">Last 7 Days</button>
                 <button class="btn btn--primary" @click="applyFilters">Apply</button>
-                <a class="btn btn--ghost" :href="exportCsvUrl">Export CSV</a>
-                <a class="btn btn--ghost" :href="exportPdfUrl">Export PDF</a>
+                <button class="btn btn--ghost" :disabled="asyncExport.loading.value" @click="startAuditCsvExport">Export CSV</button>
+                <button class="btn btn--ghost" :disabled="asyncExport.loading.value" @click="startSummaryPdfExport">Export PDF</button>
+                <button
+                    v-if="asyncExport.task.value?.status === 'ready'"
+                    class="btn btn--primary"
+                    @click="asyncExport.download"
+                >
+                    Download
+                </button>
             </div>
 
             <p class="panel__hint" v-if="lastRefreshedAt">
                 Last refreshed: {{ lastRefreshedAt.toLocaleTimeString() }}
+            </p>
+            <p class="panel__hint" v-if="exportStatusLabel">
+                {{ exportStatusLabel }}
             </p>
 
             <div class="table-wrap">

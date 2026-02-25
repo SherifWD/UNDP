@@ -124,4 +124,89 @@ class DashboardApiTest extends TestCase
                 'cluster_meta' => ['enabled', 'zoom'],
             ]);
     }
+
+    public function test_reporter_can_access_map_endpoint_with_own_scope_only(): void
+    {
+        $tripoli = Municipality::query()->create([
+            'name_en' => 'Tripoli',
+            'name_ar' => 'طرابلس',
+            'code' => 'TRI',
+        ]);
+
+        $benghazi = Municipality::query()->create([
+            'name_en' => 'Benghazi',
+            'name_ar' => 'بنغازي',
+            'code' => 'BEN',
+        ]);
+
+        $tripoliProject = Project::query()->create([
+            'municipality_id' => $tripoli->id,
+            'name_en' => 'Tripoli Water Network',
+            'name_ar' => 'شبكة مياه طرابلس',
+            'status' => 'active',
+            'latitude' => 32.8872,
+            'longitude' => 13.1913,
+        ]);
+
+        $benghaziProject = Project::query()->create([
+            'municipality_id' => $benghazi->id,
+            'name_en' => 'Benghazi School Rehab',
+            'name_ar' => 'تأهيل مدارس بنغازي',
+            'status' => 'active',
+            'latitude' => 32.1167,
+            'longitude' => 20.0667,
+        ]);
+
+        $reporter = User::factory()->create([
+            'role' => UserRole::REPORTER->value,
+            'municipality_id' => $tripoli->id,
+        ]);
+
+        Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $tripoliProject->id,
+            'municipality_id' => $tripoli->id,
+            'status' => SubmissionStatus::UNDER_REVIEW->value,
+            'title' => 'Reporter own submission',
+            'latitude' => 32.8875,
+            'longitude' => 13.1918,
+        ]);
+
+        $otherReporter = User::factory()->create([
+            'role' => UserRole::REPORTER->value,
+            'municipality_id' => $benghazi->id,
+        ]);
+
+        Submission::query()->create([
+            'reporter_id' => $otherReporter->id,
+            'project_id' => $benghaziProject->id,
+            'municipality_id' => $benghazi->id,
+            'status' => SubmissionStatus::APPROVED->value,
+            'title' => 'Other reporter submission',
+            'latitude' => 32.1171,
+            'longitude' => 20.0671,
+        ]);
+
+        Sanctum::actingAs($reporter);
+
+        $response = $this->getJson('/api/dashboard/map?cluster=1&cluster_zoom=8');
+
+        $response->assertOk();
+
+        $markers = collect($response->json('markers', []));
+        $projectIds = $markers
+            ->where('type', 'project')
+            ->pluck('id')
+            ->all();
+
+        $submissionTitles = $markers
+            ->where('type', 'submission')
+            ->pluck('name')
+            ->all();
+
+        $this->assertContains($tripoliProject->id, $projectIds);
+        $this->assertNotContains($benghaziProject->id, $projectIds);
+        $this->assertContains('Reporter own submission', $submissionTitles);
+        $this->assertNotContains('Other reporter submission', $submissionTitles);
+    }
 }

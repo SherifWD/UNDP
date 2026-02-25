@@ -104,15 +104,37 @@ class DatabaseSeeder extends Seeder
             'preferred_locale' => 'en',
         ]);
 
-        $focal = $this->createUser([
-            'name' => 'Municipal Focal Point',
-            'email' => 'focal.tripoli@undp.local',
-            'country_code' => '+218',
-            'phone' => '910000003',
-            'phone_e164' => '+218910000003',
-            'role' => UserRole::MUNICIPAL_FOCAL_POINT->value,
-            'municipality_id' => $tripoli->id,
-            'preferred_locale' => 'ar',
+        $focals = collect([
+            $this->createUser([
+                'name' => 'Municipal Focal Point - Tripoli',
+                'email' => 'focal.tripoli@undp.local',
+                'country_code' => '+218',
+                'phone' => '910000003',
+                'phone_e164' => '+218910000003',
+                'role' => UserRole::MUNICIPAL_FOCAL_POINT->value,
+                'municipality_id' => $tripoli->id,
+                'preferred_locale' => 'ar',
+            ]),
+            $this->createUser([
+                'name' => 'Municipal Focal Point - Benghazi',
+                'email' => 'focal.benghazi@undp.local',
+                'country_code' => '+218',
+                'phone' => '910000005',
+                'phone_e164' => '+218910000005',
+                'role' => UserRole::MUNICIPAL_FOCAL_POINT->value,
+                'municipality_id' => $benghazi->id,
+                'preferred_locale' => 'en',
+            ]),
+            $this->createUser([
+                'name' => 'Municipal Focal Point - Misrata',
+                'email' => 'focal.misrata@undp.local',
+                'country_code' => '+218',
+                'phone' => '910000006',
+                'phone_e164' => '+218910000006',
+                'role' => UserRole::MUNICIPAL_FOCAL_POINT->value,
+                'municipality_id' => $misrata->id,
+                'preferred_locale' => 'ar',
+            ]),
         ]);
 
         $partner = $this->createUser([
@@ -128,7 +150,7 @@ class DatabaseSeeder extends Seeder
         $reporters = collect([
             $this->createUser([
                 'name' => 'Community Reporter - Tripoli',
-                'email' => 'reporter1@undp.local',
+                'email' => 'reporter.tripoli@undp.local',
                 'country_code' => '+218',
                 'phone' => '910000101',
                 'phone_e164' => '+218910000101',
@@ -138,7 +160,7 @@ class DatabaseSeeder extends Seeder
             ]),
             $this->createUser([
                 'name' => 'Community Reporter - Benghazi',
-                'email' => 'reporter2@undp.local',
+                'email' => 'reporter.benghazi@undp.local',
                 'country_code' => '+218',
                 'phone' => '910000102',
                 'phone_e164' => '+218910000102',
@@ -146,15 +168,31 @@ class DatabaseSeeder extends Seeder
                 'municipality_id' => $benghazi->id,
                 'preferred_locale' => 'en',
             ]),
+            $this->createUser([
+                'name' => 'Community Reporter - Misrata',
+                'email' => 'reporter.misrata@undp.local',
+                'country_code' => '+218',
+                'phone' => '910000103',
+                'phone_e164' => '+218910000103',
+                'role' => UserRole::REPORTER->value,
+                'municipality_id' => $misrata->id,
+                'preferred_locale' => 'ar',
+            ]),
         ]);
+
+        $reportersByMunicipality = $reporters->groupBy('municipality_id');
+        $focalsByMunicipality = $focals->keyBy('municipality_id');
 
         $this->printSeededRoleAccounts([
             'UNDP Admin' => $admin,
             'Auditor' => $auditor,
-            'Municipal Focal Point' => $focal,
+            'Municipal Focal Point (Tripoli)' => $focals[0],
+            'Municipal Focal Point (Benghazi)' => $focals[1],
+            'Municipal Focal Point (Misrata)' => $focals[2],
             'Partner/Donor Viewer' => $partner,
             'Community Reporter (Tripoli)' => $reporters[0],
             'Community Reporter (Benghazi)' => $reporters[1],
+            'Community Reporter (Misrata)' => $reporters[2],
         ]);
 
         $statuses = [
@@ -168,8 +206,24 @@ class DatabaseSeeder extends Seeder
 
         foreach (range(1, 28) as $index) {
             $project = $projects->random();
-            $reporter = $reporters->random();
+            $reporter = $reportersByMunicipality
+                ->get($project->municipality_id, collect([$reporters->random()]))
+                ->random();
+            $validator = $focalsByMunicipality->get($project->municipality_id, $admin);
             $status = $statuses[array_rand($statuses)];
+            $createdAt = now()->subDays(random_int(0, 25))->subHours(random_int(0, 23));
+            $submittedAt = in_array($status, [SubmissionStatus::DRAFT, SubmissionStatus::QUEUED], true)
+                ? null
+                : $createdAt->copy()->addMinutes(random_int(10, 180));
+            $validatedAt = in_array($status, [SubmissionStatus::APPROVED, SubmissionStatus::REWORK_REQUESTED, SubmissionStatus::REJECTED], true)
+                ? ($submittedAt?->copy()->addHours(random_int(1, 48)) ?? $createdAt->copy()->addHours(random_int(1, 48)))
+                : null;
+            $validationComment = match ($status) {
+                SubmissionStatus::REJECTED => 'Missing evidence attachments.',
+                SubmissionStatus::REWORK_REQUESTED => 'Please add location and attachment details.',
+                default => null,
+            };
+            $updatedAt = $validatedAt ?? ($submittedAt?->copy()->addHours(random_int(1, 24)) ?? $createdAt->copy()->addHours(random_int(1, 24)));
 
             $submission = Submission::create([
                 'client_uuid' => (string) str()->uuid(),
@@ -186,33 +240,15 @@ class DatabaseSeeder extends Seeder
                 'media' => [],
                 'latitude' => $project->latitude,
                 'longitude' => $project->longitude,
-                'submitted_at' => now()->subDays(random_int(0, 20)),
-                'validated_by' => in_array($status, [SubmissionStatus::APPROVED, SubmissionStatus::REWORK_REQUESTED, SubmissionStatus::REJECTED], true) ? $focal->id : null,
-                'validated_at' => in_array($status, [SubmissionStatus::APPROVED, SubmissionStatus::REWORK_REQUESTED, SubmissionStatus::REJECTED], true) ? now()->subDays(random_int(0, 10)) : null,
-                'validation_comment' => $status === SubmissionStatus::REJECTED ? 'Missing evidence attachments.' : null,
-                'created_at' => now()->subDays(random_int(0, 25)),
-                'updated_at' => now()->subDays(random_int(0, 10)),
+                'submitted_at' => $submittedAt,
+                'validated_by' => in_array($status, [SubmissionStatus::APPROVED, SubmissionStatus::REWORK_REQUESTED, SubmissionStatus::REJECTED], true) ? $validator->id : null,
+                'validated_at' => $validatedAt,
+                'validation_comment' => $validationComment,
+                'created_at' => $createdAt,
+                'updated_at' => $updatedAt,
             ]);
 
-            SubmissionStatusEvent::create([
-                'submission_id' => $submission->id,
-                'actor_id' => $reporter->id,
-                'from_status' => null,
-                'to_status' => SubmissionStatus::SUBMITTED->value,
-                'comment' => 'Initial submission.',
-                'created_at' => $submission->created_at,
-            ]);
-
-            if ($submission->status !== SubmissionStatus::SUBMITTED->value) {
-                SubmissionStatusEvent::create([
-                    'submission_id' => $submission->id,
-                    'actor_id' => $submission->validated_by ?? $admin->id,
-                    'from_status' => SubmissionStatus::SUBMITTED->value,
-                    'to_status' => $submission->status,
-                    'comment' => $submission->validation_comment,
-                    'created_at' => $submission->updated_at,
-                ]);
-            }
+            $this->createSeedStatusEvents($submission, $reporter, $validator);
         }
     }
 
@@ -242,6 +278,76 @@ class DatabaseSeeder extends Seeder
         foreach ($reasons as $reason) {
             ValidationReason::updateOrCreate(['code' => $reason['code']], $reason + ['is_active' => true]);
         }
+    }
+
+    private function createSeedStatusEvents(Submission $submission, User $reporter, User $validator): void
+    {
+        $status = SubmissionStatus::from($submission->status);
+        $createdAt = $submission->created_at ?? now();
+        $submittedAt = $submission->submitted_at ?? $createdAt->copy()->addMinutes(15);
+        $underReviewAt = $submittedAt->copy()->addMinutes(30);
+        $decisionAt = $submission->validated_at ?? $submission->updated_at ?? $underReviewAt->copy()->addHours(2);
+
+        if ($status === SubmissionStatus::DRAFT) {
+            SubmissionStatusEvent::create([
+                'submission_id' => $submission->id,
+                'actor_id' => $reporter->id,
+                'from_status' => null,
+                'to_status' => SubmissionStatus::DRAFT->value,
+                'comment' => 'Saved as draft.',
+                'created_at' => $createdAt,
+            ]);
+
+            return;
+        }
+
+        if ($status === SubmissionStatus::QUEUED) {
+            SubmissionStatusEvent::create([
+                'submission_id' => $submission->id,
+                'actor_id' => $reporter->id,
+                'from_status' => null,
+                'to_status' => SubmissionStatus::QUEUED->value,
+                'comment' => 'Queued while offline.',
+                'created_at' => $createdAt,
+            ]);
+
+            return;
+        }
+
+        SubmissionStatusEvent::create([
+            'submission_id' => $submission->id,
+            'actor_id' => $reporter->id,
+            'from_status' => null,
+            'to_status' => SubmissionStatus::SUBMITTED->value,
+            'comment' => 'Initial submission.',
+            'created_at' => $submittedAt,
+        ]);
+
+        if ($status === SubmissionStatus::SUBMITTED) {
+            return;
+        }
+
+        SubmissionStatusEvent::create([
+            'submission_id' => $submission->id,
+            'actor_id' => $validator->id,
+            'from_status' => SubmissionStatus::SUBMITTED->value,
+            'to_status' => SubmissionStatus::UNDER_REVIEW->value,
+            'comment' => 'Submission entered validation queue.',
+            'created_at' => $underReviewAt,
+        ]);
+
+        if ($status === SubmissionStatus::UNDER_REVIEW) {
+            return;
+        }
+
+        SubmissionStatusEvent::create([
+            'submission_id' => $submission->id,
+            'actor_id' => $validator->id,
+            'from_status' => SubmissionStatus::UNDER_REVIEW->value,
+            'to_status' => $status->value,
+            'comment' => $submission->validation_comment,
+            'created_at' => $decisionAt,
+        ]);
     }
 
     private function createUser(array $attributes): User

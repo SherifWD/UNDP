@@ -91,6 +91,17 @@ class UserController extends Controller
             'preferred_locale' => ['nullable', Rule::in(['ar', 'en'])],
         ]);
 
+        if ($this->roleRequiresMunicipality($validated['role']) && empty($validated['municipality_id'])) {
+            $message = __('Municipality is required for reporter and focal point roles.');
+
+            return response()->json([
+                'message' => $message,
+                'errors' => [
+                    'municipality_id' => [$message],
+                ],
+            ], 422);
+        }
+
         $phoneData = PhoneNumber::normalize($validated['country_code'], $validated['phone']);
 
         if (User::where('phone_e164', $phoneData['phone_e164'])->exists()) {
@@ -140,6 +151,22 @@ class UserController extends Controller
             'preferred_locale' => ['sometimes', Rule::in(['ar', 'en'])],
             'confirm_role_change' => ['sometimes', 'boolean'],
         ]);
+
+        $effectiveRole = $validated['role'] ?? $user->role;
+        $effectiveMunicipalityId = array_key_exists('municipality_id', $validated)
+            ? $validated['municipality_id']
+            : $user->municipality_id;
+
+        if ($this->roleRequiresMunicipality($effectiveRole) && empty($effectiveMunicipalityId)) {
+            $message = __('Municipality is required for reporter and focal point roles.');
+
+            return response()->json([
+                'message' => $message,
+                'errors' => [
+                    'municipality_id' => [$message],
+                ],
+            ], 422);
+        }
 
         if (array_key_exists('role', $validated) && $validated['role'] !== $user->role && ! ($validated['confirm_role_change'] ?? false)) {
             return response()->json([
@@ -275,5 +302,13 @@ class UserController extends Controller
             'last_login_at' => optional($user->last_login_at)->toIso8601String(),
             'created_at' => optional($user->created_at)->toIso8601String(),
         ];
+    }
+
+    private function roleRequiresMunicipality(string $role): bool
+    {
+        return in_array($role, [
+            UserRole::REPORTER->value,
+            UserRole::MUNICIPAL_FOCAL_POINT->value,
+        ], true);
     }
 }

@@ -331,11 +331,22 @@ class SubmissionController extends Controller
 
     private function transition(Request $request, Submission $submission, string $toStatus, bool $requiresComment): JsonResponse
     {
+        $fromStatus = $submission->status;
+        $allowedFromStatuses = $this->allowedFromStatuses($toStatus);
+
+        if (! in_array($fromStatus, $allowedFromStatuses, true)) {
+            return response()->json([
+                'message' => __('Invalid status transition for current workflow cycle.'),
+                'from_status' => $fromStatus,
+                'to_status' => $toStatus,
+                'allowed_from' => $allowedFromStatuses,
+            ], 422);
+        }
+
         $validated = $request->validate([
             'comment' => [$requiresComment ? 'required' : 'nullable', 'string', 'max:2000'],
         ]);
 
-        $fromStatus = $submission->status;
         $comment = $validated['comment'] ?? null;
 
         $submission->forceFill([
@@ -384,6 +395,27 @@ class SubmissionController extends Controller
             'message' => __('Submission status updated successfully.'),
             'submission' => $this->serializeSubmission($submission),
         ]);
+    }
+
+    private function allowedFromStatuses(string $toStatus): array
+    {
+        return match ($toStatus) {
+            SubmissionStatus::APPROVED->value => [
+                SubmissionStatus::UNDER_REVIEW->value,
+                SubmissionStatus::SUBMITTED->value,
+                SubmissionStatus::REWORK_REQUESTED->value,
+            ],
+            SubmissionStatus::REJECTED->value => [
+                SubmissionStatus::UNDER_REVIEW->value,
+                SubmissionStatus::SUBMITTED->value,
+                SubmissionStatus::REWORK_REQUESTED->value,
+            ],
+            SubmissionStatus::REWORK_REQUESTED->value => [
+                SubmissionStatus::UNDER_REVIEW->value,
+                SubmissionStatus::SUBMITTED->value,
+            ],
+            default => [],
+        };
     }
 
     private function serializeSubmission(Submission $submission): array

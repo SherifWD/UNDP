@@ -15,7 +15,7 @@ Status legend:
 | AUTH-01 Secure Login (AR/EN) | DONE | Phone + country picker (+218 default), numeric keypad entry, inline validation, OTP boxes with auto-advance, OTP autofill hint, resend countdown, change-number flow, returning-user welcome toast, and loading/skeleton behavior are implemented. |
 | AUTH-02 User & Role Management | DONE | User CRUD, role assignment, enable/disable, filters, sortable columns, pagination, CSV export, create-user modal, edit side-panel, role-change confirmation modal, and inline validation are implemented. |
 | AUTH-03 RBAC Matrix Enforcement | DONE | API middleware + policy + query scoping implemented. Unauthorized routes/components guarded. Blocked permission attempts are logged. |
-| AUTH-04 Audit Log of Key Actions | PARTIAL | Central audit log with advanced filters, quick date presets, pagination, detail panel, polling-based refresh, immutable entries, and CSV/PDF export links implemented. Missing push-based realtime stream and richer audit-detail segmentation/report templates. |
+| AUTH-04 Audit Log of Key Actions | PARTIAL | Central audit log with advanced filters, quick date presets, pagination, detail panel, immutable entries, async CSV/PDF export tasks, and SSE/poll fallback refresh implemented. Missing richer audit-detail segmentation/report templates. |
 
 ## Web Validation Portal
 
@@ -30,10 +30,10 @@ Status legend:
 
 | Epic | Status | Notes |
 |---|---|---|
-| WEB-05 KPI Dashboard | PARTIAL | KPI cards, municipality/project/status breakdown, trend table, advanced filters, chips, and status drill-down are implemented. Missing richer charting library visualizations. |
-| WEB-06 Geo-Mapped View | PARTIAL | Server-side map clustering, zoom-aware cluster/raw rendering, persistent filters, reset action, and marker detail popups are implemented. Missing dedicated full-screen map route/layout and marker spiderfy behavior. |
-| WEB-07 Partner/Donor Read-Only Dashboard | PARTIAL | Role-restricted read-only partner dashboard with municipality/project/date filters and approved-only trends is implemented. Missing final donor-focused chart aesthetics and stricter read-only visual lock indicators. |
-| WEB-08 CSV/PDF Exports | PARTIAL | CSV + PDF export endpoints implemented with role-scoped filtering, including users CSV export for user-management view. Missing asynchronous export jobs, progress polling, and completion notifications for large exports. |
+| WEB-05 KPI Dashboard | DONE | KPI cards, status donut analytics, municipality distribution bars, trend chart, advanced filters, chips, and status drill-down are implemented. |
+| WEB-06 Geo-Mapped View | DONE | Server-side map clustering, zoom-aware cluster/raw rendering, full-screen map mode, marker overlap spiderfy behavior, persistent filters, reset action, and marker detail popups are implemented. |
+| WEB-07 Partner/Donor Read-Only Dashboard | DONE | Role-restricted read-only partner dashboard with municipality/project/date filters, instant refresh, approved-only trend chart, export flow, and explicit read-only lock indicators is implemented. |
+| WEB-08 CSV/PDF Exports | PARTIAL | Role-scoped CSV + PDF export endpoints plus async background export tasks, progress polling, and completion/download flow are implemented. Remaining gaps are UX polish items like richer export configuration previews and notification center integration. |
 
 ## Mobile Epics (MOB-01..MOB-10)
 
@@ -48,7 +48,4 @@ Status legend:
 - Not all epic UX/performance details are complete; several items are in `PARTIAL` and need a final implementation phase for full acceptance parity.
 
 ## Current Not-Done (Backend/Web/Dashboard/APIs)
-1. Push-based realtime updates (WebSocket/SSE) for audit/worklist/dashboard instead of polling.
-2. Async export generation with queue progress API and ready notifications.
-3. Rich chart components (donut/stacked/interactive bar) for dashboard analytics.
-4. Full-screen map experience with advanced marker interactions (spiderfy/overlap handling).
+1. Narrative report templates for donor storytelling (optional enhancement, not required for core platform operations).

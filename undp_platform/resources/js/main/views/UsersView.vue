@@ -4,8 +4,12 @@ import AppShell from '../components/AppShell.vue';
 import RoleBadge from '../components/RoleBadge.vue';
 import api from '../api';
 import { useUiStore } from '../stores/ui';
+import { useAuthStore } from '../stores/auth';
+import { useAsyncExport } from '../composables/useAsyncExport';
 
 const ui = useUiStore();
+const auth = useAuthStore();
+const asyncExport = useAsyncExport();
 
 const users = ref([]);
 const roles = ref([]);
@@ -21,6 +25,17 @@ const roleChangeModalOpen = ref(false);
 const statusModalOpen = ref(false);
 const pendingStatusUser = ref(null);
 const statusReason = ref('');
+const userAuditModalOpen = ref(false);
+const auditedUser = ref(null);
+const userAuditLoading = ref(false);
+const userAuditError = ref('');
+const userAuditEntries = ref([]);
+
+const userAuditPagination = reactive({
+    current_page: 1,
+    last_page: 1,
+    total: 0,
+});
 
 const filters = reactive({
     search: '',
@@ -68,6 +83,7 @@ const roleMap = computed(() => {
         return acc;
     }, {});
 });
+const canViewAudit = computed(() => auth.hasPermission('audit.view'));
 
 const createRoleDescription = computed(() => roleMap.value[createForm.role]?.description || '');
 const editRoleDescription = computed(() => roleMap.value[editForm.role]?.description || '');
@@ -83,18 +99,13 @@ const roleChangeSummary = computed(() => {
     };
 });
 
-const usersExportUrl = computed(() => {
-    const params = new URLSearchParams({
-        type: 'users',
-        search: filters.search || '',
-        role: filters.role || '',
-        status: filters.status || '',
-        municipality_id: filters.municipality_id || '',
-        sort_by: sort.by,
-        sort_dir: sort.dir,
-    });
+const exportStatusLabel = computed(() => {
+    if (!asyncExport.task.value) {
+        return '';
+    }
 
-    return `/api/exports/csv?${params.toString()}`;
+    const task = asyncExport.task.value;
+    return `Export ${task.status} (${task.progress}%)`;
 });
 
 const canCreate = computed(() => {
@@ -201,6 +212,19 @@ const toggleSort = async (column) => {
     }
 
     await loadUsers(1);
+};
+
+const startUsersExport = async () => {
+    await asyncExport.startExport({
+        format: 'csv',
+        type: 'users',
+        search: filters.search || null,
+        role: filters.role || null,
+        status: filters.status || null,
+        municipality_id: filters.municipality_id || null,
+        sort_by: sort.by,
+        sort_dir: sort.dir,
+    });
 };
 
 const openCreateModal = () => {
@@ -322,6 +346,54 @@ const closeStatusModal = () => {
     statusReason.value = '';
 };
 
+const loadUserAudit = async (page = userAuditPagination.current_page) => {
+    if (!auditedUser.value) {
+        return;
+    }
+
+    userAuditLoading.value = true;
+    userAuditError.value = '';
+
+    try {
+        const { data } = await api.get(`/users/${auditedUser.value.id}/audit`, {
+            params: { page },
+        });
+
+        userAuditEntries.value = data.data || [];
+        userAuditPagination.current_page = data.current_page || 1;
+        userAuditPagination.last_page = data.last_page || 1;
+        userAuditPagination.total = data.total || userAuditEntries.value.length;
+    } catch (err) {
+        userAuditError.value = err.response?.data?.message || 'Unable to load user audit timeline.';
+    } finally {
+        userAuditLoading.value = false;
+    }
+};
+
+const openUserAuditModal = async (user) => {
+    auditedUser.value = user;
+    userAuditModalOpen.value = true;
+    await loadUserAudit(1);
+};
+
+const goToUserAuditPage = async (page) => {
+    if (page < 1 || page > userAuditPagination.last_page || page === userAuditPagination.current_page) {
+        return;
+    }
+
+    await loadUserAudit(page);
+};
+
+const closeUserAuditModal = () => {
+    userAuditModalOpen.value = false;
+    auditedUser.value = null;
+    userAuditEntries.value = [];
+    userAuditError.value = '';
+    userAuditPagination.current_page = 1;
+    userAuditPagination.last_page = 1;
+    userAuditPagination.total = 0;
+};
+
 const confirmStatusChange = async () => {
     if (!pendingStatusUser.value) {
         return;
@@ -378,8 +450,16 @@ onMounted(async () => {
                 </select>
                 <button class="btn btn--primary" @click="applyFilters">Apply</button>
                 <button class="btn btn--ghost" @click="openCreateModal">Create User</button>
-                <a class="btn btn--ghost" :href="usersExportUrl">Export CSV</a>
+                <button class="btn btn--ghost" :disabled="asyncExport.loading.value" @click="startUsersExport">Export CSV</button>
+                <button
+                    v-if="asyncExport.task.value?.status === 'ready'"
+                    class="btn btn--primary"
+                    @click="asyncExport.download"
+                >
+                    Download
+                </button>
             </div>
+            <p class="panel__hint" v-if="exportStatusLabel">{{ exportStatusLabel }}</p>
 
             <div class="table-wrap">
                 <table class="table">
@@ -414,6 +494,9 @@ onMounted(async () => {
                             <button class="btn btn--ghost" @click="startEdit(user)">Edit</button>
                             <button class="btn btn--ghost" @click="openStatusModal(user)">
                                 {{ user.status === 'active' ? 'Disable' : 'Enable' }}
+                            </button>
+                            <button class="btn btn--ghost" v-if="canViewAudit" @click="openUserAuditModal(user)">
+                                Audit
                             </button>
                         </td>
                     </tr>
@@ -588,6 +671,40 @@ onMounted(async () => {
                 <div class="inline-group">
                     <button class="btn btn--warn" @click="confirmStatusChange">Confirm</button>
                     <button class="btn btn--ghost" @click="closeStatusModal">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-backdrop" v-if="userAuditModalOpen">
+            <div class="modal-card">
+                <h3>User Audit Timeline</h3>
+                <p class="panel__hint" v-if="auditedUser">
+                    {{ auditedUser.name }} ({{ auditedUser.phone_e164 }})
+                </p>
+
+                <p class="field-error" v-if="userAuditError">{{ userAuditError }}</p>
+                <p class="panel__hint" v-if="userAuditLoading">Loading timeline...</p>
+
+                <ul class="timeline" v-if="!userAuditLoading && userAuditEntries.length">
+                    <li v-for="entry in userAuditEntries" :key="entry.id">
+                        <strong>{{ entry.action }}</strong>
+                        <span>{{ entry.actor?.name || 'System' }} ({{ entry.actor?.role || '-' }})</span>
+                        <small>{{ new Date(entry.created_at).toLocaleString() }}</small>
+                    </li>
+                </ul>
+
+                <p class="panel__hint" v-if="!userAuditLoading && !userAuditEntries.length">No audit entries found.</p>
+
+                <div class="pagination-bar">
+                    <button class="btn btn--ghost" :disabled="userAuditPagination.current_page <= 1" @click="goToUserAuditPage(userAuditPagination.current_page - 1)">Prev</button>
+                    <span class="pagination-meta">
+                        Page {{ userAuditPagination.current_page }} / {{ userAuditPagination.last_page }}
+                    </span>
+                    <button class="btn btn--ghost" :disabled="userAuditPagination.current_page >= userAuditPagination.last_page" @click="goToUserAuditPage(userAuditPagination.current_page + 1)">Next</button>
+                </div>
+
+                <div class="inline-group">
+                    <button class="btn btn--ghost" @click="closeUserAuditModal">Close</button>
                 </div>
             </div>
         </div>

@@ -5,15 +5,135 @@ namespace App\Http\Controllers\Api;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\ExportTask;
 use App\Models\Submission;
 use App\Models\User;
+use App\Jobs\GenerateExportTaskJob;
+use App\Services\AuditLogger;
 use App\Services\SubmissionAccessService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExportController extends Controller
 {
+    public function createTask(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'format' => ['required', 'in:csv,pdf'],
+            'type' => ['nullable', 'in:submissions,audit_logs,users,summary'],
+            'status' => ['nullable', 'string', 'max:100'],
+            'project_id' => ['nullable', 'integer'],
+            'municipality_id' => ['nullable', 'integer'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date'],
+            'action' => ['nullable', 'string', 'max:255'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'role' => ['nullable', 'in:'.implode(',', UserRole::values())],
+            'sort_by' => ['nullable', 'in:name,email,phone,role,status,created_at,last_login_at'],
+            'sort_dir' => ['nullable', 'in:asc,desc'],
+        ]);
+
+        $format = $validated['format'];
+        $type = $validated['type'] ?? ($format === 'pdf' ? 'summary' : 'submissions');
+
+        if ($format === 'csv' && ! $request->user()->hasPermission('reports.export.csv')) {
+            return response()->json(['message' => 'Access denied.'], 403);
+        }
+
+        if ($format === 'pdf' && ! $request->user()->hasPermission('reports.export.pdf')) {
+            return response()->json(['message' => 'Access denied.'], 403);
+        }
+
+        if ($format === 'pdf') {
+            $type = 'summary';
+        }
+
+        if ($type === 'audit_logs' && ! $request->user()->hasPermission('audit.view')) {
+            return response()->json(['message' => 'Access denied.'], 403);
+        }
+
+        if ($type === 'users' && ! $request->user()->hasPermission('users.view')) {
+            return response()->json(['message' => 'Access denied.'], 403);
+        }
+
+        $task = ExportTask::query()->create([
+            'user_id' => $request->user()->id,
+            'format' => $format,
+            'type' => $type,
+            'status' => 'queued',
+            'progress' => 0,
+            'filters' => collect($validated)
+                ->except(['format', 'type'])
+                ->filter(fn ($value) => $value !== null && $value !== '')
+                ->all(),
+        ]);
+
+        GenerateExportTaskJob::dispatch($task->id)->onQueue('exports');
+
+        AuditLogger::log(
+            action: 'exports.task_created',
+            entityType: 'export_tasks',
+            entityId: $task->id,
+            metadata: [
+                'format' => $task->format,
+                'type' => $task->type,
+            ],
+            request: $request,
+        );
+
+        return response()->json([
+            'message' => 'Export task queued successfully.',
+            'task' => $this->serializeTask($task),
+        ], 202);
+    }
+
+    public function task(Request $request, ExportTask $exportTask): JsonResponse
+    {
+        if ((int) $exportTask->user_id !== (int) $request->user()->id) {
+            return response()->json(['message' => 'Access denied.'], 403);
+        }
+
+        if (! $this->hasTaskPermission($request->user(), $exportTask)) {
+            return response()->json(['message' => 'Access denied.'], 403);
+        }
+
+        return response()->json([
+            'task' => $this->serializeTask($exportTask),
+        ]);
+    }
+
+    public function downloadTask(Request $request, ExportTask $exportTask)
+    {
+        if ((int) $exportTask->user_id !== (int) $request->user()->id) {
+            abort(403, 'Access denied.');
+        }
+
+        if (! $this->hasTaskPermission($request->user(), $exportTask)) {
+            abort(403, 'Access denied.');
+        }
+
+        if ($exportTask->status !== 'ready' || ! $exportTask->file_path) {
+            abort(409, 'Export file is not ready yet.');
+        }
+
+        $disk = $exportTask->file_disk ?: 'local';
+
+        if (! Storage::disk($disk)->exists($exportTask->file_path)) {
+            abort(410, 'Export file no longer exists.');
+        }
+
+        return Storage::disk($disk)->download(
+            $exportTask->file_path,
+            $exportTask->file_name ?: basename($exportTask->file_path),
+            array_filter([
+                'Content-Type' => $exportTask->mime_type,
+            ]),
+        );
+    }
+
     public function csv(Request $request): StreamedResponse
     {
         if (! $request->user()->hasPermission('reports.export.csv')) {
@@ -299,5 +419,48 @@ class ExportController extends Controller
         }, $filename, [
             'Content-Type' => 'text/csv',
         ]);
+    }
+
+    private function serializeTask(ExportTask $task): array
+    {
+        return [
+            'id' => $task->id,
+            'format' => $task->format,
+            'type' => $task->type,
+            'status' => $task->status,
+            'progress' => (int) $task->progress,
+            'error_message' => $task->error_message,
+            'file_name' => $task->file_name,
+            'size_bytes' => $task->size_bytes,
+            'mime_type' => $task->mime_type,
+            'created_at' => optional($task->created_at)->toIso8601String(),
+            'started_at' => optional($task->started_at)->toIso8601String(),
+            'completed_at' => optional($task->completed_at)->toIso8601String(),
+            'expires_at' => optional($task->expires_at)->toIso8601String(),
+            'download_url' => $task->status === 'ready'
+                ? route('exports.tasks.download', ['exportTask' => $task->id])
+                : null,
+        ];
+    }
+
+    private function hasTaskPermission(User $user, ExportTask $task): bool
+    {
+        if ($task->format === 'csv') {
+            if (! $user->hasPermission('reports.export.csv')) {
+                return false;
+            }
+
+            if ($task->type === 'audit_logs' && ! $user->hasPermission('audit.view')) {
+                return false;
+            }
+
+            if ($task->type === 'users' && ! $user->hasPermission('users.view')) {
+                return false;
+            }
+
+            return true;
+        }
+
+        return $user->hasPermission('reports.export.pdf');
     }
 }

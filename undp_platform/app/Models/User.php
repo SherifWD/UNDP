@@ -78,6 +78,11 @@ class User extends Authenticatable
         return $this->hasMany(MediaAsset::class, 'uploaded_by');
     }
 
+    public function exportTasks(): HasMany
+    {
+        return $this->hasMany(ExportTask::class);
+    }
+
     public function roleEnum(): UserRole
     {
         return UserRole::from($this->role);

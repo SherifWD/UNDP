@@ -200,11 +200,9 @@ Track and alert on:
 - Chunked streaming for CSV exports
 
 ## 13) Current Gaps to Reach Full Production Maturity
-1. Async export jobs with progress polling (current exports are synchronous request-response).
-2. True media transcoding/thumbnail pipeline integration (current processing job is scaffolded placeholder).
-3. Realtime dashboard/audit updates via broadcast channels or SSE.
-4. Centralized metrics/log shipping (e.g., Prometheus + Loki/ELK).
-5. DR runbook and tested restore drills.
+1. True media transcoding/thumbnail pipeline integration (current processing job is scaffolded placeholder).
+2. Centralized metrics/log shipping (e.g., Prometheus + Loki/ELK).
+3. DR runbook and tested restore drills.
 
 ## 14) Deployment Readiness Checklist
 - [ ] Set MySQL production connection and backup policy

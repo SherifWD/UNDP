@@ -190,7 +190,8 @@ class DashboardController extends Controller
 
         if (! $user->hasPermission('dashboards.view.system')
             && ! $user->hasPermission('dashboards.view.municipality')
-            && ! $user->hasPermission('dashboards.view.partner')) {
+            && ! $user->hasPermission('dashboards.view.partner')
+            && ! $user->hasPermission('dashboards.view.own')) {
             return response()->json(['message' => 'Access denied.'], 403);
         }
 
@@ -206,10 +207,14 @@ class DashboardController extends Controller
 
         $projectQuery = Project::query()->with('municipality:id,name_en,name_ar');
         $submissionQuery = Submission::query()->with(['municipality:id,name_en,name_ar', 'project:id,name_en,name_ar']);
+        SubmissionAccessService::scope($user, $submissionQuery);
 
         if ($user->hasRole(UserRole::MUNICIPAL_FOCAL_POINT) && $user->municipality_id) {
             $projectQuery->where('municipality_id', $user->municipality_id);
-            $submissionQuery->where('municipality_id', $user->municipality_id);
+        }
+
+        if ($user->hasRole(UserRole::REPORTER) && $user->municipality_id) {
+            $projectQuery->where('municipality_id', $user->municipality_id);
         }
 
         if (! empty($validated['municipality_id']) && $user->hasPermission('dashboards.view.system')) {
@@ -231,10 +236,6 @@ class DashboardController extends Controller
 
         if (! empty($validated['date_to'])) {
             $submissionQuery->whereDate('created_at', '<=', $validated['date_to']);
-        }
-
-        if ($user->hasRole(UserRole::PARTNER_DONOR_VIEWER)) {
-            $submissionQuery->where('status', 'approved');
         }
 
         $projects = $projectQuery

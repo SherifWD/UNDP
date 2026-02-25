@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import L from 'leaflet';
 import AppShell from '../components/AppShell.vue';
 import api from '../api';
@@ -15,7 +15,6 @@ const loading = ref(false);
 const error = ref('');
 
 const kpis = ref({});
-const statusBreakdown = ref({});
 const submissions = ref([]);
 const projects = ref([]);
 const municipalities = ref([]);
@@ -24,8 +23,12 @@ const mapMarkers = ref([]);
 const selectedProjectId = ref(null);
 const mapRef = ref(null);
 const showFilterPanel = ref(false);
+const DEFAULT_MAP_CENTER = [26.3351, 17.2283];
+const DEFAULT_MAP_ZOOM = 6;
+const lastMapScopeKey = ref('');
 let map;
 let markerLayer;
+let eventSource;
 
 const filters = reactive({
     municipality_id: '',
@@ -34,6 +37,8 @@ const filters = reactive({
     priority: '',
     area: '',
 });
+
+const canOpenSubmissionWorklist = computed(() => auth.hasPermission('submissions.validate'));
 
 const greetingName = computed(() => {
     const fullName = auth.user?.name || 'User';
@@ -89,25 +94,133 @@ const fundingCurrent = computed(() => {
 
 const fundingPercent = computed(() => ((fundingCurrent.value / fundingTarget) * 100).toFixed(1));
 
+const projectStatsById = computed(() => {
+    const pendingStatuses = new Set(['under_review', 'submitted', 'rework_requested', 'queued']);
+    const rows = {};
+
+    submissions.value.forEach((submission) => {
+        const projectId = Number(submission?.project?.id || submission?.project_id || 0);
+        if (!projectId) {
+            return;
+        }
+
+        if (!rows[projectId]) {
+            rows[projectId] = {
+                total: 0,
+                approved: 0,
+                pending: 0,
+                rejected: 0,
+                progressValues: [],
+            };
+        }
+
+        const current = rows[projectId];
+        current.total += 1;
+
+        if (submission.status === 'approved') {
+            current.approved += 1;
+        } else if (submission.status === 'rejected') {
+            current.rejected += 1;
+        } else if (pendingStatuses.has(submission.status)) {
+            current.pending += 1;
+        }
+
+        const progressValue = Number(submission?.data?.progress_percent || 0);
+        if (Number.isFinite(progressValue) && progressValue > 0) {
+            current.progressValues.push(progressValue);
+        }
+    });
+
+    return rows;
+});
+
+const getProjectStats = (projectId) => {
+    return projectStatsById.value[Number(projectId)] || {
+        total: 0,
+        approved: 0,
+        pending: 0,
+        rejected: 0,
+        progressValues: [],
+    };
+};
+
+const resolveProjectProgress = (projectId) => {
+    const stats = getProjectStats(projectId);
+
+    if (stats.progressValues.length > 0) {
+        const avg = stats.progressValues.reduce((sum, value) => sum + value, 0) / stats.progressValues.length;
+        return Math.max(0, Math.min(100, Math.round(avg)));
+    }
+
+    if (stats.total === 0) {
+        const project = projects.value.find((row) => Number(row.id) === Number(projectId));
+        return project?.status === 'archived' ? 100 : 0;
+    }
+
+    return Math.round((stats.approved / stats.total) * 100);
+};
+
+const resolveProjectPriority = (projectId) => {
+    const pending = getProjectStats(projectId).pending;
+
+    if (pending >= 8) {
+        return 'high';
+    }
+
+    if (pending >= 3) {
+        return 'medium';
+    }
+
+    return 'low';
+};
+
+const projectPriorityClass = (projectId) => `badge--${resolveProjectPriority(projectId)}`;
+
+const projectReference = (projectId) => `PRJ-${String(projectId).padStart(3, '0')}`;
+
+const shortProjectDescription = (description) => {
+    if (!description) {
+        return t('dashboard.noShortDescription');
+    }
+
+    return description.length > 74 ? `${description.slice(0, 74)}...` : description;
+};
+
 const filteredProjects = computed(() => {
     const search = filters.search.trim().toLowerCase();
     const selectedMunicipality = Number(filters.municipality_id || 0);
+    const selectedProjectIdFromFilter = Number(filters.area || 0);
 
-    return projects.value.filter((project) => {
-        if (selectedMunicipality && Number(project.municipality?.id || 0) !== selectedMunicipality) {
-            return false;
-        }
+    return projects.value
+        .filter((project) => {
+            if (selectedMunicipality && Number(project.municipality?.id || 0) !== selectedMunicipality) {
+                return false;
+            }
 
-        if (search && !String(project.name || '').toLowerCase().includes(search)) {
-            return false;
-        }
+            if (selectedProjectIdFromFilter && Number(project.id) !== selectedProjectIdFromFilter) {
+                return false;
+            }
 
-        if (filters.status && project.status !== filters.status) {
-            return false;
-        }
+            if (search) {
+                const haystack = `${project.name || ''} ${project.municipality?.name || ''} ${project.id}`.toLowerCase();
+                if (!haystack.includes(search)) {
+                    return false;
+                }
+            }
 
-        return true;
-    });
+            if (filters.status && project.status !== filters.status) {
+                return false;
+            }
+
+            if (filters.priority && resolveProjectPriority(project.id) !== filters.priority) {
+                return false;
+            }
+
+            return true;
+        })
+        .sort((a, b) => {
+            return new Date(b.last_update_at || 0).getTime() - new Date(a.last_update_at || 0).getTime();
+        });
 });
 
 const selectedProject = computed(() => {
@@ -117,13 +230,38 @@ const selectedProject = computed(() => {
     return current || filteredProjects.value[0];
 });
 
-const selectedProjectSubmissions = computed(() => {
-    if (!selectedProject.value) return [];
-    return submissions.value.filter((submission) => Number(submission.project?.id) === Number(selectedProject.value.id));
+const selectedProjectStats = computed(() => {
+    if (!selectedProject.value) {
+        return null;
+    }
+
+    return getProjectStats(selectedProject.value.id);
 });
 
 const addNewProject = () => {
     router.push({ name: 'projects' });
+};
+
+const openProjectSubmissions = (project) => {
+    if (!project || !canOpenSubmissionWorklist.value) {
+        return;
+    }
+
+    router.push({
+        name: 'validation',
+        query: {
+            project_id: String(project.id),
+        },
+    });
+};
+
+const selectProject = (project) => {
+    if (!project) {
+        return;
+    }
+
+    selectedProjectId.value = project.id;
+    focusMapOnProject(project);
 };
 
 const applyFilterPanel = async () => {
@@ -138,13 +276,34 @@ const resetFilterPanel = async () => {
     await loadDashboard();
 };
 
+const resolveDefaultMunicipality = () => {
+    if (filters.municipality_id) {
+        return;
+    }
+
+    const preferredMunicipalityId = Number(auth.user?.municipality?.id || 0);
+
+    if (preferredMunicipalityId && municipalities.value.some((row) => Number(row.id) === preferredMunicipalityId)) {
+        filters.municipality_id = String(preferredMunicipalityId);
+        return;
+    }
+
+    if (municipalities.value.length > 0) {
+        filters.municipality_id = String(municipalities.value[0].id);
+    }
+};
+
+const selectedMunicipalityParam = () => {
+    return filters.municipality_id ? Number(filters.municipality_id) : undefined;
+};
+
 const initMap = async () => {
     await nextTick();
     if (!mapRef.value || map) return;
 
     map = L.map(mapRef.value, {
         zoomControl: true,
-    }).setView([26.3351, 17.2283], 6);
+    }).setView(DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 18,
@@ -152,6 +311,8 @@ const initMap = async () => {
     }).addTo(map);
 
     markerLayer = L.layerGroup().addTo(map);
+
+    setTimeout(() => map?.invalidateSize(), 80);
 };
 
 const renderMarkers = () => {
@@ -159,12 +320,14 @@ const renderMarkers = () => {
     markerLayer.clearLayers();
 
     mapMarkers.value.forEach((markerData) => {
+        const isSelectedProjectMarker = markerData.type === 'project' && Number(markerData.id) === Number(selectedProjectId.value);
+
         const marker = L.circleMarker([markerData.lat, markerData.lng], {
-            radius: markerData.type === 'project' ? 8 : 6,
+            radius: isSelectedProjectMarker ? 10 : markerData.type === 'project' ? 8 : 6,
             color: markerData.type === 'project' ? '#3B6DD8' : '#E34D43',
             fillColor: markerData.type === 'project' ? '#3B6DD8' : '#E34D43',
             fillOpacity: 0.95,
-            weight: 1,
+            weight: isSelectedProjectMarker ? 3 : 1,
         });
 
         marker.bindPopup(`
@@ -173,8 +336,60 @@ const renderMarkers = () => {
             ${t('dashboard.municipality')}: ${markerData.municipality || '-'}
         `);
 
+        if (markerData.type === 'project') {
+            marker.on('click', () => {
+                const project = projects.value.find((row) => Number(row.id) === Number(markerData.id));
+                if (project) {
+                    selectedProjectId.value = project.id;
+                }
+            });
+        }
+
         markerLayer.addLayer(marker);
     });
+};
+
+const focusMapOnData = () => {
+    if (!map) {
+        return;
+    }
+
+    const markerPoints = mapMarkers.value
+        .filter((item) => Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lng)))
+        .map((item) => [Number(item.lat), Number(item.lng)]);
+
+    const projectPoints = projects.value
+        .filter((item) => Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude)))
+        .map((item) => [Number(item.latitude), Number(item.longitude)]);
+
+    const points = markerPoints.length ? markerPoints : projectPoints;
+
+    if (!points.length) {
+        map.setView(DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM);
+        return;
+    }
+
+    const bounds = L.latLngBounds(points);
+
+    if (bounds.isValid()) {
+        map.fitBounds(bounds, {
+            padding: [24, 24],
+            maxZoom: 13,
+        });
+    }
+};
+
+const focusMapOnProject = (project) => {
+    if (!map || !project) {
+        return;
+    }
+
+    const lat = Number(project.latitude);
+    const lng = Number(project.longitude);
+
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        map.flyTo([lat, lng], 12, { duration: 0.4 });
+    }
 };
 
 const loadDashboard = async () => {
@@ -182,33 +397,72 @@ const loadDashboard = async () => {
     error.value = '';
 
     try {
+        const municipalityRes = await api.get('/municipalities');
+        municipalities.value = municipalityRes.data.data || [];
+        resolveDefaultMunicipality();
+
+        const municipalityId = selectedMunicipalityParam();
         const mapParams = {
-            municipality_id: filters.municipality_id || undefined,
+            municipality_id: municipalityId,
             status: filters.status || undefined,
             project_id: filters.area || undefined,
         };
 
-        const [kpiRes, mapRes, projectRes, submissionRes, municipalityRes] = await Promise.all([
-            api.get('/dashboard/kpis', { params: { municipality_id: filters.municipality_id || undefined } }),
+        const results = await Promise.allSettled([
+            api.get('/dashboard/kpis', { params: { municipality_id: municipalityId } }),
             api.get('/dashboard/map', { params: mapParams }),
-            api.get('/projects', { params: { municipality_id: filters.municipality_id || undefined } }),
-            api.get('/submissions', { params: { per_page: 120, municipality_id: filters.municipality_id || undefined } }),
-            api.get('/municipalities'),
+            api.get('/projects', { params: { municipality_id: municipalityId, status: filters.status || undefined } }),
+            api.get('/submissions', { params: { per_page: 120, municipality_id: municipalityId } }),
         ]);
 
-        kpis.value = kpiRes.data.kpis || {};
-        statusBreakdown.value = kpiRes.data.status_breakdown || {};
-        mapMarkers.value = mapRes.data.markers || [];
-        projects.value = projectRes.data.data || [];
-        submissions.value = submissionRes.data.data || [];
-        municipalities.value = municipalityRes.data.data || [];
+        const [kpiResult, mapResult, projectResult, submissionResult] = results;
+        const partialErrors = [];
 
-        if (!selectedProjectId.value && projects.value.length) {
-            selectedProjectId.value = projects.value[0].id;
+        if (kpiResult.status === 'fulfilled') {
+            kpis.value = kpiResult.value.data.kpis || {};
+        } else {
+            partialErrors.push(kpiResult.reason?.response?.data?.message || 'KPI data is unavailable.');
+        }
+
+        if (mapResult.status === 'fulfilled') {
+            mapMarkers.value = mapResult.value.data.markers || [];
+        } else {
+            mapMarkers.value = [];
+            partialErrors.push(mapResult.reason?.response?.data?.message || 'Map data is unavailable.');
+        }
+
+        if (projectResult.status === 'fulfilled') {
+            projects.value = projectResult.value.data.data || [];
+        } else {
+            projects.value = [];
+            partialErrors.push(projectResult.reason?.response?.data?.message || 'Projects are unavailable.');
+        }
+
+        if (submissionResult.status === 'fulfilled') {
+            submissions.value = submissionResult.value.data.data || [];
+        } else {
+            submissions.value = [];
+            partialErrors.push(submissionResult.reason?.response?.data?.message || 'Submissions are unavailable.');
         }
 
         await initMap();
+
+        if (selectedProjectId.value && !filteredProjects.value.some((row) => Number(row.id) === Number(selectedProjectId.value))) {
+            selectedProjectId.value = null;
+        }
+
         renderMarkers();
+
+        const currentScopeKey = `${municipalityId || 'all'}:${filters.area || 'all'}:${filters.status || 'all'}`;
+
+        if (currentScopeKey !== lastMapScopeKey.value) {
+            focusMapOnData();
+            lastMapScopeKey.value = currentScopeKey;
+        }
+
+        if (partialErrors.length > 0) {
+            error.value = partialErrors[0];
+        }
     } catch (err) {
         error.value = err.response?.data?.message || 'Unable to load dashboard.';
     } finally {
@@ -216,13 +470,54 @@ const loadDashboard = async () => {
     }
 };
 
-onMounted(loadDashboard);
+const connectRealtime = () => {
+    if (!window.EventSource || !auth.token) {
+        return;
+    }
+
+    const token = encodeURIComponent(auth.token);
+    eventSource = new EventSource(`/api/live/events?channel=dashboard&token=${token}`);
+
+    eventSource.addEventListener('update', () => {
+        loadDashboard();
+    });
+
+    eventSource.addEventListener('end', () => {
+        eventSource?.close();
+        eventSource = null;
+    });
+
+    eventSource.onerror = () => {
+        eventSource?.close();
+        eventSource = null;
+    };
+};
+
+watch(filteredProjects, (rows) => {
+    if (!rows.length || !rows.some((row) => Number(row.id) === Number(selectedProjectId.value))) {
+        selectedProjectId.value = null;
+    }
+});
+
+watch(selectedProjectId, () => {
+    renderMarkers();
+});
+
+onMounted(async () => {
+    await loadDashboard();
+    connectRealtime();
+});
 
 onBeforeUnmount(() => {
     if (map) {
         map.off();
         map.remove();
         map = null;
+    }
+
+    if (eventSource) {
+        eventSource.close();
+        eventSource = null;
     }
 });
 </script>
@@ -307,64 +602,78 @@ onBeforeUnmount(() => {
             </section>
 
             <section class="tracky-card tracky-map-layout">
-                <div class="tracky-map-wrap">
+                <div class="tracky-map-board">
                     <div class="tracky-map-controls">
                         <label>{{ t('dashboard.municipality') }}</label>
                         <select v-model="filters.municipality_id" @change="loadDashboard">
-                            <option value="">{{ t('dashboard.selectMunicipality') }}</option>
+                            <option value="">{{ t('dashboard.allMunicipalities') }}</option>
                             <option v-for="m in municipalities" :key="m.id" :value="m.id">{{ m.name }}</option>
                         </select>
                     </div>
+
+                    <aside class="tracky-map-overlay">
+                        <div class="tracky-side-toolbar">
+                            <input v-model="filters.search" :placeholder="t('dashboard.searchProjects')" />
+                            <button type="button" class="tracky-btn tracky-btn--ghost" @click="showFilterPanel = !showFilterPanel">{{ t('dashboard.filter') }}</button>
+                        </div>
+
+                        <div class="tracky-filter-panel" v-if="showFilterPanel">
+                            <h4>{{ t('dashboard.projectFilters') }}</h4>
+                            <select v-model="filters.priority">
+                                <option value="">{{ t('dashboard.selectPriority') }}</option>
+                                <option value="high">{{ t('dashboard.high') }}</option>
+                                <option value="medium">{{ t('dashboard.medium') }}</option>
+                                <option value="low">{{ t('dashboard.low') }}</option>
+                            </select>
+                            <select v-model="filters.area">
+                                <option value="">{{ t('dashboard.selectArea') }}</option>
+                                <option v-for="project in projects" :key="project.id" :value="project.id">{{ project.name }}</option>
+                            </select>
+                            <select v-model="filters.status">
+                                <option value="">{{ t('dashboard.allStatus') }}</option>
+                                <option value="active">{{ t('dashboard.active') }}</option>
+                                <option value="archived">{{ t('dashboard.archived') }}</option>
+                            </select>
+                            <div class="tracky-filter-actions">
+                                <button class="tracky-btn tracky-btn--primary" type="button" @click="applyFilterPanel">{{ t('dashboard.apply') }}</button>
+                                <button class="tracky-btn tracky-btn--ghost" type="button" @click="resetFilterPanel">{{ t('dashboard.reset') }}</button>
+                            </div>
+                        </div>
+
+                        <p class="tracky-subtle tracky-project-count">
+                            {{ t('dashboard.projectsFound', { count: filteredProjects.length }) }}
+                        </p>
+
+                        <div class="tracky-project-list" v-if="filteredProjects.length">
+                            <article
+                                class="tracky-project-card"
+                                v-for="project in filteredProjects"
+                                :key="project.id"
+                                :class="{ 'tracky-project-card--active': Number(project.id) === Number(selectedProject?.id) }"
+                                @click="selectProject(project)"
+                            >
+                                <div class="tracky-project-card__head">
+                                    <p class="tracky-project-code">{{ projectReference(project.id) }}</p>
+                                    <span class="badge" :class="projectPriorityClass(project.id)">
+                                        {{ t(`dashboard.${resolveProjectPriority(project.id)}`) }}
+                                    </span>
+                                </div>
+                                <h4>{{ project.name }}</h4>
+                                <p class="tracky-project-meta">{{ project.municipality?.name || '-' }} - {{ project.status }}</p>
+                                <div class="tracky-project-foot">
+                                    <span>{{ shortProjectDescription(project.description) }}</span>
+                                    <div class="tracky-project-metrics">
+                                        <span>{{ t('dashboard.approved') }}: {{ getProjectStats(project.id).approved }}</span>
+                                        <span>{{ t('dashboard.pending') }}: {{ getProjectStats(project.id).pending }}</span>
+                                    </div>
+                                </div>
+                            </article>
+                        </div>
+                        <p class="tracky-project-list-empty" v-else>{{ t('projectsPage.noProjects') }}</p>
+                    </aside>
+
                     <div ref="mapRef" class="tracky-map" />
                 </div>
-
-                <aside class="tracky-side-rail">
-                    <div class="tracky-side-toolbar">
-                        <input v-model="filters.search" :placeholder="t('dashboard.searchProjects')" />
-                        <button type="button" class="tracky-btn tracky-btn--ghost" @click="showFilterPanel = !showFilterPanel">{{ t('dashboard.filter') }}</button>
-                    </div>
-
-                    <div class="tracky-filter-panel" v-if="showFilterPanel">
-                        <h4>{{ t('dashboard.projectFilters') }}</h4>
-                        <select v-model="filters.priority">
-                            <option value="">{{ t('dashboard.selectPriority') }}</option>
-                            <option value="high">{{ t('dashboard.high') }}</option>
-                            <option value="medium">{{ t('dashboard.medium') }}</option>
-                            <option value="low">{{ t('dashboard.low') }}</option>
-                        </select>
-                        <select v-model="filters.area">
-                            <option value="">{{ t('dashboard.selectArea') }}</option>
-                            <option v-for="project in projects" :key="project.id" :value="project.id">{{ project.name }}</option>
-                        </select>
-                        <select v-model="filters.status">
-                            <option value="">{{ t('dashboard.allStatus') }}</option>
-                            <option value="active">{{ t('dashboard.active') }}</option>
-                            <option value="archived">{{ t('dashboard.archived') }}</option>
-                        </select>
-                        <div class="tracky-filter-actions">
-                            <button class="tracky-btn tracky-btn--primary" type="button" @click="applyFilterPanel">{{ t('dashboard.apply') }}</button>
-                            <button class="tracky-btn tracky-btn--ghost" type="button" @click="resetFilterPanel">{{ t('dashboard.reset') }}</button>
-                        </div>
-                    </div>
-
-                    <div class="tracky-project-list">
-                        <article
-                            class="tracky-project-card"
-                            v-for="project in filteredProjects"
-                            :key="project.id"
-                            :class="{ 'tracky-project-card--active': Number(project.id) === Number(selectedProject?.id) }"
-                            @click="selectedProjectId = project.id"
-                        >
-                            <p class="tracky-project-code">PRJ-{{ String(project.id).padStart(3, '0') }}</p>
-                            <h4>{{ project.name }}</h4>
-                            <p class="tracky-project-meta">{{ project.municipality?.name || '-' }} - {{ project.status }}</p>
-                            <div class="tracky-project-foot">
-                                <span>{{ project.description ? project.description.slice(0, 34) : t('dashboard.noShortDescription') }}</span>
-                                <span class="badge badge--progress">{{ project.status === 'active' ? t('dashboard.inProgress') : t('dashboard.archivedBadge') }}</span>
-                            </div>
-                        </article>
-                    </div>
-                </aside>
 
                 <aside class="tracky-detail-pane" v-if="selectedProject">
                     <header>
@@ -377,18 +686,40 @@ onBeforeUnmount(() => {
                     <h5>{{ t('dashboard.projectDescription') }}</h5>
                     <p>{{ selectedProject.description || t('dashboard.noDescription') }}</p>
                     <hr />
-                    <ul>
-                        <li><span>{{ t('dashboard.duration') }}</span><strong>3 Months</strong></li>
-                        <li><span>{{ t('dashboard.donors') }}</span><strong>UNDP + Partners</strong></li>
-                        <li><span>{{ t('dashboard.programLead') }}</span><strong>UNDP Libya</strong></li>
-                        <li><span>{{ t('dashboard.contact') }}</span><strong>+218 91 554 88 44</strong></li>
+                    <ul class="tracky-detail-kv">
+                        <li>
+                            <span>{{ t('dashboard.reports') }}</span>
+                            <strong>{{ selectedProjectStats?.total || 0 }}</strong>
+                        </li>
+                        <li>
+                            <span>{{ t('dashboard.approved') }}</span>
+                            <strong>{{ selectedProjectStats?.approved || 0 }}</strong>
+                        </li>
+                        <li>
+                            <span>{{ t('dashboard.pending') }}</span>
+                            <strong>{{ selectedProjectStats?.pending || 0 }}</strong>
+                        </li>
+                        <li>
+                            <span>{{ t('dashboard.rejected') }}</span>
+                            <strong>{{ selectedProjectStats?.rejected || 0 }}</strong>
+                        </li>
+                        <li>
+                            <span>{{ t('projectsPage.progress') }}</span>
+                            <strong>{{ resolveProjectProgress(selectedProject.id) }}%</strong>
+                        </li>
+                        <li>
+                            <span>{{ t('dashboard.location') }}</span>
+                            <strong>{{ selectedProject.latitude ?? '-' }}, {{ selectedProject.longitude ?? '-' }}</strong>
+                        </li>
                     </ul>
-                    <button class="tracky-btn tracky-btn--soft" type="button">
+                    <button
+                        class="tracky-btn tracky-btn--soft"
+                        type="button"
+                        v-if="canOpenSubmissionWorklist"
+                        @click="openProjectSubmissions(selectedProject)"
+                    >
                         {{ t('dashboard.goToSubmission') }}
                     </button>
-                    <p class="tracky-subtle">
-                        {{ t('dashboard.relatedUpdates', { count: selectedProjectSubmissions.length }) }}
-                    </p>
                 </aside>
             </section>
 

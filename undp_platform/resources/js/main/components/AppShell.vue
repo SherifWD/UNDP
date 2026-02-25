@@ -30,6 +30,21 @@ const navItems = computed(() => {
         { name: 'home', label: t('nav.home'), icon: 'dashboard', group: 'main' },
         { name: 'projects', label: t('nav.projects'), permission: 'projects.view', icon: 'reports', group: 'main' },
         { name: 'validation', label: t('nav.submissions'), permission: 'submissions.validate', icon: 'submission', group: 'main' },
+        {
+            name: 'municipal-overview',
+            label: t('nav.municipal'),
+            anyPermissions: ['dashboards.view.municipality', 'dashboards.view.system'],
+            icon: 'municipal',
+            group: 'main',
+        },
+        {
+            name: 'reports',
+            label: t('nav.reports'),
+            anyPermissions: ['dashboards.view.system', 'dashboards.view.municipality'],
+            icon: 'reports',
+            group: 'main',
+        },
+        { name: 'partner-dashboard', label: t('nav.partner'), permission: 'dashboards.view.partner', icon: 'partner', group: 'main' },
         { name: 'users', label: t('nav.users'), permission: 'users.view', icon: 'users', group: 'main' },
         { name: 'audit-logs', label: t('nav.audit'), permission: 'audit.view', icon: 'audit', group: 'main' },
     ];

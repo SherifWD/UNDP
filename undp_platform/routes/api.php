@@ -7,10 +7,13 @@ use App\Http\Controllers\Api\ExportController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\MunicipalityController;
 use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\Api\RealtimeController;
 use App\Http\Controllers\Api\SubmissionController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WorkflowController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/live/events', [RealtimeController::class, 'stream'])->middleware('throttle:api');
 
 Route::prefix('auth')->group(function (): void {
     Route::post('/request-otp', [AuthController::class, 'requestOtp'])->middleware('throttle:otp');
@@ -61,12 +64,20 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::get('/dashboard/municipal-overview', [DashboardController::class, 'municipalOverview'])
         ->middleware('any_permission:dashboards.view.system,dashboards.view.municipality');
     Route::get('/dashboard/map', [DashboardController::class, 'mapData'])
-        ->middleware('any_permission:dashboards.view.system,dashboards.view.municipality,dashboards.view.partner');
+        ->middleware('any_permission:dashboards.view.system,dashboards.view.municipality,dashboards.view.partner,dashboards.view.own');
     Route::get('/dashboard/partner', [DashboardController::class, 'partnerOverview'])
         ->middleware('any_permission:dashboards.view.system,dashboards.view.partner');
 
     Route::get('/audit-logs', [AuditLogController::class, 'index'])->middleware('permission:audit.view');
     Route::get('/audit-logs/{auditLog}', [AuditLogController::class, 'show'])->middleware('permission:audit.view');
+
+    Route::post('/exports/tasks', [ExportController::class, 'createTask'])
+        ->middleware('any_permission:reports.export.csv,reports.export.pdf');
+    Route::get('/exports/tasks/{exportTask}', [ExportController::class, 'task'])
+        ->middleware('any_permission:reports.export.csv,reports.export.pdf');
+    Route::get('/exports/tasks/{exportTask}/download', [ExportController::class, 'downloadTask'])
+        ->middleware('any_permission:reports.export.csv,reports.export.pdf')
+        ->name('exports.tasks.download');
 
     Route::get('/exports/csv', [ExportController::class, 'csv'])->middleware('permission:reports.export.csv');
     Route::get('/exports/pdf', [ExportController::class, 'pdf'])->middleware('permission:reports.export.pdf');

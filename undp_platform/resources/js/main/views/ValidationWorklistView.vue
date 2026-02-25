@@ -1,14 +1,19 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import AppShell from '../components/AppShell.vue';
 import api from '../api';
+import { useAuthStore } from '../stores/auth';
+import { useRoute } from 'vue-router';
 
+const auth = useAuthStore();
+const route = useRoute();
 const loading = ref(false);
 const error = ref('');
 const submissions = ref([]);
 const projects = ref([]);
 const scope = ref(null);
 let pollTimer = null;
+let eventSource = null;
 
 const filters = reactive({
     search: '',
@@ -122,6 +127,14 @@ const applyFilters = async () => {
     await loadPending(1);
 };
 
+const initializeFiltersFromQuery = () => {
+    if (!route.query?.project_id) {
+        return;
+    }
+
+    filters.project_id = String(route.query.project_id);
+};
+
 const goToPage = async (page) => {
     if (page < 1 || page > pagination.last_page || page === pagination.current_page) {
         return;
@@ -130,20 +143,63 @@ const goToPage = async (page) => {
     await loadPending(page);
 };
 
+const connectRealtime = () => {
+    if (!window.EventSource || !auth.token) {
+        return false;
+    }
+
+    const token = encodeURIComponent(auth.token);
+    eventSource = new EventSource(`/api/live/events?channel=worklist&token=${token}`);
+
+    eventSource.addEventListener('update', () => {
+        loadPending(pagination.current_page, true);
+    });
+
+    eventSource.addEventListener('end', () => {
+        eventSource?.close();
+        eventSource = null;
+    });
+
+    eventSource.onerror = () => {
+        eventSource?.close();
+        eventSource = null;
+    };
+
+    return true;
+};
+
 onMounted(async () => {
+    initializeFiltersFromQuery();
+
     await Promise.all([
         loadProjects(),
         loadPending(1),
     ]);
 
+    connectRealtime();
+
     pollTimer = setInterval(() => {
         loadPending(pagination.current_page, true);
-    }, 120000);
+    }, 60000);
+});
+
+watch(() => route.query.project_id, async (value, previousValue) => {
+    if (value === previousValue) {
+        return;
+    }
+
+    filters.project_id = value ? String(value) : '';
+    await loadPending(1);
 });
 
 onBeforeUnmount(() => {
     if (pollTimer) {
         clearInterval(pollTimer);
+    }
+
+    if (eventSource) {
+        eventSource.close();
+        eventSource = null;
     }
 });
 </script>

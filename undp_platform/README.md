@@ -31,8 +31,12 @@ Detailed architecture and epic status:
 - `GET /api/dashboard/kpis`
 - `GET /api/dashboard/map`
 - `GET /api/audit-logs`
+- `GET /api/live/events?channel={audit|worklist|dashboard}&token={sanctum_token}`
 - `GET /api/exports/csv`
 - `GET /api/exports/pdf`
+- `POST /api/exports/tasks`
+- `GET /api/exports/tasks/{id}`
+- `GET /api/exports/tasks/{id}/download`
 
 ## Local Setup
 1. Install dependencies
@@ -56,7 +60,11 @@ Use OTP login with these phone numbers (country code `+218`):
 - UNDP Admin: `910000001`
 - Auditor: `910000002`
 - Municipal Focal Point: `910000003`
+- Municipal Focal Point (Benghazi): `910000005`
+- Municipal Focal Point (Misrata): `910000006`
 - Partner/Donor Viewer: `910000004`
 - Reporter: `910000101`
+- Reporter (Benghazi): `910000102`
+- Reporter (Misrata): `910000103`
 
 OTP codes are generated server-side and logged in `storage/logs/laravel.log` (placeholder SMS implementation).
