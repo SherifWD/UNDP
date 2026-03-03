@@ -12,6 +12,7 @@ use App\Services\SubmissionAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class DashboardController extends Controller
 {
@@ -197,17 +198,52 @@ class DashboardController extends Controller
 
         $validated = $request->validate([
             'municipality_id' => ['nullable', 'integer', 'exists:municipalities,id'],
-            'status' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', 'string', 'in:'.implode(',', SubmissionStatus::values())],
+            'project_status' => ['nullable', 'string', 'in:active,archived'],
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
-            'cluster' => ['nullable', 'boolean'],
+            'cluster' => ['nullable', Rule::in(['1', '0', 'true', 'false'])],
             'cluster_zoom' => ['nullable', 'integer', 'min:1', 'max:18'],
+            'include_submissions' => ['nullable', Rule::in(['1', '0', 'true', 'false'])],
         ]);
 
-        $projectQuery = Project::query()->with('municipality:id,name_en,name_ar');
-        $submissionQuery = Submission::query()->with(['municipality:id,name_en,name_ar', 'project:id,name_en,name_ar']);
-        SubmissionAccessService::scope($user, $submissionQuery);
+        $includeSubmissions = $request->boolean('include_submissions', true);
+
+        $projectQuery = Project::query()
+            ->select([
+                'id',
+                'name_en',
+                'name_ar',
+                'municipality_id',
+                'status',
+                'latitude',
+                'longitude',
+                'last_update_at',
+            ])
+            ->with('municipality:id,name_en,name_ar');
+
+        $submissionQuery = null;
+
+        if ($includeSubmissions) {
+            $submissionQuery = Submission::query()
+                ->select([
+                    'id',
+                    'title',
+                    'status',
+                    'municipality_id',
+                    'project_id',
+                    'latitude',
+                    'longitude',
+                    'updated_at',
+                ])
+                ->with([
+                    'municipality:id,name_en,name_ar',
+                    'project:id,name_en,name_ar',
+                ]);
+
+            SubmissionAccessService::scope($user, $submissionQuery);
+        }
 
         if ($user->hasRole(UserRole::MUNICIPAL_FOCAL_POINT) && $user->municipality_id) {
             $projectQuery->where('municipality_id', $user->municipality_id);
@@ -219,22 +255,31 @@ class DashboardController extends Controller
 
         if (! empty($validated['municipality_id']) && $user->hasPermission('dashboards.view.system')) {
             $projectQuery->where('municipality_id', $validated['municipality_id']);
-            $submissionQuery->where('municipality_id', $validated['municipality_id']);
+            if ($submissionQuery) {
+                $submissionQuery->where('municipality_id', $validated['municipality_id']);
+            }
         }
 
-        if (! empty($validated['status'])) {
+        if (! empty($validated['project_status'])) {
+            $projectQuery->where('status', $validated['project_status']);
+        }
+
+        if ($submissionQuery && ! empty($validated['status'])) {
             $submissionQuery->where('status', $validated['status']);
         }
 
         if (! empty($validated['project_id'])) {
-            $submissionQuery->where('project_id', $validated['project_id']);
+            $projectQuery->where('id', $validated['project_id']);
+            if ($submissionQuery) {
+                $submissionQuery->where('project_id', $validated['project_id']);
+            }
         }
 
-        if (! empty($validated['date_from'])) {
+        if ($submissionQuery && ! empty($validated['date_from'])) {
             $submissionQuery->whereDate('created_at', '>=', $validated['date_from']);
         }
 
-        if (! empty($validated['date_to'])) {
+        if ($submissionQuery && ! empty($validated['date_to'])) {
             $submissionQuery->whereDate('created_at', '<=', $validated['date_to']);
         }
 
@@ -254,24 +299,26 @@ class DashboardController extends Controller
             ]);
 
         $submissions = $submissionQuery
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->get()
-            ->map(fn (Submission $submission): array => [
-                'id' => $submission->id,
-                'type' => 'submission',
-                'name' => $submission->title,
-                'municipality' => $submission->municipality?->name,
-                'project' => $submission->project?->name,
-                'status' => $submission->status,
-                'lat' => (float) $submission->latitude,
-                'lng' => (float) $submission->longitude,
-                'last_update_at' => optional($submission->updated_at)->toIso8601String(),
-            ]);
+            ? $submissionQuery
+                ->whereNotNull('latitude')
+                ->whereNotNull('longitude')
+                ->get()
+                ->map(fn (Submission $submission): array => [
+                    'id' => $submission->id,
+                    'type' => 'submission',
+                    'name' => $submission->title,
+                    'municipality' => $submission->municipality?->name,
+                    'project' => $submission->project?->name,
+                    'status' => $submission->status,
+                    'lat' => (float) $submission->latitude,
+                    'lng' => (float) $submission->longitude,
+                    'last_update_at' => optional($submission->updated_at)->toIso8601String(),
+                ])
+            : collect();
 
         $markers = $projects->merge($submissions)->values();
 
-        $clusterEnabled = (bool) ($validated['cluster'] ?? true);
+        $clusterEnabled = $request->boolean('cluster', true);
         $clusterZoom = (int) ($validated['cluster_zoom'] ?? 8);
         $clusters = $clusterEnabled
             ? $this->buildMarkerClusters($markers->all(), $clusterZoom)
@@ -287,6 +334,7 @@ class DashboardController extends Controller
             'cluster_meta' => [
                 'enabled' => $clusterEnabled,
                 'zoom' => $clusterZoom,
+                'include_submissions' => $includeSubmissions,
             ],
         ]);
     }

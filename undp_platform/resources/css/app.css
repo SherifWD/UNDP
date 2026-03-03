@@ -1185,11 +1185,11 @@ pre {
     margin: 12px;
     border: 1px solid var(--tracky-border);
     border-radius: 12px;
-    padding: 8px 10px;
+    padding: 10px 12px;
     background: #f8f9fc;
     display: grid;
     grid-template-columns: 32px minmax(0, 1fr) 24px;
-    gap: 8px;
+    gap: 10px;
     align-items: center;
 }
 
@@ -1204,11 +1204,19 @@ pre {
     font-size: 0.8rem;
 }
 
+.shell__profile-meta {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+    overflow: hidden;
+}
+
 .shell__profile-name {
     margin: 0;
     font-size: 0.84rem;
     font-weight: 700;
     line-height: 1.15;
+    max-width: 100%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1218,6 +1226,7 @@ pre {
     margin: 2px 0 0;
     color: var(--tracky-muted);
     font-size: 0.74rem;
+    max-width: 100%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1233,6 +1242,8 @@ pre {
     cursor: pointer;
     display: grid;
     place-items: center;
+    justify-self: end;
+    flex-shrink: 0;
 }
 
 .shell__logout-icon {
@@ -1694,8 +1705,8 @@ pre {
 
 .tracky-map-layout {
     display: grid;
-    grid-template-columns: minmax(640px, 1fr) minmax(320px, 0.58fr);
-    gap: 12px;
+    grid-template-columns: minmax(0, 1fr) 336px;
+    gap: 14px;
     align-items: start;
 }
 
@@ -1705,7 +1716,7 @@ pre {
     overflow: hidden;
     background: #eff2f8;
     position: relative;
-    min-height: 620px;
+    min-height: 664px;
 }
 
 .tracky-map-controls {
@@ -1720,16 +1731,17 @@ pre {
 .tracky-map-controls label {
     font-weight: 700;
     color: #5b6275;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
 }
 
 .tracky-map-controls select {
     min-width: 220px;
-    min-height: 42px;
-    border-radius: 12px;
+    min-height: 46px;
+    border-radius: 14px;
     border: 1px solid #d2d8e4;
     background: #fff;
-    padding: 8px 12px;
+    padding: 10px 14px;
+    font-size: 1rem;
 }
 
 .tracky-map {
@@ -1764,10 +1776,11 @@ pre {
 
 .tracky-side-toolbar input {
     border: 1px solid #d2d8e4;
-    border-radius: 12px;
-    min-height: 40px;
-    padding: 8px 12px;
+    border-radius: 14px;
+    min-height: 46px;
+    padding: 10px 14px;
     background: #fff;
+    font-size: 1rem;
 }
 
 .tracky-filter-panel {
@@ -1790,10 +1803,10 @@ pre {
 }
 
 .tracky-filter-panel select {
-    min-height: 40px;
+    min-height: 46px;
     border: 1px solid #d5dbe8;
-    border-radius: 10px;
-    padding: 8px 12px;
+    border-radius: 14px;
+    padding: 10px 14px;
     background: #fff;
 }
 
@@ -1927,8 +1940,8 @@ pre {
     border: 1px solid #dbe0ea;
     border-radius: 14px;
     background: #f7f8fb;
-    padding: 12px;
-    min-height: 620px;
+    padding: 14px;
+    min-height: 664px;
     display: grid;
     align-content: start;
     gap: 10px;
@@ -2394,14 +2407,171 @@ pre {
     font-size: 0.85rem;
 }
 
-html[dir='rtl'] .tracky-map-controls {
-    left: auto;
-    right: 12px;
+.tracky-map-board {
+    display: grid;
+    grid-template-rows: auto 1fr;
 }
 
-html[dir='rtl'] .tracky-map-overlay {
-    right: auto;
-    left: 12px;
+.tracky-map-board__toolbar {
+    padding: 14px 16px;
+    border-bottom: 1px solid #d8ddea;
+    display: grid;
+    grid-template-columns: minmax(240px, 320px) minmax(320px, 1fr);
+    gap: 14px;
+    align-items: end;
+}
+
+.tracky-map-controls {
+    position: static;
+    display: grid;
+    gap: 6px;
+}
+
+.tracky-map-controls label {
+    font-weight: 700;
+    color: #5b6275;
+    font-size: 0.95rem;
+}
+
+.tracky-map-controls select {
+    min-width: 0;
+    min-height: 46px;
+    border-radius: 14px;
+    border: 1px solid #d2d8e4;
+    background: #fff;
+    padding: 10px 14px;
+}
+
+.tracky-map-toolbar-search {
+    display: flex;
+    justify-content: flex-end;
+    align-items: end;
+}
+
+.tracky-map-toolbar-search .tracky-side-toolbar {
+    width: min(396px, 100%);
+}
+
+.tracky-map-board__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    min-height: 600px;
+}
+
+.tracky-map {
+    min-height: 100%;
+}
+
+.tracky-map-results {
+    border-inline-start: 1px solid #d8ddea;
+    background: #f7f8fb;
+    padding: 14px 12px;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 12px;
+}
+
+.tracky-filter-panel {
+    top: calc(100% + 8px);
+    left: auto;
+    right: 0;
+    width: min(340px, 100%);
+}
+
+.tracky-project-flow {
+    display: grid;
+    gap: 14px;
+}
+
+.tracky-project-flow__head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.tracky-project-flow__title {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.tracky-project-flow__title h2 {
+    margin: 0;
+    font-size: 2rem;
+}
+
+.tracky-project-flow__title p {
+    margin-top: 4px;
+    color: #66708a;
+}
+
+.tracky-project-flow__actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.tracky-project-flow__actions input,
+.tracky-project-flow__actions select {
+    min-height: 40px;
+    border: 1px solid #d2d8e4;
+    border-radius: 10px;
+    background: #fff;
+    padding: 8px 12px;
+}
+
+.tracky-project-kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.tracky-kpi-panel {
+    display: grid;
+    gap: 10px;
+}
+
+.tracky-kpi-panel h3 {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.tracky-kpi-panel__value {
+    margin: 0;
+    font-size: 2.2rem;
+    font-weight: 800;
+}
+
+.tracky-kpi-panel__bars {
+    height: 10px;
+    border-radius: 999px;
+    overflow: hidden;
+    display: flex;
+    gap: 3px;
+}
+
+.tracky-kpi-panel__bars span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+}
+
+.tracky-kpi-panel__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    color: #5f6883;
+    font-size: 0.84rem;
+}
+
+.tracky-project-flow__table-wrap {
+    overflow: auto;
+}
+
+html[dir='rtl'] .tracky-map-controls {
+    text-align: right;
 }
 
 html[dir='rtl'] .tracky-projects-table th,
@@ -2424,6 +2594,19 @@ html[dir='rtl'] .tracky-projects-table td {
 
     .tracky-map-board {
         min-height: 520px;
+    }
+
+    .tracky-map-board__body {
+        grid-template-columns: 1fr;
+    }
+
+    .tracky-map-results {
+        border-inline-start: 0;
+        border-top: 1px solid #d8ddea;
+    }
+
+    .tracky-project-kpis {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -2466,15 +2649,19 @@ html[dir='rtl'] .tracky-projects-table td {
         min-height: 420px;
     }
 
-    .tracky-map-overlay {
-        position: static;
+    .tracky-map-board__toolbar,
+    .tracky-project-flow__head {
+        grid-template-columns: 1fr;
+        display: grid;
+    }
+
+    .tracky-map-toolbar-search .tracky-side-toolbar,
+    .tracky-project-flow__actions {
         width: 100%;
-        max-height: none;
-        border-radius: 0;
-        border: 0;
-        border-top: 1px solid #d8ddea;
-        box-shadow: none;
-        backdrop-filter: none;
+    }
+
+    .tracky-project-flow__title {
+        width: 100%;
     }
 
     .tracky-project-modal__body {
@@ -2483,5 +2670,548 @@ html[dir='rtl'] .tracky-projects-table td {
 
     .tracky-projects__head {
         flex-direction: column;
+    }
+}
+
+.shell__other-link {
+    text-decoration: none;
+}
+
+.tracky-btn--link {
+    border: 0;
+    background: transparent;
+    color: #1f55d8;
+    padding: 0;
+    min-height: auto;
+}
+
+.tracky-users-page,
+.tracky-audit-page,
+.tracky-settings-page {
+    display: grid;
+    gap: 14px;
+}
+
+.tracky-success-note,
+.tracky-settings-note {
+    margin: 0;
+    color: #5f6883;
+    font-size: 0.9rem;
+}
+
+.tracky-success-note {
+    color: #1d7b34;
+    font-weight: 700;
+}
+
+.tracky-users-summary,
+.tracky-audit-summary {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1.2fr) minmax(280px, 0.9fr);
+    gap: 14px;
+    align-items: stretch;
+}
+
+.tracky-audit-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tracky-audit-summary > div,
+.tracky-users-summary__municipalities,
+.tracky-users-summary__classification,
+.tracky-users-summary__donut-block {
+    border: 1px solid #dbe0ea;
+    border-radius: 14px;
+    background: #f7f8fb;
+    padding: 14px;
+}
+
+.tracky-audit-summary h3,
+.tracky-users-summary h3,
+.tracky-settings-grid h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.tracky-users-summary__donut-block {
+    display: grid;
+    place-items: center;
+}
+
+.tracky-users-ring {
+    width: 138px;
+    height: 138px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    position: relative;
+}
+
+.tracky-users-ring::before {
+    content: '';
+    position: absolute;
+    inset: 14px;
+    border-radius: 50%;
+    background: #f7f8fb;
+}
+
+.tracky-users-ring__center {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    gap: 2px;
+    text-align: center;
+}
+
+.tracky-users-ring__center strong {
+    font-size: 2rem;
+}
+
+.tracky-users-ring__center span {
+    color: #66708a;
+    font-size: 0.88rem;
+}
+
+.tracky-users-summary__municipalities,
+.tracky-users-summary__classification {
+    display: grid;
+    gap: 10px;
+    align-content: start;
+}
+
+.tracky-users-summary__municipality-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed #d7dce8;
+    color: #4d556f;
+}
+
+.tracky-users-summary__municipality-row:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.tracky-users-legend {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 12px;
+    color: #5f6883;
+    font-size: 0.84rem;
+}
+
+.tracky-users-legend i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-inline-end: 6px;
+}
+
+.tracky-users-table-card {
+    min-height: 560px;
+    display: grid;
+    gap: 12px;
+}
+
+.tracky-user-modal {
+    width: min(620px, 100%);
+    border: 1px solid #d8deea;
+    border-radius: 18px;
+    background: #f5f6fa;
+    box-shadow: 0 18px 42px rgba(16, 24, 40, 0.28);
+    padding: 16px;
+    display: grid;
+    gap: 14px;
+}
+
+.tracky-user-modal--compact {
+    width: min(520px, 100%);
+}
+
+.tracky-user-modal__body {
+    border: 1px solid #dfe3ee;
+    border-radius: 14px;
+    background: #fff;
+    padding: 14px;
+    display: grid;
+    gap: 12px;
+}
+
+.tracky-user-modal__footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.tracky-user-access-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.tracky-checkline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #4d556f;
+}
+
+.tracky-checkline input,
+.tracky-projects-table input[type='checkbox'],
+.tracky-projects-table input[type='radio'] {
+    accent-color: #1022df;
+}
+
+.tracky-checkline--disabled {
+    border: 1px solid #dfe3ee;
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: #f8f9fc;
+}
+
+.tracky-audit-detail-modal {
+    width: min(920px, 100%);
+    max-height: calc(100vh - 40px);
+    overflow: auto;
+    border: 1px solid #d8deea;
+    border-radius: 18px;
+    background: #f5f6fa;
+    box-shadow: 0 18px 42px rgba(16, 24, 40, 0.28);
+    padding: 16px;
+    display: grid;
+    gap: 14px;
+}
+
+.tracky-audit-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.tracky-audit-detail-grid__full {
+    grid-column: 1 / -1;
+}
+
+.tracky-audit-detail-grid pre {
+    margin: 0;
+    font: 0.82rem/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #43506a;
+}
+
+.tracky-settings-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.tracky-settings-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.tracky-settings-head__actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.tracky-settings-tabs button {
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    padding: 8px 12px;
+    color: #6a7288;
+    cursor: pointer;
+    font: inherit;
+}
+
+.tracky-settings-tabs button.active {
+    background: #ecefff;
+    color: #2433d6;
+    border-color: #d9ddfb;
+    font-weight: 700;
+}
+
+.tracky-settings-panel {
+    display: grid;
+    gap: 0;
+}
+
+.tracky-settings-fieldset {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    display: grid;
+    gap: 0;
+}
+
+.tracky-settings-fieldset:disabled {
+    opacity: 0.72;
+}
+
+.tracky-settings-grid {
+    display: grid;
+    grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1fr);
+    gap: 16px;
+    padding: 18px 0;
+    border-top: 1px solid #dfe3ee;
+}
+
+.tracky-settings-grid:first-child {
+    border-top: 0;
+    padding-top: 0;
+}
+
+.tracky-settings-fields {
+    display: grid;
+    gap: 12px;
+}
+
+.tracky-settings-fields .field input,
+.tracky-settings-fields .field select,
+.tracky-settings-fields .field textarea,
+.tracky-user-modal .field input,
+.tracky-user-modal .field select {
+    min-height: 42px;
+    border: 1px solid #d2d8e4;
+    border-radius: 12px;
+    background: #fff;
+    padding: 8px 12px;
+    width: 100%;
+}
+
+.tracky-settings-role-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.tracky-settings-role-card {
+    border: 1px solid #dfe3ee;
+    border-radius: 14px;
+    background: #fff;
+    padding: 12px;
+    display: grid;
+    gap: 8px;
+}
+
+.tracky-settings-role-card h4,
+.tracky-settings-choice-group span,
+.tracky-pill-editor > span {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #39425d;
+}
+
+.tracky-settings-choice-group {
+    display: grid;
+    gap: 8px;
+}
+
+.tracky-toggle-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    color: #495168;
+}
+
+.tracky-toggle-line input {
+    width: 40px;
+    height: 22px;
+}
+
+.tracky-pill-editor {
+    border: 1px solid #dfe3ee;
+    border-radius: 14px;
+    background: #fff;
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+}
+
+.tracky-pill-editor__items {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.tracky-pill-editor__item {
+    border: 1px solid #d7dce8;
+    border-radius: 12px;
+    background: #f8f9fd;
+    padding: 8px 10px;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.tracky-pill-editor__item button,
+.tracky-pill-editor__add {
+    border: 1px solid #d7dce8;
+    border-radius: 9px;
+    background: #fff;
+    color: #55607e;
+    min-height: 28px;
+    min-width: 28px;
+    cursor: pointer;
+    font: inherit;
+}
+
+.tracky-pill-editor__add {
+    width: fit-content;
+    padding: 0 10px;
+    background: #ecefff;
+    color: #2433d6;
+    border-color: #d9ddfb;
+}
+
+.tracky-file-types {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+@media (max-width: 1380px) {
+    .tracky-users-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .tracky-settings-grid,
+    .tracky-audit-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tracky-settings-head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .tracky-settings-head__actions {
+        justify-content: flex-start;
+    }
+
+    .tracky-audit-detail-grid__full {
+        grid-column: auto;
+    }
+}
+
+@media (max-width: 1120px) {
+    .tracky-user-access-grid,
+    .tracky-settings-role-grid,
+    .tracky-pill-editor__items,
+    .tracky-user-modal__footer,
+    .tracky-audit-summary {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Dashboard map layout overrides: full-width board by default, animated 3-panel split when details open. */
+.tracky-map-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+    transition: grid-template-columns 240ms ease;
+}
+
+.tracky-map-layout--detail-open {
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 380px);
+}
+
+.tracky-map-board {
+    min-width: 0;
+}
+
+.tracky-map-board__body {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(280px, 1fr);
+    min-height: 600px;
+    transition: grid-template-columns 240ms ease;
+}
+
+.tracky-map-board--detail-open .tracky-map-board__body {
+    grid-template-columns: minmax(0, 2.35fr) minmax(300px, 1fr);
+}
+
+.tracky-map {
+    min-width: 0;
+}
+
+.tracky-map-results {
+    min-width: 0;
+}
+
+.tracky-detail-pane {
+    min-width: 0;
+}
+
+.tracky-detail-pane__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.tracky-detail-pane__header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tracky-detail-pane__close {
+    width: 36px;
+    height: 36px;
+    border: 1px solid #d5d9e4;
+    border-radius: 12px;
+    background: #fff;
+    color: #5f677b;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.tracky-detail-pane__close:hover {
+    background: #eef2fb;
+    border-color: #c5cde0;
+    color: #2c3553;
+}
+
+.tracky-detail-reveal-enter-active,
+.tracky-detail-reveal-leave-active {
+    transition: opacity 220ms ease, transform 240ms ease;
+}
+
+.tracky-detail-reveal-enter-from,
+.tracky-detail-reveal-leave-to {
+    opacity: 0;
+    transform: translateX(18px);
+}
+
+@media (max-width: 1380px) {
+    .tracky-map-layout,
+    .tracky-map-layout--detail-open {
+        grid-template-columns: 1fr;
+    }
+
+    .tracky-map-board__body,
+    .tracky-map-board--detail-open .tracky-map-board__body {
+        grid-template-columns: 1fr;
     }
 }

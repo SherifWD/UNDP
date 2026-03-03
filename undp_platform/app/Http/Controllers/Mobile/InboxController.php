@@ -1,0 +1,89 @@
+<?php
+
+namespace App\Http\Controllers\Mobile;
+
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Facades\Validator;
+
+class InboxController extends MobileController
+{
+    public function index(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'unread_only' => ['nullable', 'boolean'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        if ($validator->fails()) {
+            return $this->returnValidationError($validator);
+        }
+
+        $validated = $validator->validated();
+        $query = $request->user()->notifications()->latest();
+
+        if ($request->boolean('unread_only')) {
+            $query->whereNull('read_at');
+        }
+
+        $limit = $validated['limit'] ?? 25;
+        $notifications = $query->limit($limit)->get();
+
+        return $this->successResponse([
+            'data' => $notifications->map(fn (DatabaseNotification $notification): array => $this->serializeNotification($notification))
+                ->values(),
+            'meta' => [
+                'unread_count' => $request->user()->unreadNotifications()->count(),
+                'returned' => $notifications->count(),
+            ],
+        ]);
+    }
+
+    public function markRead(Request $request, DatabaseNotification $notification): JsonResponse
+    {
+        if ((int) $notification->notifiable_id !== (int) $request->user()->id
+            || $notification->notifiable_type !== $request->user()::class) {
+            return $this->errorResponse('Notification not found.', 404);
+        }
+
+        if (! $notification->read_at) {
+            $notification->markAsRead();
+        }
+
+        return $this->successResponse([
+            'notification' => $this->serializeNotification($notification->fresh()),
+        ], 'Notification marked as read.');
+    }
+
+    public function markAllRead(Request $request): JsonResponse
+    {
+        $request->user()->unreadNotifications()->update([
+            'read_at' => now(),
+        ]);
+
+        return $this->successResponse([], 'All notifications marked as read.');
+    }
+
+    private function serializeNotification(DatabaseNotification $notification): array
+    {
+        $data = (array) $notification->data;
+        $status = is_string($data['status'] ?? null) ? $data['status'] : null;
+
+        return [
+            'id' => $notification->id,
+            'type' => class_basename($notification->type),
+            'title' => $data['title'] ?? 'Update',
+            'message' => $status
+                ? sprintf('%s is now %s', $data['title'] ?? 'Submission', $this->mobileSubmissionStatusLabel($status))
+                : ($data['title'] ?? 'Notification'),
+            'submission_id' => $data['submission_id'] ?? null,
+            'project_name' => $data['project_name'] ?? null,
+            'status' => $status,
+            'status_label' => $status ? $this->mobileSubmissionStatusLabel($status) : null,
+            'is_read' => $notification->read_at !== null,
+            'read_at' => optional($notification->read_at)->toIso8601String(),
+            'created_at' => optional($notification->created_at)->toIso8601String(),
+        ];
+    }
+}

@@ -20,6 +20,7 @@ class Project extends Model
         'latitude',
         'longitude',
         'last_update_at',
+        'mobile_meta',
     ];
 
     protected function casts(): array
@@ -28,6 +29,7 @@ class Project extends Model
             'latitude' => 'float',
             'longitude' => 'float',
             'last_update_at' => 'datetime',
+            'mobile_meta' => 'array',
         ];
     }
 

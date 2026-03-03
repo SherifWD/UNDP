@@ -1,0 +1,18 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://127.0.0.1:8000",
+      "localStorage": [
+        {
+          "name": "undp_token",
+          "value": "7|ICYHjTb8p5PfLhVSm5qLBTZjDCfOchN9KbgsjdLF7d479ea6"
+        },
+        {
+          "name": "undp_user",
+          "value": "{\"id\":1,\"name\":\"UNDP Admin\",\"email\":\"admin@undp.local\",\"phone\":\"910000001\",\"country_code\":\"+218\",\"phone_e164\":\"+218910000001\",\"role\":\"undp_admin\",\"status\":\"active\",\"preferred_locale\":\"en\",\"municipality\":null,\"permissions\":[\"projects.view\",\"municipalities.view\",\"media.upload\",\"submissions.validate\",\"submissions.approve\",\"submissions.reject\",\"submissions.rework\",\"dashboards.view.municipality\",\"reports.export.csv\",\"users.view\",\"users.create\",\"users.update\",\"users.toggle_status\",\"roles.assign\",\"audit.view\",\"audit.export\",\"submissions.view.all\",\"dashboards.view.system\",\"reports.export.pdf\",\"projects.manage\",\"municipalities.manage\",\"workflow.manage\",\"media.view.all\",\"notifications.send\"],\"last_login_at\":\"2026-02-27T19:49:53+00:00\"}"
+        }
+      ]
+    }
+  ]
+}

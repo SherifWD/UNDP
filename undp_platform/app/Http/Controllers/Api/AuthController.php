@@ -33,7 +33,7 @@ class AuthController extends Controller
 
         $cooldown = (int) config('otp.resend_cooldown_seconds', 60);
         $expiresIn = (int) config('otp.expires_in_seconds', 300);
-        $digits = (int) config('otp.code_digits', 6);
+        $digits = (int) config('otp.code_digits', 4);
 
         $otp = OtpCode::firstOrNew([
             'country_code' => $phoneData['country_code'],
@@ -88,6 +88,7 @@ class AuthController extends Controller
         return response()->json([
             'message' => __('Verification code sent successfully.'),
             'masked_phone' => PhoneNumber::mask($phoneData['country_code'], $phoneData['phone']),
+            'otp' => $otp->code,
             'resend_in' => $cooldown,
             'expires_in' => $expiresIn,
         ]);

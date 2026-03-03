@@ -31,13 +31,6 @@ const navItems = computed(() => {
         { name: 'projects', label: t('nav.projects'), permission: 'projects.view', icon: 'reports', group: 'main' },
         { name: 'validation', label: t('nav.submissions'), permission: 'submissions.validate', icon: 'submission', group: 'main' },
         {
-            name: 'municipal-overview',
-            label: t('nav.municipal'),
-            anyPermissions: ['dashboards.view.municipality', 'dashboards.view.system'],
-            icon: 'municipal',
-            group: 'main',
-        },
-        {
             name: 'reports',
             label: t('nav.reports'),
             anyPermissions: ['dashboards.view.system', 'dashboards.view.municipality'],
@@ -62,10 +55,12 @@ const currentPageLabel = computed(() => {
     const routeLabels = {
         home: t('nav.home'),
         projects: t('nav.projects'),
+        'project-submissions': t('nav.projects'),
         validation: t('nav.submissions'),
         'submission-detail': t('nav.submissions'),
         users: t('nav.users'),
         'audit-logs': t('nav.audit'),
+        settings: t('shell.settings'),
         reports: t('nav.reports'),
         'municipal-overview': t('nav.municipal'),
         'partner-dashboard': t('nav.partner'),
@@ -125,21 +120,25 @@ const iconPath = (name) => NAV_ICON_PATHS[name] || NAV_ICON_PATHS.dashboard;
 
             <section class="shell__nav-group">
                 <p class="shell__group-label">{{ t('shell.other') }}</p>
-                <button class="shell__other-link" type="button">
+                <RouterLink
+                    :to="{ name: 'settings' }"
+                    class="shell__other-link"
+                    active-class="shell__nav-link--active"
+                >
                     <span class="shell__nav-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24">
                             <path :d="iconPath('settings')" />
                         </svg>
                     </span>
                     <span>{{ t('shell.settings') }}</span>
-                </button>
+                </RouterLink>
             </section>
 
             <footer class="shell__profile">
                 <div class="shell__profile-avatar">{{ firstName.charAt(0).toUpperCase() }}</div>
-                <div>
-                    <p class="shell__profile-name">{{ auth.user?.name || 'User' }}</p>
-                    <p class="shell__profile-email">{{ auth.user?.email || auth.user?.phone_e164 || '' }}</p>
+                <div class="shell__profile-meta">
+                    <p class="shell__profile-name" :title="auth.user?.name || 'User'">{{ auth.user?.name || 'User' }}</p>
+                    <p class="shell__profile-email" :title="auth.user?.email || auth.user?.phone_e164 || ''">{{ auth.user?.email || auth.user?.phone_e164 || '' }}</p>
                 </div>
                 <button class="shell__logout-btn" type="button" @click="logout" aria-label="Logout">
                     <span class="shell__logout-icon" aria-hidden="true" />

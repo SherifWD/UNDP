@@ -1,17 +1,20 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from './stores/auth';
-import LoginView from './views/LoginView.vue';
-import OtpView from './views/OtpView.vue';
-import HomeView from './views/HomeView.vue';
-import ProjectsView from './views/ProjectsView.vue';
-import UsersView from './views/UsersView.vue';
-import ValidationWorklistView from './views/ValidationWorklistView.vue';
-import SubmissionDetailView from './views/SubmissionDetailView.vue';
-import AuditLogView from './views/AuditLogView.vue';
-import ReportsView from './views/ReportsView.vue';
-import PartnerDashboardView from './views/PartnerDashboardView.vue';
-import MunicipalOverviewView from './views/MunicipalOverviewView.vue';
-import AccessDeniedView from './views/AccessDeniedView.vue';
+
+const LoginView = () => import('./views/LoginView.vue');
+const OtpView = () => import('./views/OtpView.vue');
+const HomeView = () => import('./views/HomeView.vue');
+const ProjectsView = () => import('./views/ProjectsView.vue');
+const ProjectSubmissionsView = () => import('./views/ProjectSubmissionsView.vue');
+const UsersView = () => import('./views/UsersView.vue');
+const ValidationWorklistView = () => import('./views/ValidationWorklistView.vue');
+const SubmissionDetailView = () => import('./views/SubmissionDetailView.vue');
+const AuditLogView = () => import('./views/AuditLogView.vue');
+const SettingsView = () => import('./views/SettingsView.vue');
+const ReportsView = () => import('./views/ReportsView.vue');
+const PartnerDashboardView = () => import('./views/PartnerDashboardView.vue');
+const MunicipalOverviewView = () => import('./views/MunicipalOverviewView.vue');
+const AccessDeniedView = () => import('./views/AccessDeniedView.vue');
 
 const routes = [
     {
@@ -39,6 +42,15 @@ const routes = [
         meta: { requiresAuth: true, permission: 'projects.view' },
     },
     {
+        path: '/projects/:id/submissions',
+        name: 'project-submissions',
+        component: ProjectSubmissionsView,
+        meta: {
+            requiresAuth: true,
+            anyPermissions: ['submissions.view.own', 'submissions.view.municipality', 'submissions.view.all', 'submissions.view.approved_aggregated'],
+        },
+    },
+    {
         path: '/users',
         name: 'users',
         component: UsersView,
@@ -56,7 +68,7 @@ const routes = [
         component: SubmissionDetailView,
         meta: {
             requiresAuth: true,
-            anyPermissions: ['submissions.view.own', 'submissions.view.municipality', 'submissions.view.all'],
+            anyPermissions: ['submissions.view.own', 'submissions.view.municipality', 'submissions.view.all', 'submissions.view.approved_aggregated'],
         },
     },
     {
@@ -64,6 +76,12 @@ const routes = [
         name: 'audit-logs',
         component: AuditLogView,
         meta: { requiresAuth: true, permission: 'audit.view' },
+    },
+    {
+        path: '/settings',
+        name: 'settings',
+        component: SettingsView,
+        meta: { requiresAuth: true },
     },
     {
         path: '/municipal-overview',

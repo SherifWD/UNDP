@@ -31,7 +31,7 @@ class SubmissionController extends Controller
             'date_to' => ['nullable', 'date'],
             'sort_by' => ['nullable', Rule::in(['created_at', 'submitted_at', 'updated_at', 'status'])],
             'sort_dir' => ['nullable', Rule::in(['asc', 'desc'])],
-            'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
+            'per_page' => ['nullable', 'integer', 'min:5', 'max:200'],
         ]);
 
         $query = Submission::query()->with([
@@ -99,10 +99,19 @@ class SubmissionController extends Controller
                 SubmissionStatus::REWORK_REQUESTED->value,
                 SubmissionStatus::SUBMITTED->value,
             ])],
-            'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
+            'per_page' => ['nullable', 'integer', 'min:5', 'max:200'],
         ]);
 
         $query = Submission::query()
+            ->select([
+                'id',
+                'title',
+                'status',
+                'created_at',
+                'reporter_id',
+                'project_id',
+                'municipality_id',
+            ])
             ->with([
                 'reporter:id,name,role',
                 'project:id,name_en,name_ar,municipality_id',
@@ -150,7 +159,7 @@ class SubmissionController extends Controller
         $submissions = $query
             ->orderBy($sortBy, $sortDir)
             ->paginate($validated['per_page'] ?? 20)
-            ->through(fn (Submission $submission): array => $this->serializeSubmission($submission));
+            ->through(fn (Submission $submission): array => $this->serializeWorklistSubmission($submission));
 
         $payload = $submissions->toArray();
         $scopeMunicipality = $request->user()->municipality()->first();
@@ -456,6 +465,34 @@ class SubmissionController extends Controller
                 'id' => $submission->validator->id,
                 'name' => $submission->validator->name,
                 'role' => $submission->validator->role,
+            ] : null,
+            'project' => $submission->project ? [
+                'id' => $submission->project->id,
+                'name_en' => $submission->project->name_en,
+                'name_ar' => $submission->project->name_ar,
+                'name' => $submission->project->name,
+            ] : null,
+            'municipality' => $submission->municipality ? [
+                'id' => $submission->municipality->id,
+                'name_en' => $submission->municipality->name_en,
+                'name_ar' => $submission->municipality->name_ar,
+                'name' => $submission->municipality->name,
+            ] : null,
+        ];
+    }
+
+    private function serializeWorklistSubmission(Submission $submission): array
+    {
+        return [
+            'id' => $submission->id,
+            'title' => $submission->title,
+            'status' => $submission->status,
+            'status_label' => $this->statusLabel($submission->status),
+            'created_at' => optional($submission->created_at)->toIso8601String(),
+            'reporter' => $submission->reporter ? [
+                'id' => $submission->reporter->id,
+                'name' => $submission->reporter->name,
+                'role' => $submission->reporter->role,
             ] : null,
             'project' => $submission->project ? [
                 'id' => $submission->project->id,

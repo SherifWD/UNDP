@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\EnsureAnyPermission;
 use App\Http\Middleware\EnsurePermission;
+use App\Http\Middleware\NormalizeApiJsonResponse;
 use App\Http\Middleware\SetLocaleFromRequest;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -17,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->api(prepend: [
+            NormalizeApiJsonResponse::class,
             SetLocaleFromRequest::class,
         ]);
 

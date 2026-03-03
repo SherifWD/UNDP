@@ -23,7 +23,11 @@ class AuthOtpTest extends TestCase
 
         $requestResponse
             ->assertOk()
-            ->assertJsonStructure(['message', 'masked_phone', 'resend_in', 'expires_in']);
+            ->assertJsonStructure(['message', 'masked_phone', 'resend_in', 'expires_in', 'msg', 'data'])
+            ->assertJsonPath('result', true);
+
+        $this->assertSame($requestResponse->json('message'), $requestResponse->json('msg'));
+        $this->assertSame($requestResponse->json('masked_phone'), $requestResponse->json('data.masked_phone'));
 
         $otp = OtpCode::query()->where('phone_e164', '+218911111111')->first();
 
@@ -40,7 +44,11 @@ class AuthOtpTest extends TestCase
             ->assertOk()
             ->assertJsonPath('user.role', UserRole::REPORTER->value)
             ->assertJsonPath('user.status', UserStatus::ACTIVE->value)
-            ->assertJsonStructure(['token', 'user']);
+            ->assertJsonPath('result', true)
+            ->assertJsonStructure(['token', 'user', 'msg', 'data']);
+
+        $this->assertSame($verifyResponse->json('token'), $verifyResponse->json('data.token'));
+        $this->assertSame($verifyResponse->json('user.id'), $verifyResponse->json('data.user.id'));
 
         $this->assertDatabaseHas('users', [
             'phone_e164' => '+218911111111',
@@ -76,7 +84,10 @@ class AuthOtpTest extends TestCase
 
         $response
             ->assertForbidden()
-            ->assertJsonPath('message', 'Your account is disabled. Please contact an administrator.');
+            ->assertJsonPath('message', 'Your account is disabled. Please contact an administrator.')
+            ->assertJsonPath('result', false);
+
+        $this->assertSame([], $response->json('data'));
 
         $this->assertSame($user->id, User::query()->where('phone_e164', '+218922222222')->value('id'));
     }
@@ -113,8 +124,21 @@ class AuthOtpTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('user.id', $admin->id)
-            ->assertJsonPath('user.role', UserRole::UNDP_ADMIN->value);
+            ->assertJsonPath('user.role', UserRole::UNDP_ADMIN->value)
+            ->assertJsonPath('result', true);
 
         $this->assertSame(1, User::query()->where('phone_e164', '+218910000001')->count());
+    }
+
+    public function test_validation_errors_are_wrapped_in_the_standard_api_envelope(): void
+    {
+        $response = $this->postJson('/api/auth/request-otp', []);
+
+        $response
+            ->assertUnprocessable()
+            ->assertJsonPath('result', false)
+            ->assertJsonStructure(['message', 'msg', 'errors', 'data']);
+
+        $this->assertSame($response->json('errors'), $response->json('data.errors'));
     }
 }

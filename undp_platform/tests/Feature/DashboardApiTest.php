@@ -52,7 +52,17 @@ class DashboardApiTest extends TestCase
 
         $response
             ->assertOk()
+            ->assertJsonPath('result', true)
             ->assertJsonStructure([
+                'data' => [
+                    'kpis' => [
+                        'total_submissions',
+                        'approved',
+                        'under_review',
+                        'rework_requested',
+                        'rejected',
+                    ],
+                ],
                 'kpis' => [
                     'total_submissions',
                     'approved',

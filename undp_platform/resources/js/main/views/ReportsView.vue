@@ -4,11 +4,9 @@ import L from 'leaflet';
 import AppShell from '../components/AppShell.vue';
 import KpiCards from '../components/KpiCards.vue';
 import api from '../api';
-import { useAuthStore } from '../stores/auth';
 import { useAsyncExport } from '../composables/useAsyncExport';
 
 const FILTER_STORAGE_KEY = 'undp_reports_filters_v1';
-const auth = useAuthStore();
 const asyncExport = useAsyncExport();
 
 const kpis = ref({});
@@ -36,8 +34,8 @@ const mapShellRef = ref(null);
 const isMapFullscreen = ref(false);
 let map;
 let markerLayer;
-let pollTimer;
-let eventSource;
+let mapRefreshTimer;
+const projectOptionsLoaded = ref(false);
 
 const STATUS_COLORS = {
     approved: '#16a34a',
@@ -171,7 +169,13 @@ const initMap = async () => {
     markerLayer = L.layerGroup().addTo(map);
 
     map.on('zoomend', () => {
-        loadMapData(true);
+        if (mapRefreshTimer) {
+            clearTimeout(mapRefreshTimer);
+        }
+
+        mapRefreshTimer = setTimeout(() => {
+            loadMapData(true);
+        }, 180);
     });
 };
 
@@ -274,14 +278,29 @@ const renderMarkers = () => {
     });
 };
 
-const loadLookups = async () => {
-    const [municipalitiesRes, projectsRes] = await Promise.all([
-        api.get('/municipalities'),
-        api.get('/projects'),
-    ]);
+const loadMunicipalities = async () => {
+    if (municipalities.value.length) {
+        return;
+    }
 
-    municipalities.value = municipalitiesRes.data.data || [];
-    projects.value = projectsRes.data.data || [];
+    const { data } = await api.get('/municipalities');
+    municipalities.value = data.data || [];
+};
+
+const loadProjectOptions = async (force = false) => {
+    if (projectOptionsLoaded.value && !force) {
+        return;
+    }
+
+    const { data } = await api.get('/projects', {
+        params: {
+            municipality_id: filters.municipality_id || undefined,
+            per_page: 100,
+        },
+    });
+
+    projects.value = data.data || [];
+    projectOptionsLoaded.value = true;
 };
 
 const loadKpis = async () => {
@@ -304,6 +323,7 @@ const loadMapData = async (silent = false) => {
                 ...filters,
                 cluster: true,
                 cluster_zoom: map ? map.getZoom() : 8,
+                include_submissions: Boolean(filters.status || filters.project_id || ((map ? map.getZoom() : 8) >= 10)),
             },
         });
 
@@ -349,7 +369,16 @@ const resetFilters = async () => {
         status: '',
     });
 
+    projectOptionsLoaded.value = false;
+    projects.value = [];
+
     await loadReports();
+};
+
+const onMunicipalityChange = async () => {
+    filters.project_id = '';
+    projectOptionsLoaded.value = false;
+    await loadProjectOptions(true);
 };
 
 const drillStatus = async (status) => {
@@ -402,59 +431,27 @@ const toggleMapFullscreen = async () => {
     setTimeout(() => map?.invalidateSize(), 80);
 };
 
-const connectRealtime = () => {
-    if (!window.EventSource || !auth.token) {
-        return false;
-    }
-
-    const token = encodeURIComponent(auth.token);
-    eventSource = new EventSource(`/api/live/events?channel=dashboard&token=${token}`);
-
-    eventSource.addEventListener('update', () => {
-        loadReports();
-    });
-
-    eventSource.addEventListener('end', () => {
-        eventSource?.close();
-        eventSource = null;
-    });
-
-    eventSource.onerror = () => {
-        eventSource?.close();
-        eventSource = null;
-    };
-
-    return true;
-};
-
 onMounted(async () => {
     Object.assign(filters, persistedFilters());
     await initMap();
-    await loadLookups();
+    await loadMunicipalities();
+    if (filters.municipality_id || filters.project_id) {
+        await loadProjectOptions(true);
+    }
     await loadReports();
     document.addEventListener('fullscreenchange', onFullscreenChange);
-
-    connectRealtime();
-
-    pollTimer = setInterval(() => {
-        loadReports();
-    }, 60000);
 });
 
 onBeforeUnmount(() => {
     document.removeEventListener('fullscreenchange', onFullscreenChange);
 
-    if (pollTimer) {
-        clearInterval(pollTimer);
+    if (mapRefreshTimer) {
+        clearTimeout(mapRefreshTimer);
     }
     if (map) {
         map.off();
         map.remove();
         map = null;
-    }
-    if (eventSource) {
-        eventSource.close();
-        eventSource = null;
     }
 });
 </script>
@@ -472,13 +469,13 @@ onBeforeUnmount(() => {
             <div class="toolbar">
                 <input v-model="filters.date_from" type="date">
                 <input v-model="filters.date_to" type="date">
-                <select v-model="filters.municipality_id">
+                <select v-model="filters.municipality_id" @change="onMunicipalityChange">
                     <option value="">All municipalities</option>
                     <option v-for="municipality in municipalities" :key="municipality.id" :value="municipality.id">
                         {{ municipality.name }}
                     </option>
                 </select>
-                <select v-model="filters.project_id">
+                <select v-model="filters.project_id" @focus="loadProjectOptions()">
                     <option value="">All projects</option>
                     <option v-for="project in projects" :key="project.id" :value="project.id">
                         {{ project.name }}

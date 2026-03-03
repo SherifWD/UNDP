@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
@@ -14,15 +14,16 @@ const router = useRouter();
 
 const municipalities = ref([]);
 const projects = ref([]);
-const submissions = ref([]);
+const tabCounts = ref({ all: 0, by_municipality: {} });
 const loading = ref(false);
+const detailLoading = ref(false);
 const saving = ref(false);
 const error = ref('');
 
-const viewMode = ref('table');
 const activeMunicipalityTab = ref('all');
-const selectedProjectId = ref(null);
 const projectDetailsModalOpen = ref(false);
+const projectDetails = ref(null);
+const projectReporters = ref([]);
 const projectFormModalOpen = ref(false);
 const municipalityModalOpen = ref(false);
 const editingProjectId = ref(null);
@@ -34,8 +35,10 @@ const filters = reactive({
 });
 
 const pagination = reactive({
-    page: 1,
-    perPage: 9,
+    current_page: 1,
+    last_page: 1,
+    per_page: 10,
+    total: 0,
 });
 
 const municipalityForm = reactive({
@@ -54,168 +57,50 @@ const projectForm = reactive({
     longitude: '',
 });
 
+let searchTimer = null;
+
 const canManageMunicipalities = computed(() => auth.hasPermission('municipalities.manage'));
 const canManageProjects = computed(() => auth.hasPermission('projects.manage'));
-const canOpenSubmissionWorklist = computed(() => auth.hasPermission('submissions.validate'));
+const canViewProjectSubmissions = computed(() => (
+    auth.hasPermission('submissions.view.own')
+    || auth.hasPermission('submissions.view.municipality')
+    || auth.hasPermission('submissions.view.all')
+    || auth.hasPermission('submissions.view.approved_aggregated')
+));
 
 const projectReference = (projectId) => `PRJ-${String(projectId).padStart(3, '0')}`;
 
-const formatDateTime = (value) => {
-    if (!value) {
-        return '-';
-    }
+const projectPriority = (project) => {
+    const pending = Number(project?.stats?.pending_submissions || 0);
 
-    return new Date(value).toLocaleDateString();
-};
-
-const normalizeText = (value) => String(value || '').toLowerCase();
-
-const submissionStatsByProject = computed(() => {
-    const pendingStatuses = new Set(['under_review', 'submitted', 'rework_requested', 'queued']);
-    const rows = {};
-
-    submissions.value.forEach((submission) => {
-        const projectId = Number(submission?.project?.id || submission?.project_id || 0);
-        if (!projectId) {
-            return;
-        }
-
-        if (!rows[projectId]) {
-            rows[projectId] = {
-                total: 0,
-                approved: 0,
-                pending: 0,
-                rejected: 0,
-                progressValues: [],
-                mediaItems: 0,
-            };
-        }
-
-        const current = rows[projectId];
-        current.total += 1;
-
-        if (submission.status === 'approved') {
-            current.approved += 1;
-        } else if (submission.status === 'rejected') {
-            current.rejected += 1;
-        } else if (pendingStatuses.has(submission.status)) {
-            current.pending += 1;
-        }
-
-        const progressValue = Number(submission?.data?.progress_percent || 0);
-        if (Number.isFinite(progressValue) && progressValue > 0) {
-            current.progressValues.push(progressValue);
-        }
-
-        const mediaAssets = Array.isArray(submission?.media_assets) ? submission.media_assets.length : 0;
-        const mediaFallback = Array.isArray(submission?.media) ? submission.media.length : 0;
-        current.mediaItems += mediaAssets || mediaFallback;
-    });
-
-    return rows;
-});
-
-const resolveProgress = (projectId, status) => {
-    const stats = submissionStatsByProject.value[Number(projectId)] || null;
-
-    if (stats?.progressValues?.length) {
-        const avg = stats.progressValues.reduce((sum, value) => sum + value, 0) / stats.progressValues.length;
-        return Math.max(0, Math.min(100, Math.round(avg)));
-    }
-
-    if (!stats || stats.total === 0) {
-        return status === 'archived' ? 100 : 0;
-    }
-
-    return Math.max(0, Math.min(100, Math.round((stats.approved / stats.total) * 100)));
-};
-
-const resolvePriority = (pendingCount) => {
-    if (pendingCount >= 8) return 'high';
-    if (pendingCount >= 3) return 'medium';
+    if (pending >= 8) return 'high';
+    if (pending >= 3) return 'medium';
     return 'low';
 };
 
-const filteredProjects = computed(() => {
-    const search = normalizeText(filters.search.trim());
-
-    return projects.value
-        .filter((project) => {
-            if (filters.municipality_id && Number(project.municipality?.id) !== Number(filters.municipality_id)) {
-                return false;
-            }
-
-            if (filters.status && project.status !== filters.status) {
-                return false;
-            }
-
-            if (search) {
-                const haystack = `${project.name || ''} ${project.municipality?.name || ''} ${projectReference(project.id)}`.toLowerCase();
-                if (!haystack.includes(search)) {
-                    return false;
-                }
-            }
-
-            return true;
-        })
-        .sort((a, b) => new Date(b.last_update_at || 0).getTime() - new Date(a.last_update_at || 0).getTime());
-});
-
-const enrichedProjects = computed(() => {
-    return filteredProjects.value.map((project) => {
-        const stats = submissionStatsByProject.value[Number(project.id)] || {
-            total: 0,
-            approved: 0,
-            pending: 0,
-            rejected: 0,
-            progressValues: [],
-            mediaItems: 0,
-        };
-
-        const progress = resolveProgress(project.id, project.status);
-        const priority = resolvePriority(stats.pending);
-
-        return {
-            ...project,
-            reference: projectReference(project.id),
-            stats,
-            progress,
-            priority,
-        };
-    });
-});
+const projectPriorityClass = (project) => `badge--${projectPriority(project)}`;
 
 const municipalityTabs = computed(() => {
-    const tabs = [{ id: 'all', label: t('projectsPage.allMunicipalities'), count: projects.value.length }];
+    const tabs = [{ id: 'all', label: t('projectsPage.allMunicipalities'), count: Number(tabCounts.value.all || 0) }];
 
     municipalities.value.forEach((municipality) => {
-        const count = projects.value.filter((project) => Number(project.municipality?.id) === Number(municipality.id)).length;
         tabs.push({
             id: String(municipality.id),
             label: municipality.name,
-            count,
+            count: Number(tabCounts.value.by_municipality?.[municipality.id] || 0),
         });
     });
 
     return tabs;
 });
 
-const totalPages = computed(() => {
-    return Math.max(1, Math.ceil(enrichedProjects.value.length / pagination.perPage));
-});
-
-const paginatedProjects = computed(() => {
-    const start = (pagination.page - 1) * pagination.perPage;
-    return enrichedProjects.value.slice(start, start + pagination.perPage);
-});
-
 const visiblePages = computed(() => {
     const pages = [];
-    const current = pagination.page;
-    const total = totalPages.value;
+    const current = pagination.current_page;
+    const last = pagination.last_page;
 
-    if (total <= 7) {
-        for (let page = 1; page <= total; page += 1) {
+    if (last <= 7) {
+        for (let page = 1; page <= last; page += 1) {
             pages.push(page);
         }
         return pages;
@@ -224,28 +109,57 @@ const visiblePages = computed(() => {
     pages.push(1);
 
     if (current > 3) {
-        pages.push('...-left');
+        pages.push('ellipsis-left');
     }
 
     const start = Math.max(2, current - 1);
-    const end = Math.min(total - 1, current + 1);
+    const end = Math.min(last - 1, current + 1);
 
     for (let page = start; page <= end; page += 1) {
         pages.push(page);
     }
 
-    if (current < total - 2) {
-        pages.push('...-right');
+    if (current < last - 2) {
+        pages.push('ellipsis-right');
     }
 
-    pages.push(total);
+    pages.push(last);
 
     return pages;
 });
 
-const selectedProject = computed(() => {
-    return enrichedProjects.value.find((project) => Number(project.id) === Number(selectedProjectId.value)) || null;
-});
+const openProjectSubmissions = (project) => {
+    if (!project || !canViewProjectSubmissions.value) {
+        return;
+    }
+
+    router.push({
+        name: 'project-submissions',
+        params: {
+            id: String(project.id),
+        },
+    });
+};
+
+const setMunicipalityTab = async (tabId) => {
+    activeMunicipalityTab.value = tabId;
+    filters.municipality_id = tabId === 'all' ? '' : String(tabId);
+    await loadProjects(1);
+};
+
+const populateProjectForm = (project) => {
+    editingProjectId.value = project.id;
+
+    Object.assign(projectForm, {
+        municipality_id: project.municipality?.id || '',
+        name_en: project.name_en || '',
+        name_ar: project.name_ar || '',
+        description: project.description || '',
+        status: project.status || 'active',
+        latitude: project.latitude ?? '',
+        longitude: project.longitude ?? '',
+    });
+};
 
 const resetProjectForm = () => {
     Object.assign(projectForm, {
@@ -260,57 +174,78 @@ const resetProjectForm = () => {
     editingProjectId.value = null;
 };
 
-const loadData = async () => {
+const loadMunicipalities = async () => {
+    try {
+        const { data } = await api.get('/municipalities');
+        municipalities.value = data.data || [];
+    } catch {
+        municipalities.value = [];
+    }
+};
+
+const loadProjects = async (page = pagination.current_page) => {
     loading.value = true;
     error.value = '';
 
     try {
-        const results = await Promise.allSettled([
-            api.get('/municipalities'),
-            api.get('/projects'),
-            api.get('/submissions', { params: { per_page: 100 } }),
-        ]);
+        const { data } = await api.get('/projects', {
+            params: {
+                with_stats: 1,
+                per_page: pagination.per_page,
+                page,
+                search: filters.search || undefined,
+                status: filters.status || undefined,
+                municipality_id: filters.municipality_id || undefined,
+            },
+        });
 
-        const [municipalityResult, projectsResult, submissionsResult] = results;
-        const partialErrors = [];
-
-        if (municipalityResult.status === 'fulfilled') {
-            municipalities.value = municipalityResult.value.data.data || [];
-        } else {
-            municipalities.value = [];
-            partialErrors.push(municipalityResult.reason?.response?.data?.message || 'Unable to load municipalities.');
-        }
-
-        if (projectsResult.status === 'fulfilled') {
-            projects.value = projectsResult.value.data.data || [];
-        } else {
-            projects.value = [];
-            partialErrors.push(projectsResult.reason?.response?.data?.message || 'Unable to load projects.');
-        }
-
-        if (submissionsResult.status === 'fulfilled') {
-            submissions.value = submissionsResult.value.data.data || [];
-        } else {
-            submissions.value = [];
-        }
-
-        if (!filters.municipality_id) {
-            const preferredMunicipalityId = Number(auth.user?.municipality?.id || 0);
-
-            if (preferredMunicipalityId && municipalities.value.some((row) => Number(row.id) === preferredMunicipalityId)) {
-                filters.municipality_id = String(preferredMunicipalityId);
-                activeMunicipalityTab.value = String(preferredMunicipalityId);
-            }
-        }
-
-        if (partialErrors.length > 0) {
-            error.value = partialErrors[0];
-        }
+        projects.value = data.data || [];
+        pagination.current_page = data.current_page || 1;
+        pagination.last_page = data.last_page || 1;
+        pagination.total = data.total || projects.value.length;
+        tabCounts.value = data.tab_counts || { all: projects.value.length, by_municipality: {} };
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to load projects and municipalities.';
+        error.value = err.response?.data?.message || 'Unable to load projects.';
+        projects.value = [];
+        tabCounts.value = { all: 0, by_municipality: {} };
+        pagination.current_page = 1;
+        pagination.last_page = 1;
+        pagination.total = 0;
     } finally {
         loading.value = false;
     }
+};
+
+const fetchProjectDetails = async (projectId) => {
+    detailLoading.value = true;
+    error.value = '';
+
+    try {
+        const { data } = await api.get(`/projects/${projectId}`);
+        projectDetails.value = data.project;
+        projectReporters.value = data.reporters || [];
+    } catch (err) {
+        error.value = err.response?.data?.message || 'Unable to load project details.';
+        projectDetails.value = null;
+        projectReporters.value = [];
+    } finally {
+        detailLoading.value = false;
+    }
+};
+
+const openProjectDetails = async (project) => {
+    if (!project) {
+        return;
+    }
+
+    projectDetailsModalOpen.value = true;
+    await fetchProjectDetails(project.id);
+};
+
+const closeProjectDetails = () => {
+    projectDetailsModalOpen.value = false;
+    projectDetails.value = null;
+    projectReporters.value = [];
 };
 
 const saveMunicipality = async () => {
@@ -336,7 +271,8 @@ const saveMunicipality = async () => {
 
         municipalityModalOpen.value = false;
         ui.pushToast('Municipality saved successfully.');
-        await loadData();
+        await loadMunicipalities();
+        await loadProjects(1);
     } catch (err) {
         error.value = err.response?.data?.message || 'Unable to save municipality.';
     } finally {
@@ -373,7 +309,11 @@ const saveProject = async () => {
 
         projectFormModalOpen.value = false;
         resetProjectForm();
-        await loadData();
+        await loadProjects(pagination.current_page);
+
+        if (projectDetailsModalOpen.value && projectDetails.value) {
+            await fetchProjectDetails(projectDetails.value.id);
+        }
     } catch (err) {
         error.value = err.response?.data?.message || 'Unable to save project.';
     } finally {
@@ -391,18 +331,11 @@ const openEditProjectModal = (project) => {
         return;
     }
 
-    editingProjectId.value = project.id;
+    if (projectDetailsModalOpen.value) {
+        projectDetailsModalOpen.value = false;
+    }
 
-    Object.assign(projectForm, {
-        municipality_id: project.municipality?.id || '',
-        name_en: project.name_en || '',
-        name_ar: project.name_ar || '',
-        description: project.description || '',
-        status: project.status || 'active',
-        latitude: project.latitude ?? '',
-        longitude: project.longitude ?? '',
-    });
-
+    populateProjectForm(project);
     projectFormModalOpen.value = true;
 };
 
@@ -411,62 +344,45 @@ const closeProjectFormModal = () => {
     resetProjectForm();
 };
 
-const openProjectDetails = (project) => {
-    selectedProjectId.value = project.id;
-    projectDetailsModalOpen.value = true;
-};
-
-const closeProjectDetails = () => {
-    projectDetailsModalOpen.value = false;
-};
-
-const openSubmissionPage = (project) => {
-    if (!project || !canOpenSubmissionWorklist.value) {
+const goToPage = async (page) => {
+    if (typeof page !== 'number' || page === pagination.current_page || page < 1 || page > pagination.last_page) {
         return;
     }
 
-    router.push({
-        name: 'validation',
-        query: {
-            project_id: String(project.id),
-        },
-    });
+    await loadProjects(page);
 };
 
-const goToPage = (page) => {
-    if (typeof page !== 'number') {
-        return;
-    }
-
-    if (page < 1 || page > totalPages.value || page === pagination.page) {
-        return;
-    }
-
-    pagination.page = page;
-};
-
-watch(activeMunicipalityTab, (value) => {
-    filters.municipality_id = value === 'all' ? '' : String(value);
+watch(() => filters.status, async () => {
+    await loadProjects(1);
 });
 
-watch(() => filters.municipality_id, (value) => {
-    const normalized = value ? String(value) : 'all';
-    if (activeMunicipalityTab.value !== normalized) {
-        activeMunicipalityTab.value = normalized;
+watch(() => filters.search, () => {
+    if (searchTimer) {
+        clearTimeout(searchTimer);
+    }
+
+    searchTimer = setTimeout(() => {
+        loadProjects(1);
+    }, 280);
+});
+
+onMounted(async () => {
+    await loadMunicipalities();
+
+    const preferredMunicipalityId = Number(auth.user?.municipality?.id || 0);
+    if (preferredMunicipalityId && municipalities.value.some((row) => Number(row.id) === preferredMunicipalityId)) {
+        activeMunicipalityTab.value = String(preferredMunicipalityId);
+        filters.municipality_id = String(preferredMunicipalityId);
+    }
+
+    await loadProjects(1);
+});
+
+onBeforeUnmount(() => {
+    if (searchTimer) {
+        clearTimeout(searchTimer);
     }
 });
-
-watch([() => filters.search, () => filters.status, () => filters.municipality_id, viewMode], () => {
-    pagination.page = 1;
-});
-
-watch(totalPages, (value) => {
-    if (pagination.page > value) {
-        pagination.page = value;
-    }
-});
-
-onMounted(loadData);
 </script>
 
 <template>
@@ -474,8 +390,8 @@ onMounted(loadData);
         <section class="tracky-projects">
             <header class="tracky-projects__head">
                 <div>
-                    <h2>{{ t('projectsPage.summaryTitle') }}</h2>
-                    <p>{{ t('projectsPage.summarySubtitle') }}</p>
+                    <h2>{{ t('projectsPage.title') }}</h2>
+                    <p>{{ t('projectsPage.subtitle') }}</p>
                 </div>
                 <div class="tracky-projects__head-actions">
                     <button
@@ -484,7 +400,7 @@ onMounted(loadData);
                         v-if="canManageMunicipalities"
                         @click="municipalityModalOpen = true"
                     >
-                        {{ t('projectsPage.addMunicipality') }}
+                        {{ t('projectsPage.createMunicipality') }}
                     </button>
                     <button
                         class="tracky-btn tracky-btn--primary"
@@ -493,7 +409,7 @@ onMounted(loadData);
                         @click="openCreateProjectModal"
                     >
                         <span>+</span>
-                        <span>{{ t('projectsPage.addProject') }}</span>
+                        <span>{{ t('dashboard.addNewProject') }}</span>
                     </button>
                 </div>
             </header>
@@ -501,27 +417,16 @@ onMounted(loadData);
             <p class="field-error" v-if="error">{{ error }}</p>
 
             <section class="tracky-card tracky-projects__toolbar">
-                <div class="tracky-projects__search-wrap">
-                    <input v-model="filters.search" :placeholder="t('projectsPage.searchPlaceholder')">
-                </div>
-
                 <div class="tracky-projects__filters">
+                    <div class="tracky-projects__search-wrap">
+                        <input v-model="filters.search" :placeholder="t('dashboard.searchProjects')">
+                    </div>
+
                     <select v-model="filters.status">
-                        <option value="">{{ t('projectsPage.allStatuses') }}</option>
+                        <option value="">{{ t('dashboard.allStatus') }}</option>
                         <option value="active">{{ t('dashboard.active') }}</option>
                         <option value="archived">{{ t('dashboard.archived') }}</option>
                     </select>
-
-                    <select v-model="filters.municipality_id">
-                        <option value="">{{ t('projectsPage.allMunicipalities') }}</option>
-                        <option v-for="municipality in municipalities" :key="municipality.id" :value="municipality.id">
-                            {{ municipality.name }}
-                        </option>
-                    </select>
-
-                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="viewMode = viewMode === 'table' ? 'cards' : 'table'">
-                        {{ viewMode === 'table' ? t('projectsPage.cardView') : t('projectsPage.tableView') }}
-                    </button>
                 </div>
 
                 <div class="tracky-projects__tabs">
@@ -530,7 +435,7 @@ onMounted(loadData);
                         v-for="tab in municipalityTabs"
                         :key="tab.id"
                         :class="{ active: activeMunicipalityTab === tab.id }"
-                        @click="activeMunicipalityTab = tab.id"
+                        @click="setMunicipalityTab(tab.id)"
                     >
                         <span>{{ tab.label }}</span>
                         <small>{{ tab.count }}</small>
@@ -541,227 +446,164 @@ onMounted(loadData);
             <section class="tracky-card tracky-projects__content">
                 <div class="tracky-projects__empty" v-if="loading">{{ t('common.loading') }}</div>
 
-                <template v-else-if="paginatedProjects.length">
-                    <div class="tracky-projects-grid" v-if="viewMode === 'cards'">
-                        <article class="tracky-project-summary-card" v-for="project in paginatedProjects" :key="project.id" @click="openProjectDetails(project)">
-                            <div class="tracky-project-summary-card__head">
+                <div class="tracky-projects-table-wrap" v-else-if="projects.length">
+                    <table class="tracky-projects-table">
+                        <thead>
+                        <tr>
+                            <th>{{ t('projectsPage.projects') }}</th>
+                            <th>{{ t('projectsPage.projectReference') }}</th>
+                            <th>{{ t('projectsPage.approvedSubmissions') }}</th>
+                            <th>{{ t('projectsPage.pendingSubmissions') }}</th>
+                            <th>{{ t('projectsPage.progress') }}</th>
+                            <th>{{ t('projectsPage.status') }}</th>
+                            <th>{{ t('projectsPage.tableColumns.actions') }}</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr v-for="project in projects" :key="project.id" @click="openProjectDetails(project)">
+                            <td>
+                                <strong>{{ project.name }}</strong>
+                                <p>ID:{{ project.id }}</p>
+                            </td>
+                            <td>{{ projectReference(project.id) }}</td>
+                            <td>{{ project.stats?.approved_submissions || 0 }}</td>
+                            <td>{{ project.stats?.pending_submissions || 0 }}</td>
+                            <td>
+                                <div class="tracky-project-progress-row">
+                                    <small>{{ project.stats?.progress_percent || 0 }}%</small>
+                                </div>
+                                <div class="tracky-project-inline-progress">
+                                    <span :style="{ width: `${project.stats?.progress_percent || 0}%` }" />
+                                </div>
+                            </td>
+                            <td>
                                 <span class="badge" :class="project.status === 'active' ? 'badge--active' : 'badge--archived'">
                                     {{ project.status === 'active' ? t('dashboard.active') : t('dashboard.archived') }}
                                 </span>
-                                <button
-                                    type="button"
-                                    class="tracky-card-menu-btn"
-                                    v-if="canManageProjects"
-                                    @click.stop="openEditProjectModal(project)"
-                                >
-                                    •••
-                                </button>
-                            </div>
-
-                            <p class="tracky-project-summary-card__ref">{{ project.reference }}</p>
-                            <h3>{{ project.name }}</h3>
-                            <p class="tracky-project-meta">{{ project.municipality?.name || '-' }}</p>
-
-                            <div class="tracky-project-progress-row">
-                                <span>{{ t('projectsPage.progress') }}</span>
-                                <strong>{{ project.progress }}%</strong>
-                            </div>
-                            <div class="tracky-progress">
-                                <div class="tracky-progress__bar" :style="{ width: `${project.progress}%` }" />
-                            </div>
-
-                            <div class="tracky-project-summary-stats">
-                                <div>
-                                    <small>{{ t('projectsPage.reports') }}</small>
-                                    <strong>{{ project.stats.total }}</strong>
+                            </td>
+                            <td>
+                                <div class="tracky-project-actions" @click.stop>
+                                    <button
+                                        class="tracky-btn tracky-btn--ghost"
+                                        type="button"
+                                        v-if="canViewProjectSubmissions"
+                                        @click="openProjectSubmissions(project)"
+                                    >
+                                        View Submission
+                                    </button>
+                                    <button
+                                        class="tracky-btn tracky-btn--ghost"
+                                        type="button"
+                                        v-if="canManageProjects"
+                                        @click="openEditProjectModal(project)"
+                                    >
+                                        {{ t('projectsPage.editProject') }}
+                                    </button>
                                 </div>
-                                <div>
-                                    <small>{{ t('dashboard.approved') }}</small>
-                                    <strong>{{ project.stats.approved }}</strong>
-                                </div>
-                                <div>
-                                    <small>{{ t('dashboard.pending') }}</small>
-                                    <strong>{{ project.stats.pending }}</strong>
-                                </div>
-                            </div>
-
-                            <button
-                                class="tracky-btn tracky-btn--soft"
-                                type="button"
-                                v-if="canOpenSubmissionWorklist"
-                                @click.stop="openSubmissionPage(project)"
-                            >
-                                {{ t('projectsPage.goToSubmissions') }}
-                            </button>
-                        </article>
-                    </div>
-
-                    <div class="tracky-projects-table-wrap" v-else>
-                        <table class="tracky-projects-table">
-                            <thead>
-                            <tr>
-                                <th>{{ t('projectsPage.tableColumns.project') }}</th>
-                                <th>{{ t('projectsPage.tableColumns.reference') }}</th>
-                                <th>{{ t('projectsPage.tableColumns.approved') }}</th>
-                                <th>{{ t('projectsPage.tableColumns.pending') }}</th>
-                                <th>{{ t('projectsPage.tableColumns.progress') }}</th>
-                                <th>{{ t('projectsPage.tableColumns.status') }}</th>
-                                <th>{{ t('projectsPage.tableColumns.actions') }}</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr v-for="project in paginatedProjects" :key="project.id" @click="openProjectDetails(project)">
-                                <td>
-                                    <strong>{{ project.name }}</strong>
-                                    <p>{{ project.municipality?.name || '-' }}</p>
-                                </td>
-                                <td>{{ project.reference }}</td>
-                                <td>{{ project.stats.approved }}</td>
-                                <td>{{ project.stats.pending }}</td>
-                                <td>
-                                    <div class="tracky-project-progress-row">
-                                        <small>{{ project.progress }}%</small>
-                                    </div>
-                                    <div class="tracky-project-inline-progress">
-                                        <span :style="{ width: `${project.progress}%` }" />
-                                    </div>
-                                </td>
-                                <td>
-                                    <span class="badge" :class="project.status === 'active' ? 'badge--active' : 'badge--archived'">
-                                        {{ project.status === 'active' ? t('dashboard.active') : t('dashboard.archived') }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="tracky-project-actions" @click.stop>
-                                        <button class="tracky-btn tracky-btn--ghost" type="button" @click="openProjectDetails(project)">
-                                            {{ t('projectsPage.viewDetails') }}
-                                        </button>
-                                        <button
-                                            class="tracky-btn tracky-btn--ghost"
-                                            type="button"
-                                            v-if="canOpenSubmissionWorklist"
-                                            @click="openSubmissionPage(project)"
-                                        >
-                                            {{ t('projectsPage.viewSubmission') }}
-                                        </button>
-                                        <button
-                                            class="tracky-btn tracky-btn--ghost"
-                                            type="button"
-                                            v-if="canManageProjects"
-                                            @click="openEditProjectModal(project)"
-                                        >
-                                            {{ t('projectsPage.editShort') }}
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </template>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
 
                 <div class="tracky-projects__empty" v-else>
-                    <h3>{{ t('projectsPage.noProjectsTitle') }}</h3>
-                    <p>{{ t('projectsPage.noProjectsBody') }}</p>
+                    <h3>{{ t('projectsPage.noProjects') }}</h3>
+                    <p>Create a project to start monitoring activities.</p>
                 </div>
             </section>
 
-            <footer class="tracky-projects__pagination" v-if="!loading && enrichedProjects.length">
-                <p>{{ t('projectsPage.pageIndicator', { page: pagination.page, total: totalPages }) }}</p>
+            <footer class="tracky-projects__pagination" v-if="!loading && pagination.last_page > 1">
+                <p>Page {{ pagination.current_page }} of {{ pagination.last_page }}</p>
                 <div class="tracky-page-buttons">
-                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.page <= 1" @click="goToPage(pagination.page - 1)">
+                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.current_page <= 1" @click="goToPage(pagination.current_page - 1)">
                         Prev
                     </button>
                     <button
                         v-for="page in visiblePages"
                         :key="String(page)"
                         class="tracky-btn"
-                        :class="typeof page === 'number' && page === pagination.page ? 'tracky-btn--primary' : 'tracky-btn--ghost'"
+                        :class="typeof page === 'number' && page === pagination.current_page ? 'tracky-btn--primary' : 'tracky-btn--ghost'"
                         :disabled="typeof page !== 'number'"
                         @click="goToPage(page)"
                     >
                         {{ typeof page === 'number' ? page : '...' }}
                     </button>
-                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.page >= totalPages" @click="goToPage(pagination.page + 1)">
+                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.current_page >= pagination.last_page" @click="goToPage(pagination.current_page + 1)">
                         Next
                     </button>
                 </div>
             </footer>
 
-            <div class="tracky-project-modal-backdrop" v-if="projectDetailsModalOpen && selectedProject" @click.self="closeProjectDetails">
+            <div class="tracky-project-modal-backdrop" v-if="projectDetailsModalOpen" @click.self="closeProjectDetails">
                 <article class="tracky-project-modal">
                     <header class="tracky-project-modal__head">
                         <div>
-                            <h3>{{ selectedProject.name }}</h3>
-                            <p>{{ selectedProject.reference }}</p>
+                            <h3>{{ detailLoading ? 'Loading project...' : projectDetails?.name || 'Project Details' }}</h3>
+                            <p v-if="projectDetails">{{ projectReference(projectDetails.id) }}</p>
                         </div>
                         <div class="tracky-project-modal__head-actions">
                             <button
                                 class="tracky-btn tracky-btn--soft"
                                 type="button"
-                                v-if="canOpenSubmissionWorklist"
-                                @click="openSubmissionPage(selectedProject)"
+                                v-if="projectDetails && canViewProjectSubmissions"
+                                @click="openProjectSubmissions(projectDetails)"
                             >
-                                {{ t('projectsPage.goToSubmissions') }}
+                                Go to Submissions
                             </button>
                             <button
                                 class="tracky-btn tracky-btn--ghost"
                                 type="button"
-                                v-if="canManageProjects"
-                                @click="openEditProjectModal(selectedProject)"
+                                v-if="projectDetails && canManageProjects"
+                                @click="openEditProjectModal(projectDetails)"
                             >
                                 {{ t('projectsPage.editProject') }}
                             </button>
-                            <button class="tracky-btn tracky-btn--ghost" type="button" @click="closeProjectDetails">
-                                {{ t('projectsPage.close') }}
-                            </button>
+                            <button class="tracky-btn tracky-btn--ghost" type="button" @click="closeProjectDetails">Close</button>
                         </div>
                     </header>
 
-                    <div class="tracky-project-modal__body">
+                    <div class="tracky-project-modal__body" v-if="projectDetails && !detailLoading">
                         <section class="tracky-project-modal__column">
                             <div class="tracky-project-modal__meta-grid">
                                 <div>
                                     <span>{{ t('projectsPage.status') }}</span>
                                     <strong>
-                                        <span class="badge" :class="selectedProject.status === 'active' ? 'badge--active' : 'badge--archived'">
-                                            {{ selectedProject.status === 'active' ? t('dashboard.active') : t('dashboard.archived') }}
+                                        <span class="badge" :class="projectDetails.status === 'active' ? 'badge--active' : 'badge--archived'">
+                                            {{ projectDetails.status === 'active' ? t('dashboard.active') : t('dashboard.archived') }}
                                         </span>
                                     </strong>
                                 </div>
                                 <div>
                                     <span>{{ t('projectsPage.municipality') }}</span>
-                                    <strong>{{ selectedProject.municipality?.name || '-' }}</strong>
+                                    <strong>{{ projectDetails.municipality?.name || '-' }}</strong>
                                 </div>
                                 <div>
-                                    <span>{{ t('projectsPage.projectReference') }}</span>
-                                    <strong>{{ selectedProject.reference }}</strong>
+                                    <span>{{ t('projectsPage.progress') }}</span>
+                                    <strong>{{ projectDetails.stats?.progress_percent || 0 }}%</strong>
                                 </div>
                                 <div>
-                                    <span>{{ t('projectsPage.lastUpdated') }}</span>
-                                    <strong>{{ formatDateTime(selectedProject.last_update_at) }}</strong>
+                                    <span>{{ t('projectsPage.updatedAt') }}</span>
+                                    <strong>{{ projectDetails.last_update_at ? new Date(projectDetails.last_update_at).toLocaleDateString() : '-' }}</strong>
                                 </div>
                             </div>
 
                             <div class="tracky-project-mini-map">
-                                <strong>{{ t('projectsPage.coordinates') }}</strong>
-                                <span>
-                                    {{ selectedProject.latitude ?? '-' }}, {{ selectedProject.longitude ?? '-' }}
-                                </span>
+                                <strong>Project location</strong>
+                                <span>{{ projectDetails.latitude ?? '-' }}, {{ projectDetails.longitude ?? '-' }}</span>
                             </div>
 
                             <div class="tracky-project-section">
                                 <h4>{{ t('dashboard.projectDescription') }}</h4>
-                                <p>{{ selectedProject.description || t('dashboard.noDescription') }}</p>
+                                <p>{{ projectDetails.description || t('dashboard.noDescription') }}</p>
                             </div>
 
                             <div class="tracky-project-section">
                                 <div class="tracky-project-progress-row">
                                     <h4>{{ t('projectsPage.progress') }}</h4>
-                                    <strong>{{ selectedProject.progress }}%</strong>
+                                    <strong>{{ projectDetails.stats?.progress_percent || 0 }}%</strong>
                                 </div>
                                 <div class="tracky-progress">
-                                    <div class="tracky-progress__bar" :style="{ width: `${selectedProject.progress}%` }" />
+                                    <div class="tracky-progress__bar" :style="{ width: `${projectDetails.stats?.progress_percent || 0}%` }" />
                                 </div>
                             </div>
                         </section>
@@ -772,40 +614,46 @@ onMounted(loadData);
                                 <ul class="tracky-project-stats-list">
                                     <li>
                                         <span>{{ t('projectsPage.totalSubmissions') }}</span>
-                                        <strong>{{ selectedProject.stats.total }}</strong>
+                                        <strong>{{ projectDetails.stats?.total_submissions || 0 }}</strong>
                                     </li>
                                     <li>
                                         <span>{{ t('projectsPage.approvedSubmissions') }}</span>
-                                        <strong>{{ selectedProject.stats.approved }}</strong>
+                                        <strong>{{ projectDetails.stats?.approved_submissions || 0 }}</strong>
                                     </li>
                                     <li>
                                         <span>{{ t('projectsPage.pendingSubmissions') }}</span>
-                                        <strong>{{ selectedProject.stats.pending }}</strong>
+                                        <strong>{{ projectDetails.stats?.pending_submissions || 0 }}</strong>
                                     </li>
                                     <li>
                                         <span>{{ t('projectsPage.rejectedSubmissions') }}</span>
-                                        <strong>{{ selectedProject.stats.rejected }}</strong>
+                                        <strong>{{ projectDetails.stats?.rejected_submissions || 0 }}</strong>
                                     </li>
                                     <li>
                                         <span>{{ t('projectsPage.mediaAttachments') }}</span>
-                                        <strong>{{ selectedProject.stats.mediaItems }}</strong>
+                                        <strong>{{ projectDetails.stats?.media_attachments || 0 }}</strong>
                                     </li>
                                 </ul>
                             </div>
 
-                            <div class="tracky-project-section" v-if="canOpenSubmissionWorklist">
-                                <button class="tracky-btn tracky-btn--primary" type="button" @click="openSubmissionPage(selectedProject)">
-                                    {{ t('projectsPage.goToSubmissions') }}
-                                </button>
+                            <div class="tracky-project-section" v-if="projectReporters.length">
+                                <h4>Assigned Reporter Details</h4>
+                                <ul class="tracky-project-stats-list">
+                                    <li v-for="reporter in projectReporters" :key="reporter.id">
+                                        <span>{{ reporter.name }}</span>
+                                        <strong>{{ reporter.email || '-' }}</strong>
+                                    </li>
+                                </ul>
                             </div>
                         </section>
                     </div>
+
+                    <div class="tracky-projects__empty" v-else-if="detailLoading">Loading project details...</div>
                 </article>
             </div>
 
             <div class="modal-backdrop" v-if="projectFormModalOpen" @click.self="closeProjectFormModal">
                 <article class="modal-card tracky-form-modal">
-                    <h3>{{ editingProjectId ? t('projectsPage.modalEditProject') : t('projectsPage.modalCreateProject') }}</h3>
+                    <h3>{{ editingProjectId ? t('projectsPage.editProject') : t('projectsPage.createProject') }}</h3>
 
                     <label class="field">
                         {{ t('projectsPage.municipality') }}
@@ -840,12 +688,10 @@ onMounted(loadData);
                                 <option value="archived">{{ t('dashboard.archived') }}</option>
                             </select>
                         </label>
-
                         <label class="field">
                             {{ t('projectsPage.latitude') }}
                             <input v-model="projectForm.latitude" type="number" step="any">
                         </label>
-
                         <label class="field">
                             {{ t('projectsPage.longitude') }}
                             <input v-model="projectForm.longitude" type="number" step="any">

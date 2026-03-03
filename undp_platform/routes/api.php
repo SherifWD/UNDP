@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\MunicipalityController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\RealtimeController;
+use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\SubmissionController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WorkflowController;
@@ -40,6 +41,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::put('/municipalities/{municipality}', [MunicipalityController::class, 'update'])->middleware('permission:municipalities.manage');
 
     Route::get('/projects', [ProjectController::class, 'index'])->middleware('permission:projects.view');
+    Route::get('/projects/{project}', [ProjectController::class, 'show'])->middleware('permission:projects.view');
     Route::post('/projects', [ProjectController::class, 'store'])->middleware('permission:projects.manage');
     Route::put('/projects/{project}', [ProjectController::class, 'update'])->middleware('permission:projects.manage');
 
@@ -70,6 +72,9 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
 
     Route::get('/audit-logs', [AuditLogController::class, 'index'])->middleware('permission:audit.view');
     Route::get('/audit-logs/{auditLog}', [AuditLogController::class, 'show'])->middleware('permission:audit.view');
+
+    Route::get('/settings', [SettingController::class, 'show']);
+    Route::put('/settings', [SettingController::class, 'update'])->middleware('permission:workflow.manage');
 
     Route::post('/exports/tasks', [ExportController::class, 'createTask'])
         ->middleware('any_permission:reports.export.csv,reports.export.pdf');
