@@ -17,6 +17,7 @@ const reasons = ref([]);
 const loading = ref(false);
 const actionLoading = ref(false);
 const error = ref('');
+const detailsModalOpen = ref(false);
 
 const mediaPreview = reactive({
     loading: false,
@@ -58,6 +59,96 @@ const reasonOptions = computed(() => {
 
 const selectedReason = computed(() => reasonOptions.value.find((item) => item.code === actionForm.reason_code) || null);
 const selectedTimelineEvent = computed(() => timeline.value.find((event) => event.id === selectedTimelineEventId.value) || null);
+
+const FIELD_LABELS = {
+    report_type: 'Report Type',
+    reporting_period_label: 'Reporting Period',
+    project_code: 'Project Code',
+    project_name: 'Project Name',
+    goal_area: 'Goal Area',
+    component_category: 'Component Category',
+    project_status: 'Project Status',
+    delay_reason: 'Reason for Delay',
+    progress_impression: 'Impression of Work Progress',
+    physical_progress: 'Physical Progress Seen',
+    approximate_completion_percentage: 'Approximate Completion Percentage',
+    additional_observations: 'Additional Observations',
+    is_project_being_used: 'Project Being Used',
+    user_categories: 'User Categories',
+    is_used_as_intended: 'Used As Intended',
+    functional_status: 'Functional Status',
+    negative_environmental_impact: 'Negative Environmental Impact',
+    negative_impact_details: 'Environmental Impact Details',
+    actual_beneficiaries: 'Actual Beneficiaries',
+    location_label: 'Location of Observation',
+    location_source: 'Location Source',
+    location_accuracy_meters: 'Location Accuracy (m)',
+    summary_of_observation: 'Summary of Observation',
+    key_updates: 'Key Updates',
+    challenges_risks_issues: 'Challenges / Risks / Issues',
+    risk_description: 'Risk Description',
+    delay_constraint: 'Delay / Constraint',
+    impact_description: 'Impact Description',
+    notes: 'Additional Notes',
+    observed_at: 'Observed At',
+    confirm_accuracy: 'Confirmed Accuracy',
+};
+
+const humanizeKey = (key) => key
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const formatSubmissionValue = (value) => {
+    if (value === null || value === undefined || value === '') {
+        return '-';
+    }
+
+    if (typeof value === 'boolean') {
+        return value ? 'Yes' : 'No';
+    }
+
+    if (Array.isArray(value)) {
+        if (value.length === 0) {
+            return '-';
+        }
+
+        return value
+            .map((item) => (typeof item === 'string' ? item : JSON.stringify(item)))
+            .join(', ');
+    }
+
+    if (typeof value === 'object') {
+        return JSON.stringify(value);
+    }
+
+    return String(value);
+};
+
+const submissionDataEntries = computed(() => {
+    const data = submission.value?.data;
+
+    if (!data || typeof data !== 'object') {
+        return [];
+    }
+
+    return Object.entries(data)
+        .filter(([, value]) => {
+            if (value === null || value === undefined || value === '') {
+                return false;
+            }
+
+            if (Array.isArray(value) && value.length === 0) {
+                return false;
+            }
+
+            return true;
+        })
+        .map(([key, value]) => ({
+            key,
+            label: FIELD_LABELS[key] || humanizeKey(key),
+            value: formatSubmissionValue(value),
+        }));
+});
 
 const loadSubmission = async () => {
     loading.value = true;
@@ -153,6 +244,11 @@ const previewMedia = async (asset) => {
 
 const selectTimelineEvent = (event) => {
     selectedTimelineEventId.value = event.id;
+    detailsModalOpen.value = true;
+};
+
+const closeDetailsModal = () => {
+    detailsModalOpen.value = false;
 };
 
 onMounted(async () => {
@@ -260,6 +356,9 @@ onMounted(async () => {
                         <p><strong>Role:</strong> {{ selectedTimelineEvent.actor?.role || '-' }}</p>
                         <p><strong>Timestamp:</strong> {{ new Date(selectedTimelineEvent.created_at).toLocaleString() }}</p>
                         <p v-if="selectedTimelineEvent.comment"><strong>Comment:</strong> {{ selectedTimelineEvent.comment }}</p>
+                        <button class="tracky-btn tracky-btn--soft" type="button" @click="detailsModalOpen = true">
+                            Open Full Submission Snapshot
+                        </button>
                     </div>
                 </div>
             </template>
@@ -291,6 +390,101 @@ onMounted(async () => {
                         {{ actionLoading ? 'Submitting...' : `Confirm ${actionLabel}` }}
                     </button>
                     <button class="btn btn--ghost" :disabled="actionLoading" @click="closeActionModal">Cancel</button>
+                </div>
+            </article>
+        </section>
+
+        <section class="tracky-project-modal-backdrop" v-if="detailsModalOpen && submission" @click.self="closeDetailsModal">
+            <article class="tracky-project-modal">
+                <header class="tracky-project-modal__head">
+                    <div>
+                        <h3>Submission Snapshot</h3>
+                        <p>#{{ submission.id }} - {{ submission.title }}</p>
+                    </div>
+                    <div class="tracky-project-modal__head-actions">
+                        <button class="tracky-btn tracky-btn--ghost" type="button" @click="closeDetailsModal">Close</button>
+                    </div>
+                </header>
+
+                <div class="tracky-project-modal__body">
+                    <section class="tracky-project-modal__column">
+                        <div class="tracky-project-section tracky-project-section--no-divider">
+                            <h4>Timeline Event</h4>
+                            <ul class="tracky-project-stats-list" v-if="selectedTimelineEvent">
+                                <li><span>To Status</span><strong>{{ selectedTimelineEvent.to_status }}</strong></li>
+                                <li><span>From Status</span><strong>{{ selectedTimelineEvent.from_status || 'start' }}</strong></li>
+                                <li><span>Actor</span><strong>{{ selectedTimelineEvent.actor?.name || 'System' }}</strong></li>
+                                <li><span>Role</span><strong>{{ selectedTimelineEvent.actor?.role || '-' }}</strong></li>
+                                <li><span>Timestamp</span><strong>{{ new Date(selectedTimelineEvent.created_at).toLocaleString() }}</strong></li>
+                            </ul>
+                            <p v-if="selectedTimelineEvent?.comment"><strong>Comment:</strong> {{ selectedTimelineEvent.comment }}</p>
+                        </div>
+
+                        <div class="tracky-project-section">
+                            <h4>Submission Overview</h4>
+                            <ul class="tracky-project-stats-list">
+                                <li><span>Status</span><strong>{{ submission.status_label }}</strong></li>
+                                <li><span>Project</span><strong>{{ submission.project?.name || '-' }}</strong></li>
+                                <li><span>Municipality</span><strong>{{ submission.municipality?.name || '-' }}</strong></li>
+                                <li><span>Reporter</span><strong>{{ submission.reporter?.name || '-' }}</strong></li>
+                                <li><span>Submitted At</span><strong>{{ submission.submitted_at ? new Date(submission.submitted_at).toLocaleString() : '-' }}</strong></li>
+                                <li><span>Validated At</span><strong>{{ submission.validated_at ? new Date(submission.validated_at).toLocaleString() : '-' }}</strong></li>
+                            </ul>
+                        </div>
+
+                        <div class="tracky-project-section">
+                            <h4>Reported Data</h4>
+                            <ul class="tracky-project-stats-list" v-if="submissionDataEntries.length">
+                                <li v-for="entry in submissionDataEntries" :key="entry.key">
+                                    <span>{{ entry.label }}</span>
+                                    <strong>{{ entry.value }}</strong>
+                                </li>
+                            </ul>
+                            <p v-else>No structured payload fields were submitted.</p>
+                        </div>
+                    </section>
+
+                    <section class="tracky-project-modal__column">
+                        <div class="tracky-project-section tracky-project-section--no-divider">
+                            <h4>Attachments</h4>
+                            <div class="tracky-project-media-grid">
+                                <button
+                                    type="button"
+                                    class="tracky-project-media-tile tracky-project-media-tile--button"
+                                    v-for="asset in submission.media_assets || []"
+                                    :key="asset.id"
+                                    @click="previewMedia(asset)"
+                                >
+                                    <strong>{{ asset.media_type === 'video' ? 'Video' : 'Image' }}</strong>
+                                    <small>#{{ asset.id }}</small>
+                                    <span>{{ asset.status }}</span>
+                                </button>
+                                <div class="tracky-project-media-empty" v-if="!(submission.media_assets || []).length">
+                                    No uploaded media.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tracky-project-section" v-if="mediaPreview.assetId">
+                            <h4>Attachment Preview</h4>
+                            <p><strong>Asset ID:</strong> #{{ mediaPreview.assetId }}</p>
+                            <div v-if="mediaPreview.loading">Loading media...</div>
+                            <template v-else-if="mediaPreview.url">
+                                <img
+                                    v-if="mediaPreview.mediaType === 'image'"
+                                    :src="mediaPreview.url"
+                                    alt="Submission media"
+                                    class="media-preview__image"
+                                >
+                                <video
+                                    v-else
+                                    controls
+                                    :src="mediaPreview.url"
+                                    class="media-preview__video"
+                                />
+                            </template>
+                        </div>
+                    </section>
                 </div>
             </article>
         </section>

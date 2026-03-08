@@ -3431,6 +3431,12 @@ html[dir='rtl'] .tracky-detail-bullet-list {
     color: #505975;
 }
 
+.tracky-project-media-tile--button {
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+}
+
 .tracky-project-media-empty {
     min-height: 72px;
     border: 1px dashed #d4daea;
