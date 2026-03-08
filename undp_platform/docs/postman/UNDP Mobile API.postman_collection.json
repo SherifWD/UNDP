@@ -682,7 +682,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"client_uuid\": \"{{client_uuid}}\",\n  \"project_id\": {{project_id}},\n  \"mode\": \"draft\",\n  \"title\": \"Phase 1 Reinforcement Progress Update\",\n  \"project_status\": \"in_progress\",\n  \"summary_of_observation\": \"Initial draft content.\"\n}",
+              "raw": "{\n  \"client_uuid\": \"{{$guid}}\",\n  \"project_id\": {{project_id}},\n  \"mode\": \"draft\",\n  \"title\": \"Phase 1 Reinforcement Progress Update\",\n  \"project_status\": \"in_progress\",\n  \"summary_of_observation\": \"Initial draft content.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

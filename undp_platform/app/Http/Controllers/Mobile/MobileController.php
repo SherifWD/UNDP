@@ -278,6 +278,10 @@ abstract class MobileController extends Controller
 
     protected function canEditSubmission(Submission $submission): bool
     {
+        if ($submission->status === SubmissionStatus::SUBMITTED->value) {
+            return $submission->validated_at === null && $submission->validated_by === null;
+        }
+
         return in_array($submission->status, [
             SubmissionStatus::DRAFT->value,
             SubmissionStatus::REWORK_REQUESTED->value,

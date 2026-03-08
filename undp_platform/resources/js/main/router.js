@@ -47,7 +47,7 @@ const routes = [
         component: ProjectSubmissionsView,
         meta: {
             requiresAuth: true,
-            anyPermissions: ['submissions.view.own', 'submissions.view.municipality', 'submissions.view.all', 'submissions.view.approved_aggregated'],
+            anyPermissions: ['submissions.validate', 'submissions.view.own', 'submissions.view.municipality', 'submissions.view.all', 'submissions.view.approved_aggregated'],
         },
     },
     {
@@ -68,7 +68,7 @@ const routes = [
         component: SubmissionDetailView,
         meta: {
             requiresAuth: true,
-            anyPermissions: ['submissions.view.own', 'submissions.view.municipality', 'submissions.view.all', 'submissions.view.approved_aggregated'],
+            anyPermissions: ['submissions.validate', 'submissions.view.own', 'submissions.view.municipality', 'submissions.view.all', 'submissions.view.approved_aggregated'],
         },
     },
     {

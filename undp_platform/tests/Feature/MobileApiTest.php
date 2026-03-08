@@ -206,6 +206,85 @@ class MobileApiTest extends TestCase
         ]);
     }
 
+    public function test_reporter_can_resubmit_submitted_report_before_validator_action(): void
+    {
+        $municipality = Municipality::query()->create([
+            'name_en' => 'Alkufraa',
+            'name_ar' => 'الكفرة',
+            'code' => 'ALK',
+        ]);
+
+        $project = Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Alkufraa Police Station Project',
+            'name_ar' => 'مشروع مركز شرطة الكفرة',
+            'status' => 'active',
+            'latitude' => 23.3112,
+            'longitude' => 21.8569,
+            'last_update_at' => now(),
+        ]);
+
+        $reporter = User::factory()->create([
+            'role' => UserRole::REPORTER->value,
+            'municipality_id' => $municipality->id,
+            'status' => 'active',
+        ]);
+
+        $project->assignedReporters()->sync([
+            $reporter->id => ['assigned_by' => $reporter->id],
+        ]);
+
+        Sanctum::actingAs($reporter);
+
+        $draftResponse = $this->postJson('/api/mobile/submissions', [
+            'client_uuid' => (string) Str::uuid(),
+            'project_id' => $project->id,
+            'mode' => 'draft',
+            'title' => 'Planned Status Draft',
+            'project_status' => 'planned',
+        ])->assertCreated();
+
+        $submissionId = $draftResponse->json('data.submission.id');
+
+        $plannedSubmit = $this->putJson('/api/mobile/submissions/'.$submissionId, [
+            'project_id' => $project->id,
+            'mode' => 'submit',
+            'title' => 'Planned Status Draft',
+            'project_status' => 'planned',
+            'delay_reason' => 'land_ownership_dispute',
+            'actual_beneficiaries' => 0,
+            'location_label' => 'South Region - Alkufraa',
+            'confirm_accuracy' => true,
+        ]);
+
+        $plannedSubmit
+            ->assertOk()
+            ->assertJsonPath('data.submission.status', SubmissionStatus::SUBMITTED->value)
+            ->assertJsonPath('data.submission.data.project_status', 'planned');
+
+        $completedResubmit = $this->putJson('/api/mobile/submissions/'.$submissionId, [
+            'project_id' => $project->id,
+            'mode' => 'submit',
+            'title' => 'Completed Status Update',
+            'project_status' => 'completed',
+            'is_project_being_used' => true,
+            'user_categories' => ['all_of_the_above'],
+            'is_used_as_intended' => true,
+            'functional_status' => 'fully_functional',
+            'negative_environmental_impact' => true,
+            'negative_impact_details' => 'Minor construction debris left near the entrance area.',
+            'actual_beneficiaries' => 200,
+            'location_label' => 'South Region - Alkufraa',
+            'confirm_accuracy' => true,
+        ]);
+
+        $completedResubmit
+            ->assertOk()
+            ->assertJsonPath('data.submission.status', SubmissionStatus::SUBMITTED->value)
+            ->assertJsonPath('data.submission.data.project_status', 'completed')
+            ->assertJsonPath('data.submission.data.functional_status', 'fully_functional');
+    }
+
     public function test_reporting_options_expose_status_driven_mobile_flow(): void
     {
         $municipality = Municipality::query()->create([
