@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('phone_e164', 25)->index();
             $table->string('code', 12);
             $table->timestamp('expires_at')->index();
-            $table->timestamp('last_sent_at')->index();
+            $table->timestamp('last_sent_at')->nullable();
             $table->unsignedSmallInteger('attempts')->default(0);
             $table->timestamp('verified_at')->nullable();
             $table->timestamps();
