@@ -1,0 +1,1443 @@
+{
+  "info": {
+    "_postman_id": "865a7920-01f8-4942-8c70-09c3b120ac24",
+    "name": "UNDP Mobile API",
+    "description": "Mobile-only collection for the Flutter developer. This excludes dashboard/admin flows and covers authentication plus the `/mobile/*` endpoints used by the mobile app.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "37378520",
+    "_collection_link": "https://go.postman.co/collection/37378520-865a7920-01f8-4942-8c70-09c3b120ac24?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Get Registration Meta",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/registration-meta",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "registration-meta"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "  const json = pm.response.json();",
+                  "  const first = json?.data?.municipalities?.[0];",
+                  "  if (first?.id) pm.collectionVariables.set('municipality_id', String(first.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Request OTP (Unknown User - Expect Registration)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"country_code\": \"{{country_code}}\",\n  \"phone\": \"{{unknown_phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/request-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "request-otp"
+              ]
+            },
+            "description": "Expected response: 404 with `requires_registration: true` when phone number is not registered."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (pm.response.code === 404 && json?.requires_registration === true) {",
+                  "  pm.collectionVariables.set(\"requires_registration\", \"true\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Reporter",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"country_code\": \"{{country_code}}\",\n  \"phone\": \"{{new_reporter_phone}}\",\n  \"name\": \"{{full_name}}\",\n  \"age\": {{age}},\n  \"gender\": \"{{gender}}\",\n  \"municipality_id\": {{municipality_id}},\n  \"email\": \"{{reporter_email}}\",\n  \"preferred_locale\": \"{{preferred_locale}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register-reporter",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register-reporter"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "  pm.collectionVariables.set(\"phone\", pm.collectionVariables.get(\"new_reporter_phone\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Request OTP (Existing User)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"country_code\": \"{{country_code}}\",\n  \"phone\": \"{{phone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/request-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "request-otp"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "  const json = pm.response.json();",
+                  "  const otp = json?.otp ?? json?.data?.otp;",
+                  "  if (otp) pm.collectionVariables.set(\"otp_code\", String(otp));",
+                  "  pm.collectionVariables.set(\"requires_registration\", \"false\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "  const json = pm.response.json();",
+                  "  const token = json?.token ?? json?.data?.token;",
+                  "  if (token) pm.collectionVariables.set(\"token\", token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"country_code\": \"{{country_code}}\",\n  \"phone\": \"{{phone}}\",\n  \"code\": \"{{otp_code}}\",\n  \"preferred_locale\": \"{{preferred_locale}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/verify-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "verify-otp"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Device Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fcm_token\": \"flutter-device-token\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/device-token",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "device-token"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Home",
+      "item": [
+        {
+          "name": "Get Home Dashboard",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "13|sCGZNixe9WKfExEXILfmv8hVrxbsA1o1noUy8a0X50a9bc06",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/home",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "home"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Projects",
+      "item": [
+        {
+          "name": "List Mobile Projects",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "  const json = pm.response.json();",
+                  "  const first = json?.data?.items?.[0];",
+                  "  if (first?.id) pm.collectionVariables.set('project_id', String(first.id));",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "13|sCGZNixe9WKfExEXILfmv8hVrxbsA1o1noUy8a0X50a9bc06",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/projects?list_type=all&limit=20&execution_status=planned",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "projects"
+              ],
+              "query": [
+                {
+                  "key": "list_type",
+                  "value": "all"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "execution_status",
+                  "value": "planned"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Invited Projects",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/projects?list_type=invited",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "projects"
+              ],
+              "query": [
+                {
+                  "key": "list_type",
+                  "value": "invited"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Project Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/projects/{{project_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "projects",
+                "{{project_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reporting",
+      "item": [
+        {
+          "name": "Get Reporting Options",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/reporting/options?project_id={{project_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "reporting",
+                "options"
+              ],
+              "query": [
+                {
+                  "key": "project_id",
+                  "value": "{{project_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Submissions",
+      "item": [
+        {
+          "name": "List Submitted",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "  const json = pm.response.json();",
+                  "  const first = json?.data?.items?.[0];",
+                  "  if (first?.id) pm.collectionVariables.set('submission_id', String(first.id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/submissions?tab=submitted",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "submissions"
+              ],
+              "query": [
+                {
+                  "key": "tab",
+                  "value": "submitted"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Drafts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/submissions?tab=drafts",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "submissions"
+              ],
+              "query": [
+                {
+                  "key": "tab",
+                  "value": "drafts"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Draft Submission",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "  const json = pm.response.json();",
+                  "  const submission = json?.data?.submission;",
+                  "  if (submission?.id) pm.collectionVariables.set('submission_id', String(submission.id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_uuid\": \"{{client_uuid}}\",\n  \"project_id\": {{project_id}},\n  \"mode\": \"draft\",\n  \"title\": \"Phase 1 Reinforcement Progress Update\",\n  \"project_status\": \"in_progress\",\n  \"summary_of_observation\": \"Initial draft content.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/mobile/submissions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "submissions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Final Monitoring Report",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Phase 1 Reinforcement Progress Update\",\n  \"project_status\": \"in_progress\",\n  \"progress_impression\": \"good\",\n  \"physical_progress\": true,\n  \"approximate_completion_percentage\": 25,\n  \"additional_observations\": \"Concrete reinforcement is ongoing.\",\n  \"summary_of_observation\": \"Structural reinforcement of the perimeter wall is progressing steadily.\",\n  \"key_updates\": [\n    \"Reinforced concrete materials delivered on-site\",\n    \"Night shift introduced to accelerate progress\"\n  ],\n  \"actual_beneficiaries\": 123,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"gps\",\n  \"latitude\": 23.3112,\n  \"longitude\": 21.8569,\n  \"media\": [\n    {\n      \"id\": {{media_asset_id}},\n      \"type\": \"image\",\n      \"label\": \"Front gate progress\"\n    }\n  ],\n  \"notes\": \"Community members expressed satisfaction with the new facility.\",\n  \"confirm_accuracy\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/mobile/submissions/{{submission_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "submissions",
+                "{{submission_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Planned Monitoring Report",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Planned Phase Monitoring\",\n  \"project_status\": \"planned\",\n  \"delay_reason\": \"land_ownership_dispute\",\n  \"summary_of_observation\": \"Site still not started pending land ownership clarification.\",\n  \"actual_beneficiaries\": 0,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"manual\",\n  \"notes\": \"No contractor mobilization observed.\",\n  \"confirm_accuracy\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/mobile/submissions/{{submission_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "submissions",
+                "{{submission_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Completed Monitoring Report",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Completed Project Verification\",\n  \"project_status\": \"completed\",\n  \"is_project_being_used\": true,\n  \"user_categories\": [\"all_of_the_above\"],\n  \"is_used_as_intended\": true,\n  \"functional_status\": \"fully_functional\",\n  \"negative_environmental_impact\": true,\n  \"negative_impact_details\": \"Minor construction debris left near the entrance area.\",\n  \"summary_of_observation\": \"Project assets are operational and in daily use.\",\n  \"actual_beneficiaries\": 460,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"manual\",\n  \"notes\": \"Community feedback indicates high satisfaction with service quality.\",\n  \"confirm_accuracy\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/mobile/submissions/{{submission_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "submissions",
+                "{{submission_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Submission Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/submissions/{{submission_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "submissions",
+                "{{submission_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Submission Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/submissions/{{submission_id}}/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "submissions",
+                "{{submission_id}}",
+                "summary"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Submission Media",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/submissions/{{submission_id}}/media",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "submissions",
+                "{{submission_id}}",
+                "media"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Submission Media",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/submissions/{{submission_id}}/media/{{media_asset_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "submissions",
+                "{{submission_id}}",
+                "media",
+                "{{media_asset_id}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Media",
+      "item": [
+        {
+          "name": "Presign Upload",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "  const json = pm.response.json();",
+                  "  if (json?.media_asset_id) pm.collectionVariables.set('media_asset_id', String(json.media_asset_id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"submission_id\": {{submission_id}},\n  \"client_media_id\": \"mobile-photo-1\",\n  \"label\": \"Front gate progress\",\n  \"display_order\": 0,\n  \"media_type\": \"image\",\n  \"mime_type\": \"image/jpeg\",\n  \"original_filename\": \"site-photo.jpg\",\n  \"size_bytes\": 524288\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/mobile/media/presign-upload",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "media",
+                "presign-upload"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Complete Upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"size_bytes\": 524288\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/mobile/media/{{media_asset_id}}/complete",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "media",
+                "{{media_asset_id}}",
+                "complete"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Download URL",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/media/{{media_asset_id}}/download-url",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "media",
+                "{{media_asset_id}}",
+                "download-url"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Inbox",
+      "item": [
+        {
+          "name": "List Inbox",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "  const json = pm.response.json();",
+                  "  const first = json?.data?.items?.[0];",
+                  "  if (first?.id) pm.collectionVariables.set('notification_id', String(first.id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/inbox",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "inbox"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark One Read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/inbox/{{notification_id}}/read",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "inbox",
+                "{{notification_id}}",
+                "read"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark All Read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/inbox/read-all",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "inbox",
+                "read-all"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/profile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mobile Reporter\",\n  \"age\": 28,\n  \"gender\": \"male\",\n  \"preferred_locale\": \"{{preferred_locale}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/mobile/profile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Avatar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "avatar",
+                  "type": "file",
+                  "value": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/mobile/profile/avatar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "profile",
+                "avatar"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Settings",
+      "item": [
+        {
+          "name": "Get Settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mobile/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "settings"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Language",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferred_locale\": \"ar\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/mobile/settings/language",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mobile",
+                "settings",
+                "language"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "country_code",
+      "value": "+218"
+    },
+    {
+      "key": "phone",
+      "value": "910000001"
+    },
+    {
+      "key": "otp_code",
+      "value": ""
+    },
+    {
+      "key": "project_id",
+      "value": "1"
+    },
+    {
+      "key": "submission_id",
+      "value": "1"
+    },
+    {
+      "key": "notification_id",
+      "value": ""
+    },
+    {
+      "key": "media_asset_id",
+      "value": "1"
+    },
+    {
+      "key": "client_uuid",
+      "value": "11111111-1111-1111-1111-111111111111"
+    },
+    {
+      "key": "municipality_id",
+      "value": "1"
+    },
+    {
+      "key": "full_name",
+      "value": "New Reporter"
+    },
+    {
+      "key": "age",
+      "value": "27"
+    },
+    {
+      "key": "gender",
+      "value": "male"
+    },
+    {
+      "key": "preferred_locale",
+      "value": "en"
+    },
+    {
+      "key": "unknown_phone",
+      "value": "933333333"
+    },
+    {
+      "key": "new_reporter_phone",
+      "value": "944444444"
+    },
+    {
+      "key": "reporter_email",
+      "value": "reporter.mobile@example.com"
+    },
+    {
+      "key": "requires_registration",
+      "value": ""
+    }
+  ]
+}

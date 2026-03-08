@@ -55,9 +55,8 @@ return [
         ],
         'functional_statuses' => [
             'fully_functional' => 'Fully Functional / Good condition',
-            'partially_functional' => 'Partially Functional',
-            'non_functional' => 'Non-Functional',
-            'under_maintenance' => 'Under Maintenance',
+            'operational_needs_maintenance' => 'Operational but needs maintenance',
+            'broken_bad_condition' => 'Broken / Bad condition',
         ],
         'user_categories' => [
             'women' => 'Women',

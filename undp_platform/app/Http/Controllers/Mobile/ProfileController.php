@@ -29,6 +29,7 @@ class ProfileController extends MobileController
     {
         $validator = Validator::make($request->all(), [
             'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'age' => ['sometimes', 'nullable', 'integer', 'min:16', 'max:100'],
             'gender' => ['sometimes', 'nullable', Rule::in(['male', 'female', 'other', 'prefer_not_to_say'])],
         ]);
 
@@ -86,6 +87,7 @@ class ProfileController extends MobileController
             'country_code' => $user->country_code,
             'phone_e164' => $user->phone_e164,
             'email' => $user->email,
+            'age' => $user->age,
             'role' => $user->role,
             'role_label' => ucwords(str_replace('_', ' ', $user->role)),
             'gender' => $user->gender,

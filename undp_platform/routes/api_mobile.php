@@ -25,6 +25,8 @@ Route::prefix('mobile')
         Route::put('/submissions/{submission}', [SubmissionController::class, 'update']);
         Route::get('/submissions/{submission}', [SubmissionController::class, 'show']);
         Route::get('/submissions/{submission}/summary', [SubmissionController::class, 'summary']);
+        Route::get('/submissions/{submission}/media', [SubmissionController::class, 'mediaIndex']);
+        Route::delete('/submissions/{submission}/media/{mediaAsset}', [SubmissionController::class, 'destroyMedia']);
 
         Route::post('/media/presign-upload', [ApiMediaController::class, 'presignUpload'])->middleware('permission:media.upload');
         Route::post('/media/{mediaAsset}/complete', [ApiMediaController::class, 'completeUpload'])->middleware('permission:media.upload');

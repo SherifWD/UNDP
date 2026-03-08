@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\Route;
 Route::get('/live/events', [RealtimeController::class, 'stream'])->middleware('throttle:api');
 
 Route::prefix('auth')->group(function (): void {
+    Route::get('/registration-meta', [AuthController::class, 'registrationMeta']);
+    Route::post('/register-reporter', [AuthController::class, 'registerReporter'])->middleware('throttle:otp');
     Route::post('/request-otp', [AuthController::class, 'requestOtp'])->middleware('throttle:otp');
     Route::post('/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:otp');
 

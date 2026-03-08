@@ -6,6 +6,7 @@ use App\Contracts\OtpSender;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
+use App\Models\Municipality;
 use App\Models\OtpCode;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -30,6 +31,24 @@ class AuthController extends Controller
         ]);
 
         $phoneData = PhoneNumber::normalize($validated['country_code'], $validated['phone']);
+        $user = User::query()->where('phone_e164', $phoneData['phone_e164'])->first();
+
+        if (! $user) {
+            return response()->json([
+                'message' => __('User does not exist. Please create an account first.'),
+                'user_exists' => false,
+                'requires_registration' => true,
+                'phone_e164' => $phoneData['phone_e164'],
+            ], 404);
+        }
+
+        if (! $user->isActive()) {
+            return response()->json([
+                'message' => __('Your account is disabled. Please contact an administrator.'),
+                'user_exists' => true,
+                'requires_registration' => false,
+            ], 403);
+        }
 
         $cooldown = (int) config('otp.resend_cooldown_seconds', 60);
         $expiresIn = (int) config('otp.expires_in_seconds', 300);
@@ -91,6 +110,8 @@ class AuthController extends Controller
             'otp' => $otp->code,
             'resend_in' => $cooldown,
             'expires_in' => $expiresIn,
+            'user_exists' => true,
+            'requires_registration' => false,
         ]);
     }
 
@@ -100,12 +121,19 @@ class AuthController extends Controller
             'country_code' => ['required', 'regex:/^\+?[0-9]{1,4}$/'],
             'phone' => ['required', 'digits_between:6,15'],
             'code' => ['required', 'digits_between:4,8'],
-            'name' => ['nullable', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
             'preferred_locale' => ['nullable', Rule::in(['ar', 'en'])],
         ]);
 
         $phoneData = PhoneNumber::normalize($validated['country_code'], $validated['phone']);
+        $user = User::query()->where('phone_e164', $phoneData['phone_e164'])->first();
+
+        if (! $user) {
+            return response()->json([
+                'message' => __('User does not exist. Please create an account first.'),
+                'user_exists' => false,
+                'requires_registration' => true,
+            ], 404);
+        }
 
         $otp = OtpCode::where('country_code', $phoneData['country_code'])
             ->where('phone', $phoneData['phone'])
@@ -140,42 +168,12 @@ class AuthController extends Controller
             ], 422);
         }
 
-        if (! empty($validated['email'])) {
-            $emailTaken = User::query()
-                ->where('email', $validated['email'])
-                ->where('phone_e164', '!=', $phoneData['phone_e164'])
-                ->exists();
-
-            if ($emailTaken) {
-                return response()->json([
-                    'message' => __('Email is already in use.'),
-                ], 422);
-            }
-        }
-
         $otp->forceFill([
             'attempts' => $otp->attempts + 1,
             'verified_at' => now(),
         ])->save();
 
-        $user = User::where('phone_e164', $phoneData['phone_e164'])->first();
-        $isReturning = (bool) $user;
-
-        if (! $user) {
-            $user = User::create([
-                'name' => $validated['name'] ?? 'Community Reporter',
-                'email' => $validated['email'] ?? null,
-                'country_code' => $phoneData['country_code'],
-                'phone' => $phoneData['phone'],
-                'phone_e164' => $phoneData['phone_e164'],
-                'password' => Hash::make(str()->random(32)),
-                'role' => UserRole::REPORTER->value,
-                'status' => UserStatus::ACTIVE->value,
-                'preferred_locale' => $validated['preferred_locale'] ?? 'ar',
-            ]);
-
-            $user->syncRoleSafely(UserRole::REPORTER);
-        }
+        $isReturning = ! empty($user->last_login_at);
 
         if (! $user->isActive()) {
             AuditLogger::log(
@@ -222,6 +220,94 @@ class AuthController extends Controller
             'is_returning_user' => $isReturning,
             'user' => $this->serializeUser($user),
         ]);
+    }
+
+    public function registrationMeta(): JsonResponse
+    {
+        $municipalities = Municipality::query()
+            ->orderBy('name_en')
+            ->get()
+            ->map(fn (Municipality $municipality): array => [
+                'id' => $municipality->id,
+                'name_en' => $municipality->name_en,
+                'name_ar' => $municipality->name_ar,
+                'name' => $municipality->name,
+                'code' => $municipality->code,
+            ])
+            ->values()
+            ->all();
+
+        return response()->json([
+            'municipalities' => $municipalities,
+            'genders' => [
+                ['value' => 'male', 'label' => 'Man'],
+                ['value' => 'female', 'label' => 'Woman'],
+                ['value' => 'other', 'label' => 'Other'],
+                ['value' => 'prefer_not_to_say', 'label' => 'Prefer not to say'],
+            ],
+            'available_locales' => config('mobile.available_locales', []),
+            'default_country_code' => '+218',
+        ]);
+    }
+
+    public function registerReporter(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'country_code' => ['required', 'regex:/^\+?[0-9]{1,4}$/'],
+            'phone' => ['required', 'digits_between:6,15'],
+            'name' => ['required', 'string', 'max:255'],
+            'age' => ['required', 'integer', 'min:16', 'max:100'],
+            'gender' => ['required', Rule::in(['male', 'female', 'other', 'prefer_not_to_say'])],
+            'municipality_id' => ['required', 'integer', 'exists:municipalities,id'],
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('users', 'email')],
+            'preferred_locale' => ['nullable', Rule::in(['ar', 'en'])],
+        ]);
+
+        $phoneData = PhoneNumber::normalize($validated['country_code'], $validated['phone']);
+
+        if (User::query()->where('phone_e164', $phoneData['phone_e164'])->exists()) {
+            return response()->json([
+                'message' => __('Phone number is already in use.'),
+                'requires_registration' => false,
+            ], 422);
+        }
+
+        $user = User::query()->create([
+            'name' => $validated['name'],
+            'email' => $validated['email'] ?? null,
+            'country_code' => $phoneData['country_code'],
+            'phone' => $phoneData['phone'],
+            'phone_e164' => $phoneData['phone_e164'],
+            'password' => Hash::make(str()->random(32)),
+            'role' => UserRole::REPORTER->value,
+            'status' => UserStatus::ACTIVE->value,
+            'age' => (int) $validated['age'],
+            'gender' => $validated['gender'],
+            'municipality_id' => (int) $validated['municipality_id'],
+            'preferred_locale' => $validated['preferred_locale'] ?? 'ar',
+        ]);
+
+        $user->syncRoleSafely(UserRole::REPORTER);
+
+        AuditLogger::log(
+            action: 'auth.reporter_registered',
+            entityType: 'users',
+            entityId: $user->id,
+            metadata: [
+                'role' => $user->role,
+                'municipality_id' => $user->municipality_id,
+                'phone_e164' => $user->phone_e164,
+            ],
+            request: $request,
+            actor: $user,
+        );
+
+        return response()->json([
+            'message' => __('Reporter account created successfully. Request OTP to continue login.'),
+            'requires_registration' => false,
+            'next_step' => 'request_otp',
+            'user' => $this->serializeUser($user->loadMissing('municipality')),
+        ], 201);
     }
 
     public function me(Request $request): JsonResponse
@@ -277,6 +363,8 @@ class AuthController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'age' => $user->age,
+            'gender' => $user->gender,
             'phone' => $user->phone,
             'country_code' => $user->country_code,
             'phone_e164' => $user->phone_e164,

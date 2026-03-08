@@ -37,6 +37,10 @@ class SubmissionWorkflowTest extends TestCase
             'municipality_id' => $municipality->id,
         ]);
 
+        $project->assignedReporters()->sync([
+            $reporter->id => ['assigned_by' => $reporter->id],
+        ]);
+
         $focal = User::factory()->create([
             'role' => UserRole::MUNICIPAL_FOCAL_POINT->value,
             'municipality_id' => $municipality->id,

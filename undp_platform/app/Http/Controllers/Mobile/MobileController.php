@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Mobile;
 
 use App\Enums\SubmissionStatus;
 use App\Http\Controllers\Controller;
+use App\Models\MediaAsset;
 use App\Models\Project;
 use App\Models\Submission;
 use App\Models\User;
@@ -128,10 +129,13 @@ abstract class MobileController extends Controller
     {
         $payload = $this->serializeSubmissionCard($submission);
         $form = $this->submissionFormData($submission);
+        $labels = $this->submissionFormLabels($form);
 
         $payload['validation_comment'] = $submission->validation_comment;
         $payload['validated_at'] = optional($submission->validated_at)->toIso8601String();
         $payload['data'] = $form;
+        $payload['data_labels'] = $labels;
+        $payload['media_assets'] = $this->serializeSubmissionMedia($submission);
         $payload['summary'] = [
             'report_type' => $form['report_type'] ?? config('mobile.reporting.report_type'),
             'reporting_period' => $form['reporting_period_label'] ?? $this->reportingPeriodLabel($submission),
@@ -139,9 +143,18 @@ abstract class MobileController extends Controller
             'summary_of_observation' => $form['summary_of_observation'] ?? $submission->details,
             'key_updates' => array_values($form['key_updates'] ?? []),
             'submission_location' => $form['location_label'] ?? null,
+            'project_status_label' => $labels['project_status'] ?? null,
+            'delay_reason_label' => $labels['delay_reason'] ?? null,
+            'progress_impression_label' => $labels['progress_impression'] ?? null,
+            'functional_status_label' => $labels['functional_status'] ?? null,
+            'is_project_being_used_label' => $labels['is_project_being_used'] ?? null,
+            'is_used_as_intended_label' => $labels['is_used_as_intended'] ?? null,
+            'negative_environmental_impact_label' => $labels['negative_environmental_impact'] ?? null,
+            'user_categories_labels' => $labels['user_categories'] ?? [],
             'challenges_risks_issues' => $form['challenges_risks_issues'] ?? null,
             'risk_description' => $form['risk_description'] ?? null,
             'delay_constraint' => $form['delay_constraint'] ?? null,
+            'delay_constraint_label' => $labels['delay_constraint'] ?? null,
             'impact_description' => $form['impact_description'] ?? null,
             'notes' => $form['notes'] ?? null,
         ];
@@ -152,6 +165,115 @@ abstract class MobileController extends Controller
     protected function submissionFormData(Submission $submission): array
     {
         return is_array($submission->data) ? $submission->data : [];
+    }
+
+    protected function submissionMediaReferences(Submission $submission): array
+    {
+        $media = is_array($submission->media) ? $submission->media : [];
+
+        return collect($media)
+            ->filter(fn ($item): bool => is_array($item))
+            ->map(fn (array $item): array => [
+                'id' => isset($item['id']) ? (int) $item['id'] : null,
+                'type' => isset($item['type']) ? (string) $item['type'] : null,
+                'label' => isset($item['label']) ? trim((string) $item['label']) : null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    protected function serializeSubmissionMedia(Submission $submission): array
+    {
+        $submission->loadMissing('mediaAssets');
+
+        $references = $this->submissionMediaReferences($submission);
+        $referenceById = collect($references)
+            ->filter(fn (array $reference): bool => ! empty($reference['id']))
+            ->keyBy('id');
+
+        $assetsById = $submission->mediaAssets->keyBy('id');
+
+        $orderedAssets = collect($references)
+            ->map(function (array $reference) use ($assetsById): ?MediaAsset {
+                $id = (int) ($reference['id'] ?? 0);
+
+                if ($id <= 0 || ! $assetsById->has($id)) {
+                    return null;
+                }
+
+                $asset = $assetsById->get($id);
+                $assetsById->forget($id);
+
+                return $asset;
+            })
+            ->filter();
+
+        $orderedAssets = $orderedAssets->concat($assetsById->values());
+
+        return $orderedAssets
+            ->map(function (MediaAsset $asset) use ($referenceById): array {
+                $reference = $referenceById->get($asset->id, []);
+                $metadata = is_array($asset->metadata) ? $asset->metadata : [];
+                $label = trim((string) ($reference['label'] ?? ''));
+
+                if ($label === '') {
+                    $label = trim((string) ($asset->label ?? ($metadata['label'] ?? '')));
+                }
+
+                return [
+                    'id' => $asset->id,
+                    'uuid' => $asset->uuid,
+                    'media_type' => $asset->media_type,
+                    'mime_type' => $asset->mime_type,
+                    'status' => $asset->status,
+                    'label' => $label !== '' ? $label : null,
+                    'display_order' => $asset->display_order,
+                    'client_media_id' => $asset->client_media_id,
+                    'object_key' => $asset->object_key,
+                    'size_bytes' => $asset->size_bytes,
+                    'uploaded_at' => optional($asset->uploaded_at)->toIso8601String(),
+                    'processed_at' => optional($asset->processed_at)->toIso8601String(),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    protected function submissionFormLabels(array $form): array
+    {
+        return [
+            'project_status' => $this->reportingOptionLabel('project_statuses', $form['project_status'] ?? null),
+            'delay_reason' => $this->reportingOptionLabel('delay_reasons', $form['delay_reason'] ?? null),
+            'progress_impression' => $this->reportingOptionLabel('progress_impressions', $form['progress_impression'] ?? null),
+            'functional_status' => $this->reportingOptionLabel('functional_statuses', $form['functional_status'] ?? null),
+            'delay_constraint' => $this->reportingOptionLabel('constraint_types', $form['delay_constraint'] ?? null),
+            'is_project_being_used' => $this->yesNoLabel($form['is_project_being_used'] ?? null),
+            'is_used_as_intended' => $this->yesNoLabel($form['is_used_as_intended'] ?? null),
+            'negative_environmental_impact' => $this->yesNoLabel($form['negative_environmental_impact'] ?? null),
+            'user_categories' => collect($form['user_categories'] ?? [])
+                ->filter(fn ($value): bool => is_string($value) && trim($value) !== '')
+                ->map(fn (string $value): string => $this->reportingOptionLabel('user_categories', $value) ?? $value)
+                ->values()
+                ->all(),
+        ];
+    }
+
+    protected function reportingOptionLabel(string $group, mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return data_get(config('mobile.reporting', []), "{$group}.{$value}");
+    }
+
+    protected function yesNoLabel(mixed $value): ?string
+    {
+        if (! is_bool($value)) {
+            return null;
+        }
+
+        return $value ? 'Yes' : 'No';
     }
 
     protected function canEditSubmission(Submission $submission): bool

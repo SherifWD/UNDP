@@ -24,6 +24,8 @@ class MediaController extends Controller
         $validated = $request->validate([
             'submission_id' => ['required', 'integer', 'exists:submissions,id'],
             'client_media_id' => ['nullable', 'string', 'max:120'],
+            'label' => ['nullable', 'string', 'max:255'],
+            'display_order' => ['nullable', 'integer', 'min:0'],
             'media_type' => ['required', Rule::in(['image', 'video'])],
             'mime_type' => ['required', 'string', Rule::in(config('media.allowed_mime_types', []))],
             'original_filename' => ['required', 'string', 'max:255'],
@@ -48,6 +50,13 @@ class MediaController extends Controller
                 ->first();
 
             if ($existing) {
+                if (array_key_exists('label', $validated) || array_key_exists('display_order', $validated)) {
+                    $existing->forceFill([
+                        'label' => $validated['label'] ?? $existing->label,
+                        'display_order' => $validated['display_order'] ?? $existing->display_order,
+                    ])->save();
+                }
+
                 $payload = $this->mediaStorageService->createUploadUrl(
                     $existing,
                     (int) config('media.presigned_upload_expiry_seconds', 900),
@@ -78,6 +87,8 @@ class MediaController extends Controller
             'submission_id' => $submission->id,
             'uploaded_by' => $request->user()->id,
             'client_media_id' => $validated['client_media_id'] ?? null,
+            'label' => $validated['label'] ?? null,
+            'display_order' => $validated['display_order'] ?? null,
             'disk' => config('media.disk', 's3'),
             'bucket' => config('filesystems.disks.'.config('media.disk', 's3').'.bucket'),
             'object_key' => $objectKey,
@@ -217,6 +228,8 @@ class MediaController extends Controller
             'media_type' => $mediaAsset->media_type,
             'mime_type' => $mediaAsset->mime_type,
             'status' => $mediaAsset->status,
+            'label' => $mediaAsset->label,
+            'display_order' => $mediaAsset->display_order,
             'object_key' => $mediaAsset->object_key,
             'size_bytes' => $mediaAsset->size_bytes,
             'variants' => $mediaAsset->variants,

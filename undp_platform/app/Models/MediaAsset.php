@@ -15,6 +15,8 @@ class MediaAsset extends Model
         'submission_id',
         'uploaded_by',
         'client_media_id',
+        'label',
+        'display_order',
         'disk',
         'bucket',
         'object_key',
@@ -35,6 +37,7 @@ class MediaAsset extends Model
         return [
             'variants' => 'array',
             'metadata' => 'array',
+            'display_order' => 'integer',
             'uploaded_at' => 'datetime',
             'processed_at' => 'datetime',
         ];
