@@ -12,6 +12,7 @@ const ui = useUiStore();
 
 const submission = ref(null);
 const timeline = ref([]);
+const selectedTimelineEventId = ref(null);
 const reasons = ref([]);
 const loading = ref(false);
 const actionLoading = ref(false);
@@ -56,6 +57,7 @@ const reasonOptions = computed(() => {
 });
 
 const selectedReason = computed(() => reasonOptions.value.find((item) => item.code === actionForm.reason_code) || null);
+const selectedTimelineEvent = computed(() => timeline.value.find((event) => event.id === selectedTimelineEventId.value) || null);
 
 const loadSubmission = async () => {
     loading.value = true;
@@ -65,6 +67,7 @@ const loadSubmission = async () => {
         const { data } = await api.get(`/submissions/${route.params.id}`);
         submission.value = data.submission;
         timeline.value = data.timeline || [];
+        selectedTimelineEventId.value = timeline.value[0]?.id ?? null;
     } catch (err) {
         error.value = err.response?.data?.message || 'Unable to load submission details.';
     } finally {
@@ -148,6 +151,10 @@ const previewMedia = async (asset) => {
     }
 };
 
+const selectTimelineEvent = (event) => {
+    selectedTimelineEventId.value = event.id;
+};
+
 onMounted(async () => {
     await Promise.all([
         loadSubmission(),
@@ -227,13 +234,33 @@ onMounted(async () => {
                 <div class="detail-block">
                     <h3>Timeline</h3>
                     <ul class="timeline">
-                        <li v-for="event in timeline" :key="event.id">
+                        <li
+                            v-for="event in timeline"
+                            :key="event.id"
+                            :class="{ 'timeline-item--active': selectedTimelineEventId === event.id }"
+                            tabindex="0"
+                            @click="selectTimelineEvent(event)"
+                            @keydown.enter.prevent="selectTimelineEvent(event)"
+                            @keydown.space.prevent="selectTimelineEvent(event)"
+                        >
                             <strong>{{ event.to_status }}</strong>
                             <span>{{ event.actor?.name || 'System' }} ({{ event.actor?.role || '-' }})</span>
                             <small>{{ new Date(event.created_at).toLocaleString() }}</small>
                             <p v-if="event.comment">{{ event.comment }}</p>
                         </li>
                     </ul>
+
+                    <div class="timeline-detail-card" v-if="selectedTimelineEvent">
+                        <p><strong>Selected Event:</strong> {{ selectedTimelineEvent.to_status }}</p>
+                        <p>
+                            <strong>Transition:</strong>
+                            {{ selectedTimelineEvent.from_status || 'start' }} → {{ selectedTimelineEvent.to_status }}
+                        </p>
+                        <p><strong>Actor:</strong> {{ selectedTimelineEvent.actor?.name || 'System' }}</p>
+                        <p><strong>Role:</strong> {{ selectedTimelineEvent.actor?.role || '-' }}</p>
+                        <p><strong>Timestamp:</strong> {{ new Date(selectedTimelineEvent.created_at).toLocaleString() }}</p>
+                        <p v-if="selectedTimelineEvent.comment"><strong>Comment:</strong> {{ selectedTimelineEvent.comment }}</p>
+                    </div>
                 </div>
             </template>
         </section>
