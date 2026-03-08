@@ -332,7 +332,14 @@ onBeforeUnmount(() => {
                     </tr>
                     </thead>
                     <tbody>
-                    <tr v-for="submission in submissionRows" :key="submission.id">
+                    <tr
+                        v-for="submission in submissionRows"
+                        :key="submission.id"
+                        tabindex="0"
+                        @click="openSubmission(submission)"
+                        @keydown.enter.prevent="openSubmission(submission)"
+                        @keydown.space.prevent="openSubmission(submission)"
+                    >
                         <td>{{ submission.reporter?.name || `#${submission.id}` }}</td>
                         <td>{{ submission.title }}</td>
                         <td>{{ submission.municipality?.name || '-' }}</td>
@@ -343,7 +350,7 @@ onBeforeUnmount(() => {
                             </span>
                         </td>
                         <td>
-                            <button class="tracky-btn tracky-btn--ghost" type="button" @click="openSubmission(submission)">
+                            <button class="tracky-btn tracky-btn--ghost" type="button" @click.stop="openSubmission(submission)">
                                 View Details
                             </button>
                         </td>

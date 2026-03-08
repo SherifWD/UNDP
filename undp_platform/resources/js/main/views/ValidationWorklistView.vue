@@ -1,10 +1,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
 import api from '../api';
 
 const route = useRoute();
+const router = useRouter();
 const loading = ref(false);
 const error = ref('');
 const submissions = ref([]);
@@ -164,6 +165,15 @@ const goToPage = async (page) => {
     await loadPending(page);
 };
 
+const openSubmission = (submission) => {
+    router.push({
+        name: 'submission-detail',
+        params: {
+            id: submission.id,
+        },
+    });
+};
+
 onMounted(async () => {
     await initializeFiltersFromQuery();
     await loadPending(1);
@@ -286,7 +296,15 @@ onBeforeUnmount(() => {
                     </tr>
                     </thead>
                     <tbody>
-                    <tr v-for="submission in submissions" :key="submission.id" :class="{ 'row-unread': isUnread(submission) }">
+                    <tr
+                        v-for="submission in submissions"
+                        :key="submission.id"
+                        :class="{ 'row-unread': isUnread(submission) }"
+                        tabindex="0"
+                        @click="openSubmission(submission)"
+                        @keydown.enter.prevent="openSubmission(submission)"
+                        @keydown.space.prevent="openSubmission(submission)"
+                    >
                         <td>#{{ submission.id }}</td>
                         <td>{{ submission.title }}</td>
                         <td>{{ submission.reporter?.name || '-' }}</td>
@@ -298,7 +316,7 @@ onBeforeUnmount(() => {
                         </td>
                         <td>{{ submission.created_at ? new Date(submission.created_at).toLocaleString() : '-' }}</td>
                         <td>
-                            <router-link class="tracky-btn tracky-btn--ghost" :to="{ name: 'submission-detail', params: { id: submission.id } }">
+                            <router-link class="tracky-btn tracky-btn--ghost" :to="{ name: 'submission-detail', params: { id: submission.id } }" @click.stop>
                                 Review
                             </router-link>
                         </td>
