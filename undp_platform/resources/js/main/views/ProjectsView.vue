@@ -1,5 +1,7 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
@@ -15,18 +17,42 @@ const router = useRouter();
 const municipalities = ref([]);
 const projects = ref([]);
 const tabCounts = ref({ all: 0, by_municipality: {} });
+const projectDetails = ref(null);
+const projectReporters = ref([]);
+const projectMediaAttachments = ref([]);
+const availableReporters = ref([]);
+
+const projectOptionSets = reactive({
+    execution_statuses: [],
+    project_categories: [],
+    execution_models: [],
+    development_goal_areas: [],
+    visibility_options: [],
+    lifecycle_statuses: [],
+});
+
 const loading = ref(false);
 const detailLoading = ref(false);
+const optionsLoading = ref(false);
 const saving = ref(false);
+const deleting = ref(false);
 const error = ref('');
 
 const activeMunicipalityTab = ref('all');
 const projectDetailsModalOpen = ref(false);
-const projectDetails = ref(null);
-const projectReporters = ref([]);
 const projectFormModalOpen = ref(false);
 const municipalityModalOpen = ref(false);
 const editingProjectId = ref(null);
+const selectedReporterId = ref('');
+
+const detailMapEl = ref(null);
+const formMapEl = ref(null);
+
+let searchTimer = null;
+let detailMap = null;
+let detailMarker = null;
+let formMap = null;
+let formMarker = null;
 
 const filters = reactive({
     search: '',
@@ -51,13 +77,72 @@ const projectForm = reactive({
     municipality_id: '',
     name_en: '',
     name_ar: '',
+    project_code: '',
     description: '',
     status: 'active',
+    execution_status: 'in_progress',
+    project_category: 'Infrastructure - Public Safety',
+    region_label: '',
+    location_label: '',
+    implementing_partner: '',
+    program_lead: 'UNDP Libya',
+    development_goal_area: 'Public Safety',
+    execution_model: 'Government-led implementation with donor support',
+    start_date: '',
+    end_date: '',
     latitude: '',
     longitude: '',
+    objectives_text: '',
+    hard_components_text: '',
+    soft_components_text: '',
+    funding_budget: '',
+    funding_sources_text: '',
+    funding_types_text: '',
+    progress_percent: 0,
+    visibility: 'Internal - Admin & Authorized Stakeholders',
+    contacts_text: '',
+    assigned_reporter_ids: [],
 });
 
-let searchTimer = null;
+const fallbackOptionSets = {
+    execution_statuses: [
+        { value: 'not_started', label: 'Not Started' },
+        { value: 'planned', label: 'Planned' },
+        { value: 'in_progress', label: 'In Progress' },
+        { value: 'completed', label: 'Completed' },
+    ],
+    project_categories: [
+        { value: 'Infrastructure - Public Safety', label: 'Infrastructure - Public Safety' },
+        { value: 'Water / Sanitation', label: 'Water / Sanitation' },
+        { value: 'Health Services', label: 'Health Services' },
+        { value: 'Education Rehabilitation', label: 'Education Rehabilitation' },
+        { value: 'Governance / Capacity Building', label: 'Governance / Capacity Building' },
+        { value: 'Economic Recovery', label: 'Economic Recovery' },
+    ],
+    execution_models: [
+        { value: 'Government-led implementation with donor support', label: 'Government-led implementation with donor support' },
+        { value: 'Direct implementation by municipal contractor', label: 'Direct implementation by municipal contractor' },
+        { value: 'NGO-led delivery partner model', label: 'NGO-led delivery partner model' },
+        { value: 'Mixed implementation model', label: 'Mixed implementation model' },
+    ],
+    development_goal_areas: [
+        { value: 'Public Safety', label: 'Public Safety' },
+        { value: 'Primary Healthcare', label: 'Primary Healthcare' },
+        { value: 'Education Access', label: 'Education Access' },
+        { value: 'Water Access', label: 'Water Access' },
+        { value: 'Community Resilience', label: 'Community Resilience' },
+        { value: 'Local Governance', label: 'Local Governance' },
+    ],
+    visibility_options: [
+        { value: 'Internal - Admin & Authorized Stakeholders', label: 'Internal - Admin & Authorized Stakeholders' },
+        { value: 'Municipality-only internal', label: 'Municipality-only internal' },
+        { value: 'Shared with donors (summary only)', label: 'Shared with donors (summary only)' },
+    ],
+    lifecycle_statuses: [
+        { value: 'active', label: 'Active' },
+        { value: 'archived', label: 'Archived' },
+    ],
+};
 
 const canManageMunicipalities = computed(() => auth.hasPermission('municipalities.manage'));
 const canManageProjects = computed(() => auth.hasPermission('projects.manage'));
@@ -68,17 +153,36 @@ const canViewProjectSubmissions = computed(() => (
     || auth.hasPermission('submissions.view.approved_aggregated')
 ));
 
-const projectReference = (projectId) => `PRJ-${String(projectId).padStart(3, '0')}`;
+const projectModalTitle = computed(() => (
+    editingProjectId.value ? 'Edit Project' : 'Create Project'
+));
 
-const projectPriority = (project) => {
-    const pending = Number(project?.stats?.pending_submissions || 0);
+const reporterDirectory = computed(() => {
+    const map = new Map();
 
-    if (pending >= 8) return 'high';
-    if (pending >= 3) return 'medium';
-    return 'low';
-};
+    [
+        ...availableReporters.value,
+        ...projectReporters.value,
+        ...(projectDetails.value?.assigned_reporters || []),
+    ].forEach((reporter) => {
+        map.set(Number(reporter.id), reporter);
+    });
 
-const projectPriorityClass = (project) => `badge--${projectPriority(project)}`;
+    return map;
+});
+
+const assignedReporterRecords = computed(() => projectForm.assigned_reporter_ids
+    .map((id) => reporterDirectory.value.get(Number(id)) || {
+        id,
+        name: `Reporter #${id}`,
+        email: '-',
+    }));
+
+const availableReporterChoices = computed(() => {
+    const selected = new Set(projectForm.assigned_reporter_ids.map((id) => Number(id)));
+
+    return availableReporters.value.filter((reporter) => !selected.has(Number(reporter.id)));
+});
 
 const municipalityTabs = computed(() => {
     const tabs = [{ id: 'all', label: t('projectsPage.allMunicipalities'), count: Number(tabCounts.value.all || 0) }];
@@ -103,6 +207,7 @@ const visiblePages = computed(() => {
         for (let page = 1; page <= last; page += 1) {
             pages.push(page);
         }
+
         return pages;
     }
 
@@ -128,8 +233,43 @@ const visiblePages = computed(() => {
     return pages;
 });
 
+const normalizeOptionList = (list, fallback = []) => {
+    if (Array.isArray(list) && list.length) {
+        return list.map((item) => ({
+            value: item?.value ?? item,
+            label: item?.label ?? item,
+        }));
+    }
+
+    return fallback;
+};
+
+const applyFallbackOptionSets = () => {
+    Object.entries(fallbackOptionSets).forEach(([key, value]) => {
+        projectOptionSets[key] = value;
+    });
+};
+
+const projectReference = (project) => project?.code || `PRJ-${String(project?.id || '').padStart(3, '0')}`;
+const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : '-');
+const formatCurrency = (value) => `USD ${Number(value || 0).toLocaleString()}`;
+const linesToArray = (value) => String(value || '')
+    .split('\n')
+    .map((row) => row.trim())
+    .filter(Boolean);
+const arrayToLines = (value) => (Array.isArray(value) ? value.join('\n') : '');
+
+const executionStatusClass = (status) => {
+    if (status === 'completed') return 'tracky-status-chip--success';
+    if (status === 'in_progress') return 'tracky-status-chip--info';
+    if (status === 'planned') return 'tracky-status-chip--warning';
+    return 'tracky-status-chip--muted';
+};
+
+const lifecycleBadgeClass = (status) => (status === 'active' ? 'badge--active' : 'badge--archived');
+
 const openProjectSubmissions = (project) => {
-    if (!project || !canViewProjectSubmissions.value) {
+    if (! project || ! canViewProjectSubmissions.value) {
         return;
     }
 
@@ -147,39 +287,45 @@ const setMunicipalityTab = async (tabId) => {
     await loadProjects(1);
 };
 
-const populateProjectForm = (project) => {
-    editingProjectId.value = project.id;
-
-    Object.assign(projectForm, {
-        municipality_id: project.municipality?.id || '',
-        name_en: project.name_en || '',
-        name_ar: project.name_ar || '',
-        description: project.description || '',
-        status: project.status || 'active',
-        latitude: project.latitude ?? '',
-        longitude: project.longitude ?? '',
-    });
-};
-
-const resetProjectForm = () => {
-    Object.assign(projectForm, {
-        municipality_id: '',
-        name_en: '',
-        name_ar: '',
-        description: '',
-        status: 'active',
-        latitude: '',
-        longitude: '',
-    });
-    editingProjectId.value = null;
-};
-
 const loadMunicipalities = async () => {
     try {
         const { data } = await api.get('/municipalities');
         municipalities.value = data.data || [];
     } catch {
         municipalities.value = [];
+    }
+};
+
+const loadProjectOptions = async (municipalityId = null) => {
+    if (! canManageProjects.value) {
+        applyFallbackOptionSets();
+        availableReporters.value = [];
+        return;
+    }
+
+    optionsLoading.value = true;
+
+    try {
+        const { data } = await api.get('/projects/options', {
+            params: {
+                municipality_id: municipalityId || undefined,
+            },
+        });
+
+        const optionSets = data.option_sets || {};
+
+        projectOptionSets.execution_statuses = normalizeOptionList(optionSets.execution_statuses, fallbackOptionSets.execution_statuses);
+        projectOptionSets.project_categories = normalizeOptionList(optionSets.project_categories, fallbackOptionSets.project_categories);
+        projectOptionSets.execution_models = normalizeOptionList(optionSets.execution_models, fallbackOptionSets.execution_models);
+        projectOptionSets.development_goal_areas = normalizeOptionList(optionSets.development_goal_areas, fallbackOptionSets.development_goal_areas);
+        projectOptionSets.visibility_options = normalizeOptionList(optionSets.visibility_options, fallbackOptionSets.visibility_options);
+        projectOptionSets.lifecycle_statuses = normalizeOptionList(optionSets.lifecycle_statuses, fallbackOptionSets.lifecycle_statuses);
+        availableReporters.value = data.available_reporters || [];
+    } catch {
+        applyFallbackOptionSets();
+        availableReporters.value = [];
+    } finally {
+        optionsLoading.value = false;
     }
 };
 
@@ -222,34 +368,149 @@ const fetchProjectDetails = async (projectId) => {
 
     try {
         const { data } = await api.get(`/projects/${projectId}`);
-        projectDetails.value = data.project;
+        projectDetails.value = data.project || null;
         projectReporters.value = data.reporters || [];
+        projectMediaAttachments.value = data.media_attachments || [];
     } catch (err) {
         error.value = err.response?.data?.message || 'Unable to load project details.';
         projectDetails.value = null;
         projectReporters.value = [];
+        projectMediaAttachments.value = [];
+        throw err;
     } finally {
         detailLoading.value = false;
     }
 };
 
-const openProjectDetails = async (project) => {
-    if (!project) {
+const resetProjectForm = () => {
+    Object.assign(projectForm, {
+        municipality_id: '',
+        name_en: '',
+        name_ar: '',
+        project_code: '',
+        description: '',
+        status: 'active',
+        execution_status: 'in_progress',
+        project_category: 'Infrastructure - Public Safety',
+        region_label: '',
+        location_label: formatLocationLabel(defaultCenter[0], defaultCenter[1]),
+        implementing_partner: '',
+        program_lead: 'UNDP Libya',
+        development_goal_area: 'Public Safety',
+        execution_model: 'Government-led implementation with donor support',
+        start_date: '',
+        end_date: '',
+        latitude: defaultCenter[0],
+        longitude: defaultCenter[1],
+        objectives_text: '',
+        hard_components_text: '',
+        soft_components_text: '',
+        funding_budget: '',
+        funding_sources_text: '',
+        funding_types_text: '',
+        progress_percent: 0,
+        visibility: 'Internal - Admin & Authorized Stakeholders',
+        contacts_text: '',
+        assigned_reporter_ids: [],
+    });
+
+    editingProjectId.value = null;
+    selectedReporterId.value = '';
+};
+
+const populateProjectForm = (project) => {
+    if (! project) {
         return;
     }
 
+    editingProjectId.value = project.id;
+    selectedReporterId.value = '';
+
+    Object.assign(projectForm, {
+        municipality_id: project.municipality?.id || '',
+        name_en: project.name_en || '',
+        name_ar: project.name_ar || '',
+        project_code: project.code || '',
+        description: project.description || '',
+        status: project.status || 'active',
+        execution_status: project.execution_status || 'in_progress',
+        project_category: project.project_category || 'Infrastructure - Public Safety',
+        region_label: project.region_label || '',
+        location_label: project.location_label || '',
+        implementing_partner: project.implementing_partner || '',
+        program_lead: project.program_lead || 'UNDP Libya',
+        development_goal_area: project.development_goal_area || 'Public Safety',
+        execution_model: project.execution_model || 'Government-led implementation with donor support',
+        start_date: project.start_date || '',
+        end_date: project.end_date || '',
+        latitude: project.latitude ?? '',
+        longitude: project.longitude ?? '',
+        objectives_text: arrayToLines(project.objectives),
+        hard_components_text: arrayToLines(project.hard_components),
+        soft_components_text: arrayToLines(project.soft_components),
+        funding_budget: project.funding_budget ?? '',
+        funding_sources_text: arrayToLines(project.funding_sources),
+        funding_types_text: arrayToLines(project.funding_types),
+        progress_percent: Number(project.progress_percent || 0),
+        visibility: project.visibility || 'Internal - Admin & Authorized Stakeholders',
+        contacts_text: arrayToLines(project.contacts),
+        assigned_reporter_ids: (project.assigned_reporters || projectReporters.value || []).map((reporter) => Number(reporter.id)),
+    });
+};
+
+const openProjectDetails = async (project) => {
+    if (! project) {
+        return;
+    }
+
+    projectFormModalOpen.value = false;
     projectDetailsModalOpen.value = true;
-    await fetchProjectDetails(project.id);
+
+    try {
+        await fetchProjectDetails(project.id);
+        await ensureDetailMap();
+    } catch {
+        projectDetailsModalOpen.value = false;
+    }
 };
 
 const closeProjectDetails = () => {
     projectDetailsModalOpen.value = false;
-    projectDetails.value = null;
-    projectReporters.value = [];
+};
+
+const openCreateProjectModal = async () => {
+    resetProjectForm();
+    projectDetailsModalOpen.value = false;
+    await loadProjectOptions();
+    projectFormModalOpen.value = true;
+    await ensureFormMap();
+};
+
+const openEditProjectModal = async (project) => {
+    if (! project || ! canManageProjects.value) {
+        return;
+    }
+
+    projectDetailsModalOpen.value = false;
+
+    try {
+        await fetchProjectDetails(project.id);
+        populateProjectForm(projectDetails.value);
+        await loadProjectOptions(projectForm.municipality_id || null);
+        projectFormModalOpen.value = true;
+        await ensureFormMap();
+    } catch {
+        projectFormModalOpen.value = false;
+    }
+};
+
+const closeProjectFormModal = () => {
+    projectFormModalOpen.value = false;
+    resetProjectForm();
 };
 
 const saveMunicipality = async () => {
-    if (!canManageMunicipalities.value) {
+    if (! canManageMunicipalities.value) {
         return;
     }
 
@@ -280,8 +541,23 @@ const saveMunicipality = async () => {
     }
 };
 
+const addAssignedReporter = () => {
+    const reporterId = Number(selectedReporterId.value);
+
+    if (! reporterId || projectForm.assigned_reporter_ids.includes(reporterId)) {
+        return;
+    }
+
+    projectForm.assigned_reporter_ids = [...projectForm.assigned_reporter_ids, reporterId];
+    selectedReporterId.value = '';
+};
+
+const removeAssignedReporter = (reporterId) => {
+    projectForm.assigned_reporter_ids = projectForm.assigned_reporter_ids.filter((id) => Number(id) !== Number(reporterId));
+};
+
 const saveProject = async () => {
-    if (!canManageProjects.value) {
+    if (! canManageProjects.value) {
         return;
     }
 
@@ -292,27 +568,53 @@ const saveProject = async () => {
         municipality_id: projectForm.municipality_id ? Number(projectForm.municipality_id) : null,
         name_en: projectForm.name_en,
         name_ar: projectForm.name_ar,
+        project_code: projectForm.project_code || null,
         description: projectForm.description || null,
         status: projectForm.status,
+        execution_status: projectForm.execution_status,
+        project_category: projectForm.project_category || null,
+        region_label: projectForm.region_label || null,
+        location_label: projectForm.location_label || null,
+        implementing_partner: projectForm.implementing_partner || null,
+        program_lead: projectForm.program_lead || null,
+        development_goal_area: projectForm.development_goal_area || null,
+        execution_model: projectForm.execution_model || null,
+        start_date: projectForm.start_date || null,
+        end_date: projectForm.end_date || null,
         latitude: projectForm.latitude === '' ? null : Number(projectForm.latitude),
         longitude: projectForm.longitude === '' ? null : Number(projectForm.longitude),
+        objectives: linesToArray(projectForm.objectives_text),
+        hard_components: linesToArray(projectForm.hard_components_text),
+        soft_components: linesToArray(projectForm.soft_components_text),
+        funding_budget: projectForm.funding_budget === '' ? null : Number(projectForm.funding_budget),
+        funding_sources: linesToArray(projectForm.funding_sources_text),
+        funding_types: linesToArray(projectForm.funding_types_text),
+        progress_percent: Number(projectForm.progress_percent || 0),
+        visibility: projectForm.visibility || null,
+        contacts: linesToArray(projectForm.contacts_text),
+        assigned_reporter_ids: projectForm.assigned_reporter_ids.map((id) => Number(id)),
     };
 
     try {
-        if (editingProjectId.value) {
-            await api.put(`/projects/${editingProjectId.value}`, payload);
-            ui.pushToast('Project updated successfully.');
-        } else {
-            await api.post('/projects', payload);
-            ui.pushToast('Project created successfully.');
-        }
+        const response = editingProjectId.value
+            ? await api.put(`/projects/${editingProjectId.value}`, payload)
+            : await api.post('/projects', payload);
+
+        ui.pushToast(editingProjectId.value ? 'Project updated successfully.' : 'Project created successfully.');
+
+        const savedProject = response.data.project || null;
+        projectDetails.value = savedProject;
+        projectReporters.value = response.data.reporters || savedProject?.assigned_reporters || [];
+        projectMediaAttachments.value = [];
 
         projectFormModalOpen.value = false;
         resetProjectForm();
         await loadProjects(pagination.current_page);
 
-        if (projectDetailsModalOpen.value && projectDetails.value) {
-            await fetchProjectDetails(projectDetails.value.id);
+        if (savedProject) {
+            projectDetailsModalOpen.value = true;
+            await fetchProjectDetails(savedProject.id);
+            await ensureDetailMap();
         }
     } catch (err) {
         error.value = err.response?.data?.message || 'Unable to save project.';
@@ -321,27 +623,33 @@ const saveProject = async () => {
     }
 };
 
-const openCreateProjectModal = () => {
-    resetProjectForm();
-    projectFormModalOpen.value = true;
-};
-
-const openEditProjectModal = (project) => {
-    if (!project || !canManageProjects.value) {
+const deleteProject = async () => {
+    if (! projectDetails.value || ! canManageProjects.value) {
         return;
     }
 
-    if (projectDetailsModalOpen.value) {
-        projectDetailsModalOpen.value = false;
+    const confirmed = window.confirm(`Delete ${projectDetails.value.name}? This will remove related submissions and assignments.`);
+
+    if (! confirmed) {
+        return;
     }
 
-    populateProjectForm(project);
-    projectFormModalOpen.value = true;
-};
+    deleting.value = true;
+    error.value = '';
 
-const closeProjectFormModal = () => {
-    projectFormModalOpen.value = false;
-    resetProjectForm();
+    try {
+        await api.delete(`/projects/${projectDetails.value.id}`);
+        ui.pushToast('Project deleted successfully.');
+        projectDetailsModalOpen.value = false;
+        projectDetails.value = null;
+        projectReporters.value = [];
+        projectMediaAttachments.value = [];
+        await loadProjects(1);
+    } catch (err) {
+        error.value = err.response?.data?.message || 'Unable to delete project.';
+    } finally {
+        deleting.value = false;
+    }
 };
 
 const goToPage = async (page) => {
@@ -350,6 +658,128 @@ const goToPage = async (page) => {
     }
 
     await loadProjects(page);
+};
+
+const defaultCenter = [26.3351, 17.2283];
+
+const formatLocationLabel = (latitude, longitude) => `Selected location (${latitude}, ${longitude})`;
+
+const resolvedLatLng = (latitude, longitude) => {
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        return [lat, lng];
+    }
+
+    return defaultCenter;
+};
+
+const ensureTileLayer = (map) => {
+    if (map.__trackyTilesBound) {
+        return;
+    }
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
+
+    map.__trackyTilesBound = true;
+};
+
+const syncDetailMap = async () => {
+    if (! projectDetailsModalOpen.value || ! projectDetails.value) {
+        return;
+    }
+
+    await nextTick();
+
+    if (! detailMapEl.value) {
+        return;
+    }
+
+    if (! detailMap) {
+        detailMap = L.map(detailMapEl.value, {
+            zoomControl: false,
+            attributionControl: false,
+            scrollWheelZoom: false,
+        });
+        ensureTileLayer(detailMap);
+    }
+
+    const [lat, lng] = resolvedLatLng(projectDetails.value.latitude, projectDetails.value.longitude);
+
+    detailMap.setView([lat, lng], Number.isFinite(Number(projectDetails.value.latitude)) ? 13 : 6);
+
+    if (! detailMarker) {
+        detailMarker = L.circleMarker([lat, lng], {
+            radius: 10,
+            color: '#1730df',
+            fillColor: '#1730df',
+            fillOpacity: 0.24,
+            weight: 3,
+        }).addTo(detailMap);
+    } else {
+        detailMarker.setLatLng([lat, lng]);
+    }
+
+    detailMap.invalidateSize();
+};
+
+const syncFormMap = async () => {
+    if (! projectFormModalOpen.value) {
+        return;
+    }
+
+    await nextTick();
+
+    if (! formMapEl.value) {
+        return;
+    }
+
+    if (! formMap) {
+        formMap = L.map(formMapEl.value, {
+            zoomControl: true,
+            attributionControl: false,
+        });
+        ensureTileLayer(formMap);
+        formMap.on('click', (event) => {
+            projectForm.latitude = Number(event.latlng.lat.toFixed(6));
+            projectForm.longitude = Number(event.latlng.lng.toFixed(6));
+
+            projectForm.location_label = formatLocationLabel(projectForm.latitude, projectForm.longitude);
+
+            syncFormMap();
+        });
+    }
+
+    const [lat, lng] = resolvedLatLng(projectForm.latitude, projectForm.longitude);
+    const hasPoint = Number.isFinite(Number(projectForm.latitude)) && Number.isFinite(Number(projectForm.longitude));
+
+    formMap.setView([lat, lng], hasPoint ? 13 : 6);
+
+    if (! formMarker) {
+        formMarker = L.circleMarker([lat, lng], {
+            radius: 10,
+            color: '#1730df',
+            fillColor: '#1730df',
+            fillOpacity: 0.24,
+            weight: 3,
+        }).addTo(formMap);
+    } else {
+        formMarker.setLatLng([lat, lng]);
+    }
+
+    formMap.invalidateSize();
+};
+
+const ensureDetailMap = async () => {
+    await syncDetailMap();
+};
+
+const ensureFormMap = async () => {
+    await syncFormMap();
 };
 
 watch(() => filters.status, async () => {
@@ -366,10 +796,75 @@ watch(() => filters.search, () => {
     }, 280);
 });
 
+watch(() => projectForm.municipality_id, async (value) => {
+    if (! projectFormModalOpen.value) {
+        return;
+    }
+
+    await loadProjectOptions(value || null);
+
+    const allowed = new Set(availableReporters.value.map((reporter) => Number(reporter.id)));
+    projectForm.assigned_reporter_ids = projectForm.assigned_reporter_ids.filter((id) => allowed.has(Number(id)));
+
+    const selectedMunicipality = municipalities.value.find((municipality) => Number(municipality.id) === Number(value));
+
+    if (selectedMunicipality && ! projectForm.region_label) {
+        projectForm.region_label = `Region / ${selectedMunicipality.name}`;
+    }
+
+    if (selectedMunicipality && ! projectForm.implementing_partner) {
+        projectForm.implementing_partner = selectedMunicipality.name;
+    }
+});
+
+watch(() => [projectForm.latitude, projectForm.longitude], async () => {
+    if (projectFormModalOpen.value) {
+        await syncFormMap();
+    }
+});
+
+watch(() => [projectDetails.value?.latitude, projectDetails.value?.longitude], async () => {
+    if (projectDetailsModalOpen.value) {
+        await syncDetailMap();
+    }
+});
+
+watch(projectDetailsModalOpen, async (isOpen) => {
+    if (isOpen) {
+        await syncDetailMap();
+        return;
+    }
+
+    if (detailMap) {
+        detailMap.remove();
+        detailMap = null;
+        detailMarker = null;
+    }
+});
+
+watch(projectFormModalOpen, async (isOpen) => {
+    if (isOpen) {
+        await syncFormMap();
+        return;
+    }
+
+    if (formMap) {
+        formMap.remove();
+        formMap = null;
+        formMarker = null;
+    }
+});
+
 onMounted(async () => {
+    applyFallbackOptionSets();
     await loadMunicipalities();
 
+    if (canManageProjects.value) {
+        await loadProjectOptions();
+    }
+
     const preferredMunicipalityId = Number(auth.user?.municipality?.id || 0);
+
     if (preferredMunicipalityId && municipalities.value.some((row) => Number(row.id) === preferredMunicipalityId)) {
         activeMunicipalityTab.value = String(preferredMunicipalityId);
         filters.municipality_id = String(preferredMunicipalityId);
@@ -381,6 +876,18 @@ onMounted(async () => {
 onBeforeUnmount(() => {
     if (searchTimer) {
         clearTimeout(searchTimer);
+    }
+
+    if (detailMap) {
+        detailMap.remove();
+        detailMap = null;
+        detailMarker = null;
+    }
+
+    if (formMap) {
+        formMap.remove();
+        formMap = null;
+        formMarker = null;
     }
 });
 </script>
@@ -447,15 +954,15 @@ onBeforeUnmount(() => {
                 <div class="tracky-projects__empty" v-if="loading">{{ t('common.loading') }}</div>
 
                 <div class="tracky-projects-table-wrap" v-else-if="projects.length">
-                    <table class="tracky-projects-table">
+                    <table class="tracky-projects-table tracky-projects-table--rich">
                         <thead>
                         <tr>
-                            <th>{{ t('projectsPage.projects') }}</th>
-                            <th>{{ t('projectsPage.projectReference') }}</th>
-                            <th>{{ t('projectsPage.approvedSubmissions') }}</th>
-                            <th>{{ t('projectsPage.pendingSubmissions') }}</th>
+                            <th>Project</th>
+                            <th>Reference</th>
+                            <th>{{ t('projectsPage.municipality') }}</th>
                             <th>{{ t('projectsPage.progress') }}</th>
-                            <th>{{ t('projectsPage.status') }}</th>
+                            <th>Assigned Reporters</th>
+                            <th>Execution</th>
                             <th>{{ t('projectsPage.tableColumns.actions') }}</th>
                         </tr>
                         </thead>
@@ -463,23 +970,38 @@ onBeforeUnmount(() => {
                         <tr v-for="project in projects" :key="project.id" @click="openProjectDetails(project)">
                             <td>
                                 <strong>{{ project.name }}</strong>
-                                <p>ID:{{ project.id }}</p>
+                                <p>{{ project.project_category }}</p>
                             </td>
-                            <td>{{ projectReference(project.id) }}</td>
-                            <td>{{ project.stats?.approved_submissions || 0 }}</td>
-                            <td>{{ project.stats?.pending_submissions || 0 }}</td>
+                            <td>
+                                <strong>{{ projectReference(project) }}</strong>
+                                <p>{{ project.location_label || '-' }}</p>
+                            </td>
+                            <td>
+                                <strong>{{ project.municipality?.name || '-' }}</strong>
+                                <p>{{ project.region_label || '-' }}</p>
+                            </td>
                             <td>
                                 <div class="tracky-project-progress-row">
-                                    <small>{{ project.stats?.progress_percent || 0 }}%</small>
+                                    <small>{{ project.progress_percent || 0 }}%</small>
+                                    <small>{{ project.stats?.approved_submissions || 0 }} approved</small>
                                 </div>
                                 <div class="tracky-project-inline-progress">
-                                    <span :style="{ width: `${project.stats?.progress_percent || 0}%` }" />
+                                    <span :style="{ width: `${project.progress_percent || 0}%` }" />
                                 </div>
                             </td>
                             <td>
-                                <span class="badge" :class="project.status === 'active' ? 'badge--active' : 'badge--archived'">
-                                    {{ project.status === 'active' ? t('dashboard.active') : t('dashboard.archived') }}
+                                <strong>{{ project.assigned_reporters_count || 0 }}</strong>
+                                <p>{{ project.stats?.active_reporters || project.assigned_reporters_count || 0 }} active</p>
+                            </td>
+                            <td>
+                                <span class="tracky-status-chip" :class="executionStatusClass(project.execution_status)">
+                                    {{ project.execution_status_label }}
                                 </span>
+                                <p>
+                                    <span class="badge" :class="lifecycleBadgeClass(project.status)">
+                                        {{ project.status === 'active' ? t('dashboard.active') : t('dashboard.archived') }}
+                                    </span>
+                                </p>
                             </td>
                             <td>
                                 <div class="tracky-project-actions" @click.stop>
@@ -489,7 +1011,7 @@ onBeforeUnmount(() => {
                                         v-if="canViewProjectSubmissions"
                                         @click="openProjectSubmissions(project)"
                                     >
-                                        View Submission
+                                        View Submissions
                                     </button>
                                     <button
                                         class="tracky-btn tracky-btn--ghost"
@@ -539,7 +1061,7 @@ onBeforeUnmount(() => {
                     <header class="tracky-project-modal__head">
                         <div>
                             <h3>{{ detailLoading ? 'Loading project...' : projectDetails?.name || 'Project Details' }}</h3>
-                            <p v-if="projectDetails">{{ projectReference(projectDetails.id) }}</p>
+                            <p v-if="projectDetails">{{ projectReference(projectDetails) }}</p>
                         </div>
                         <div class="tracky-project-modal__head-actions">
                             <button
@@ -558,90 +1080,165 @@ onBeforeUnmount(() => {
                             >
                                 {{ t('projectsPage.editProject') }}
                             </button>
+                            <button
+                                class="tracky-btn tracky-btn--danger"
+                                type="button"
+                                v-if="projectDetails && canManageProjects"
+                                :disabled="deleting"
+                                @click="deleteProject"
+                            >
+                                Delete
+                            </button>
                             <button class="tracky-btn tracky-btn--ghost" type="button" @click="closeProjectDetails">Close</button>
                         </div>
                     </header>
 
-                    <div class="tracky-project-modal__body" v-if="projectDetails && !detailLoading">
+                    <div class="tracky-project-modal__body tracky-project-modal__body--rich" v-if="projectDetails && !detailLoading">
                         <section class="tracky-project-modal__column">
-                            <div class="tracky-project-modal__meta-grid">
+                            <div class="tracky-project-view-grid">
                                 <div>
-                                    <span>{{ t('projectsPage.status') }}</span>
+                                    <span>Project Status</span>
                                     <strong>
-                                        <span class="badge" :class="projectDetails.status === 'active' ? 'badge--active' : 'badge--archived'">
-                                            {{ projectDetails.status === 'active' ? t('dashboard.active') : t('dashboard.archived') }}
+                                        <span class="tracky-status-chip" :class="executionStatusClass(projectDetails.execution_status)">
+                                            {{ projectDetails.execution_status_label }}
                                         </span>
                                     </strong>
                                 </div>
                                 <div>
-                                    <span>{{ t('projectsPage.municipality') }}</span>
-                                    <strong>{{ projectDetails.municipality?.name || '-' }}</strong>
+                                    <span>Project Category</span>
+                                    <strong>{{ projectDetails.project_category }}</strong>
                                 </div>
                                 <div>
-                                    <span>{{ t('projectsPage.progress') }}</span>
-                                    <strong>{{ projectDetails.stats?.progress_percent || 0 }}%</strong>
+                                    <span>Region / Municipality</span>
+                                    <strong>{{ projectDetails.region_label }}</strong>
                                 </div>
                                 <div>
-                                    <span>{{ t('projectsPage.updatedAt') }}</span>
-                                    <strong>{{ projectDetails.last_update_at ? new Date(projectDetails.last_update_at).toLocaleDateString() : '-' }}</strong>
+                                    <span>Project Location</span>
+                                    <strong>{{ projectDetails.location_label }}</strong>
                                 </div>
                             </div>
 
-                            <div class="tracky-project-mini-map">
-                                <strong>Project location</strong>
-                                <span>{{ projectDetails.latitude ?? '-' }}, {{ projectDetails.longitude ?? '-' }}</span>
+                            <div class="tracky-project-map-card">
+                                <div ref="detailMapEl" class="tracky-project-map-canvas" />
                             </div>
 
                             <div class="tracky-project-section">
-                                <h4>{{ t('dashboard.projectDescription') }}</h4>
+                                <h4>Project Description</h4>
                                 <p>{{ projectDetails.description || t('dashboard.noDescription') }}</p>
+                            </div>
+
+                            <div class="tracky-project-section">
+                                <h4>Project Objectives</h4>
+                                <ul class="tracky-detail-bullet-list">
+                                    <li v-for="(objective, index) in projectDetails.objectives" :key="`objective-${index}`">{{ objective }}</li>
+                                    <li v-if="!projectDetails.objectives?.length">No objectives provided.</li>
+                                </ul>
                             </div>
 
                             <div class="tracky-project-section">
                                 <div class="tracky-project-progress-row">
                                     <h4>{{ t('projectsPage.progress') }}</h4>
-                                    <strong>{{ projectDetails.stats?.progress_percent || 0 }}%</strong>
+                                    <strong>{{ projectDetails.progress_percent || 0 }}%</strong>
                                 </div>
                                 <div class="tracky-progress">
-                                    <div class="tracky-progress__bar" :style="{ width: `${projectDetails.stats?.progress_percent || 0}%` }" />
+                                    <div class="tracky-progress__bar" :style="{ width: `${projectDetails.progress_percent || 0}%` }" />
+                                </div>
+                            </div>
+
+                            <div class="tracky-project-section">
+                                <h4>Project Components</h4>
+                                <div class="tracky-project-split-card">
+                                    <div>
+                                        <strong>Hard Components</strong>
+                                        <ul class="tracky-detail-bullet-list">
+                                            <li v-for="(item, index) in projectDetails.hard_components" :key="`hard-${index}`">{{ item }}</li>
+                                            <li v-if="!projectDetails.hard_components?.length">No hard components provided.</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <strong>Soft Components</strong>
+                                        <ul class="tracky-detail-bullet-list">
+                                            <li v-for="(item, index) in projectDetails.soft_components" :key="`soft-${index}`">{{ item }}</li>
+                                            <li v-if="!projectDetails.soft_components?.length">No soft components provided.</li>
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
                         </section>
 
                         <section class="tracky-project-modal__column">
-                            <div class="tracky-project-section">
-                                <h4>{{ t('projectsPage.submissionStats') }}</h4>
+                            <div class="tracky-project-section tracky-project-section--no-divider">
+                                <h4>Implementing Partner</h4>
                                 <ul class="tracky-project-stats-list">
-                                    <li>
-                                        <span>{{ t('projectsPage.totalSubmissions') }}</span>
-                                        <strong>{{ projectDetails.stats?.total_submissions || 0 }}</strong>
-                                    </li>
-                                    <li>
-                                        <span>{{ t('projectsPage.approvedSubmissions') }}</span>
-                                        <strong>{{ projectDetails.stats?.approved_submissions || 0 }}</strong>
-                                    </li>
-                                    <li>
-                                        <span>{{ t('projectsPage.pendingSubmissions') }}</span>
-                                        <strong>{{ projectDetails.stats?.pending_submissions || 0 }}</strong>
-                                    </li>
-                                    <li>
-                                        <span>{{ t('projectsPage.rejectedSubmissions') }}</span>
-                                        <strong>{{ projectDetails.stats?.rejected_submissions || 0 }}</strong>
-                                    </li>
-                                    <li>
-                                        <span>{{ t('projectsPage.mediaAttachments') }}</span>
-                                        <strong>{{ projectDetails.stats?.media_attachments || 0 }}</strong>
-                                    </li>
+                                    <li><span>Implementing Partner</span><strong>{{ projectDetails.implementing_partner || '-' }}</strong></li>
+                                    <li><span>Program Lead</span><strong>{{ projectDetails.program_lead || '-' }}</strong></li>
+                                    <li><span>Development Goal Area</span><strong>{{ projectDetails.development_goal_area || '-' }}</strong></li>
+                                    <li><span>Execution Model</span><strong>{{ projectDetails.execution_model || '-' }}</strong></li>
+                                    <li><span>Start / End</span><strong>{{ projectDetails.date_range_label || '-' }}</strong></li>
+                                    <li><span>Duration</span><strong>{{ projectDetails.duration_label || '-' }}</strong></li>
                                 </ul>
                             </div>
 
-                            <div class="tracky-project-section" v-if="projectReporters.length">
-                                <h4>Assigned Reporter Details</h4>
+                            <div class="tracky-project-section">
+                                <h4>Media Attachments</h4>
+                                <div class="tracky-project-media-grid">
+                                    <div class="tracky-project-media-tile" v-for="asset in projectMediaAttachments" :key="asset.id">
+                                        <strong>{{ asset.media_type === 'video' ? 'Video' : 'Image' }}</strong>
+                                        <small>#{{ asset.id }}</small>
+                                        <span>{{ asset.status }}</span>
+                                    </div>
+                                    <div class="tracky-project-media-empty" v-if="!projectMediaAttachments.length">
+                                        No uploaded media yet.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="tracky-project-section">
+                                <h4>Funding Information</h4>
+                                <div class="tracky-project-funding-card">
+                                    <div>
+                                        <span>Total Approved Budget</span>
+                                        <strong>{{ projectDetails.funding_budget_label || formatCurrency(projectDetails.funding_budget) }}</strong>
+                                    </div>
+                                    <div>
+                                        <span>Funding Sources</span>
+                                        <ul class="tracky-detail-bullet-list">
+                                            <li v-for="(item, index) in projectDetails.funding_sources" :key="`source-${index}`">{{ item }}</li>
+                                            <li v-if="!projectDetails.funding_sources?.length">No funding sources provided.</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <span>Funding Type</span>
+                                        <ul class="tracky-detail-bullet-list">
+                                            <li v-for="(item, index) in projectDetails.funding_types" :key="`type-${index}`">{{ item }}</li>
+                                            <li v-if="!projectDetails.funding_types?.length">No funding types provided.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="tracky-project-section">
+                                <h4>Share {{ projectDetails.name }}</h4>
+                                <div class="tracky-share-list">
+                                    <div class="tracky-share-row" v-for="reporter in projectReporters" :key="reporter.id">
+                                        <div>
+                                            <strong>{{ reporter.name }}</strong>
+                                            <p>{{ reporter.email || '-' }}</p>
+                                        </div>
+                                        <span class="tracky-share-badge">Assigned</span>
+                                    </div>
+                                    <div class="tracky-project-media-empty" v-if="!projectReporters.length">
+                                        No reporters assigned.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="tracky-project-section">
+                                <h4>Administrative Metadata</h4>
                                 <ul class="tracky-project-stats-list">
-                                    <li v-for="reporter in projectReporters" :key="reporter.id">
-                                        <span>{{ reporter.name }}</span>
-                                        <strong>{{ reporter.email || '-' }}</strong>
-                                    </li>
+                                    <li><span>Created By</span><strong>{{ projectDetails.created_by_label || '-' }}</strong></li>
+                                    <li><span>Last Updated</span><strong>{{ formatDate(projectDetails.updated_at || projectDetails.last_update_at) }}</strong></li>
+                                    <li><span>Visibility</span><strong>{{ projectDetails.visibility || '-' }}</strong></li>
                                 </ul>
                             </div>
                         </section>
@@ -651,60 +1248,219 @@ onBeforeUnmount(() => {
                 </article>
             </div>
 
-            <div class="modal-backdrop" v-if="projectFormModalOpen" @click.self="closeProjectFormModal">
-                <article class="modal-card tracky-form-modal">
-                    <h3>{{ editingProjectId ? t('projectsPage.editProject') : t('projectsPage.createProject') }}</h3>
+            <div class="tracky-project-modal-backdrop" v-if="projectFormModalOpen" @click.self="closeProjectFormModal">
+                <article class="tracky-project-modal tracky-project-modal--editor">
+                    <header class="tracky-project-modal__head">
+                        <div>
+                            <h3>{{ projectModalTitle }}</h3>
+                            <p>{{ editingProjectId ? 'Update the project details, location, and reporter access.' : 'Create a complete project profile and assign the reporter scope.' }}</p>
+                        </div>
+                        <div class="tracky-project-modal__head-actions">
+                            <button class="tracky-btn tracky-btn--primary" type="button" :disabled="saving" @click="saveProject">
+                                Save
+                            </button>
+                            <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="saving" @click="closeProjectFormModal">
+                                {{ t('common.cancel') }}
+                            </button>
+                        </div>
+                    </header>
 
-                    <label class="field">
-                        {{ t('projectsPage.municipality') }}
-                        <select v-model="projectForm.municipality_id">
-                            <option value="">{{ t('projectsPage.selectMunicipality') }}</option>
-                            <option v-for="municipality in municipalities" :key="municipality.id" :value="municipality.id">
-                                {{ municipality.name }}
-                            </option>
-                        </select>
-                    </label>
+                    <div class="tracky-project-modal__body tracky-project-modal__body--editor">
+                        <section class="tracky-project-modal__column">
+                            <div class="tracky-editor-grid">
+                                <label class="field">
+                                    Project Name (English)
+                                    <input v-model="projectForm.name_en" type="text">
+                                </label>
+                                <label class="field">
+                                    Project Name (Arabic)
+                                    <input v-model="projectForm.name_ar" type="text">
+                                </label>
+                                <label class="field">
+                                    Project Reference
+                                    <input v-model="projectForm.project_code" type="text" placeholder="PRJ-ALK-001">
+                                </label>
+                                <label class="field">
+                                    Record Status
+                                    <select v-model="projectForm.status">
+                                        <option v-for="option in projectOptionSets.lifecycle_statuses" :key="option.value" :value="option.value">
+                                            {{ option.label }}
+                                        </option>
+                                    </select>
+                                </label>
+                                <label class="field">
+                                    Project Status
+                                    <select v-model="projectForm.execution_status">
+                                        <option v-for="option in projectOptionSets.execution_statuses" :key="option.value" :value="option.value">
+                                            {{ option.label }}
+                                        </option>
+                                    </select>
+                                </label>
+                                <label class="field">
+                                    Project Category
+                                    <select v-model="projectForm.project_category">
+                                        <option v-for="option in projectOptionSets.project_categories" :key="option.value" :value="option.value">
+                                            {{ option.label }}
+                                        </option>
+                                    </select>
+                                </label>
+                                <label class="field">
+                                    {{ t('projectsPage.municipality') }}
+                                    <select v-model="projectForm.municipality_id">
+                                        <option value="">{{ t('projectsPage.selectMunicipality') }}</option>
+                                        <option v-for="municipality in municipalities" :key="municipality.id" :value="municipality.id">
+                                            {{ municipality.name }}
+                                        </option>
+                                    </select>
+                                </label>
+                                <label class="field">
+                                    Region / Municipality
+                                    <input v-model="projectForm.region_label" type="text" placeholder="South Region - Alkufraa">
+                                </label>
+                                <label class="field field--span-2">
+                                    Project Location Label
+                                    <input
+                                        :value="projectForm.location_label"
+                                        type="text"
+                                        placeholder="Choose the project spot from the map"
+                                        readonly
+                                    >
+                                </label>
+                            </div>
 
-                    <label class="field">
-                        {{ t('projectsPage.projectNameEn') }}
-                        <input v-model="projectForm.name_en" type="text">
-                    </label>
+                            <div class="tracky-project-map-card tracky-project-map-card--editable">
+                                <div ref="formMapEl" class="tracky-project-map-canvas tracky-project-map-canvas--editor" />
+                                <div class="tracky-project-coordinates">
+                                    <span>Latitude: <strong>{{ projectForm.latitude === '' ? '-' : projectForm.latitude }}</strong></span>
+                                    <span>Longitude: <strong>{{ projectForm.longitude === '' ? '-' : projectForm.longitude }}</strong></span>
+                                </div>
+                            </div>
 
-                    <label class="field">
-                        {{ t('projectsPage.projectNameAr') }}
-                        <input v-model="projectForm.name_ar" type="text">
-                    </label>
+                            <label class="field">
+                                Project Description
+                                <textarea v-model="projectForm.description" rows="4"></textarea>
+                            </label>
 
-                    <label class="field">
-                        {{ t('projectsPage.description') }}
-                        <textarea v-model="projectForm.description" rows="3"></textarea>
-                    </label>
+                            <label class="field">
+                                Project Objectives
+                                <textarea v-model="projectForm.objectives_text" rows="4" placeholder="One objective per line"></textarea>
+                            </label>
 
-                    <div class="inline-group">
-                        <label class="field">
-                            {{ t('projectsPage.status') }}
-                            <select v-model="projectForm.status">
-                                <option value="active">{{ t('dashboard.active') }}</option>
-                                <option value="archived">{{ t('dashboard.archived') }}</option>
-                            </select>
-                        </label>
-                        <label class="field">
-                            {{ t('projectsPage.latitude') }}
-                            <input v-model="projectForm.latitude" type="number" step="any">
-                        </label>
-                        <label class="field">
-                            {{ t('projectsPage.longitude') }}
-                            <input v-model="projectForm.longitude" type="number" step="any">
-                        </label>
-                    </div>
+                            <div class="tracky-editor-grid">
+                                <label class="field">
+                                    Hard Components
+                                    <textarea v-model="projectForm.hard_components_text" rows="5" placeholder="One item per line"></textarea>
+                                </label>
+                                <label class="field">
+                                    Soft Components
+                                    <textarea v-model="projectForm.soft_components_text" rows="5" placeholder="One item per line"></textarea>
+                                </label>
+                            </div>
 
-                    <div class="inline-group">
-                        <button class="btn btn--primary" type="button" :disabled="saving" @click="saveProject">
-                            {{ editingProjectId ? t('projectsPage.updateProject') : t('projectsPage.saveProject') }}
-                        </button>
-                        <button class="btn btn--ghost" type="button" :disabled="saving" @click="closeProjectFormModal">
-                            {{ t('common.cancel') }}
-                        </button>
+                            <label class="field">
+                                Progress
+                                <div class="tracky-progress-input">
+                                    <input v-model="projectForm.progress_percent" type="range" min="0" max="100">
+                                    <strong>{{ Number(projectForm.progress_percent || 0) }}%</strong>
+                                </div>
+                            </label>
+                        </section>
+
+                        <section class="tracky-project-modal__column">
+                            <div class="tracky-editor-grid">
+                                <label class="field">
+                                    Implementing Partner
+                                    <input v-model="projectForm.implementing_partner" type="text">
+                                </label>
+                                <label class="field">
+                                    Program Lead
+                                    <input v-model="projectForm.program_lead" type="text">
+                                </label>
+                                <label class="field">
+                                    Development Goal Area
+                                    <select v-model="projectForm.development_goal_area">
+                                        <option v-for="option in projectOptionSets.development_goal_areas" :key="option.value" :value="option.value">
+                                            {{ option.label }}
+                                        </option>
+                                    </select>
+                                </label>
+                                <label class="field">
+                                    Execution Model
+                                    <select v-model="projectForm.execution_model">
+                                        <option v-for="option in projectOptionSets.execution_models" :key="option.value" :value="option.value">
+                                            {{ option.label }}
+                                        </option>
+                                    </select>
+                                </label>
+                                <label class="field">
+                                    Start Date
+                                    <input v-model="projectForm.start_date" type="date">
+                                </label>
+                                <label class="field">
+                                    End Date
+                                    <input v-model="projectForm.end_date" type="date">
+                                </label>
+                            </div>
+
+                            <label class="field">
+                                Total Approved Budget
+                                <input v-model="projectForm.funding_budget" type="number" min="0" step="1">
+                            </label>
+
+                            <div class="tracky-editor-grid">
+                                <label class="field">
+                                    Funding Sources
+                                    <textarea v-model="projectForm.funding_sources_text" rows="4" placeholder="One source per line"></textarea>
+                                </label>
+                                <label class="field">
+                                    Funding Types
+                                    <textarea v-model="projectForm.funding_types_text" rows="4" placeholder="One funding type per line"></textarea>
+                                </label>
+                            </div>
+
+                            <label class="field">
+                                Contact Numbers
+                                <textarea v-model="projectForm.contacts_text" rows="3" placeholder="One contact per line"></textarea>
+                            </label>
+
+                            <label class="field">
+                                Visibility
+                                <select v-model="projectForm.visibility">
+                                    <option v-for="option in projectOptionSets.visibility_options" :key="option.value" :value="option.value">
+                                        {{ option.label }}
+                                    </option>
+                                </select>
+                            </label>
+
+                            <section class="tracky-project-section">
+                                <h4>Share {{ projectForm.name_en || 'this project' }}</h4>
+                                <div class="tracky-assign-row">
+                                    <select v-model="selectedReporterId" :disabled="optionsLoading || !availableReporterChoices.length">
+                                        <option value="">Add users...</option>
+                                        <option v-for="reporter in availableReporterChoices" :key="reporter.id" :value="reporter.id">
+                                            {{ reporter.name }}{{ reporter.email ? ` (${reporter.email})` : '' }}
+                                        </option>
+                                    </select>
+                                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="!selectedReporterId" @click="addAssignedReporter">
+                                        Invite
+                                    </button>
+                                </div>
+                                <div class="tracky-share-list">
+                                    <div class="tracky-share-row" v-for="reporter in assignedReporterRecords" :key="reporter.id">
+                                        <div>
+                                            <strong>{{ reporter.name }}</strong>
+                                            <p>{{ reporter.email || '-' }}</p>
+                                        </div>
+                                        <button class="tracky-icon-btn" type="button" @click="removeAssignedReporter(reporter.id)">
+                                            Remove
+                                        </button>
+                                    </div>
+                                    <div class="tracky-project-media-empty" v-if="!assignedReporterRecords.length">
+                                        No reporters assigned yet.
+                                    </div>
+                                </div>
+                            </section>
+                        </section>
                     </div>
                 </article>
             </div>

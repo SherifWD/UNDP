@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\Submission;
 use App\Models\SubmissionStatusEvent;
 use App\Services\AuditLogger;
+use App\Services\ProjectAccessService;
 use App\Services\SubmissionAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -211,6 +212,12 @@ class SubmissionController extends Controller
         }
 
         $project = Project::query()->findOrFail($validated['project_id']);
+
+        if (! ProjectAccessService::canView($request->user(), $project)) {
+            return response()->json([
+                'message' => 'You can only submit reports within your assigned scope.',
+            ], 403);
+        }
 
         $status = $validated['status'] ?? SubmissionStatus::UNDER_REVIEW->value;
 

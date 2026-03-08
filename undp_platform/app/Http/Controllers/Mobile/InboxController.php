@@ -31,7 +31,7 @@ class InboxController extends MobileController
         $notifications = $query->limit($limit)->get();
 
         return $this->successResponse([
-            'data' => $notifications->map(fn (DatabaseNotification $notification): array => $this->serializeNotification($notification))
+            'items' => $notifications->map(fn (DatabaseNotification $notification): array => $this->serializeNotification($notification))
                 ->values(),
             'meta' => [
                 'unread_count' => $request->user()->unreadNotifications()->count(),

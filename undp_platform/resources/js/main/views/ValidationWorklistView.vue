@@ -225,19 +225,16 @@ onBeforeUnmount(() => {
                 <article class="tracky-card tracky-kpi-panel">
                     <h3>Pending Queue</h3>
                     <p class="tracky-kpi-panel__value">{{ pendingCount }}</p>
-                    <p class="tracky-subtle">Items currently waiting for validation.</p>
                 </article>
 
                 <article class="tracky-card tracky-kpi-panel">
                     <h3>Active Filters</h3>
                     <p class="tracky-kpi-panel__value">{{ activeFilterCount }}</p>
-                    <p class="tracky-subtle">Use filters only when needed to keep the page responsive.</p>
                 </article>
 
                 <article class="tracky-card tracky-kpi-panel">
                     <h3>Project Filter</h3>
                     <p class="tracky-kpi-panel__value">{{ filters.project_id ? '1' : '0' }}</p>
-                    <p class="tracky-subtle">Project options load only when the selector is opened.</p>
                 </article>
             </section>
 

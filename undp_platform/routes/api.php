@@ -41,9 +41,11 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::put('/municipalities/{municipality}', [MunicipalityController::class, 'update'])->middleware('permission:municipalities.manage');
 
     Route::get('/projects', [ProjectController::class, 'index'])->middleware('permission:projects.view');
+    Route::get('/projects/options', [ProjectController::class, 'options'])->middleware('permission:projects.view');
     Route::get('/projects/{project}', [ProjectController::class, 'show'])->middleware('permission:projects.view');
     Route::post('/projects', [ProjectController::class, 'store'])->middleware('permission:projects.manage');
     Route::put('/projects/{project}', [ProjectController::class, 'update'])->middleware('permission:projects.manage');
+    Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->middleware('permission:projects.manage');
 
     Route::get('/workflow/statuses', [WorkflowController::class, 'statuses']);
     Route::get('/workflow/reasons', [WorkflowController::class, 'reasons']);
@@ -87,3 +89,5 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::get('/exports/csv', [ExportController::class, 'csv'])->middleware('permission:reports.export.csv');
     Route::get('/exports/pdf', [ExportController::class, 'pdf'])->middleware('permission:reports.export.pdf');
 });
+
+require __DIR__.'/api_mobile.php';

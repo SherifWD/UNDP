@@ -1,8 +1,8 @@
 {
   "info": {
-    "name": "UNDP Mobile API",
+    "name": "UNDP Mobile API (Flutter Only)",
     "_postman_id": "0c2d71a1-6f11-4f6f-9bf3-0ab5efcd0001",
-    "description": "Collection for Flutter/mobile development against the current UNDP platform API. Local OTPs are logged to storage/logs/laravel.log when the log OTP provider is active.",
+    "description": "Mobile-only collection for the Flutter developer. This excludes dashboard/admin flows and covers authentication plus the `/mobile/*` endpoints used by the mobile app.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -27,14 +27,6 @@
       "value": ""
     },
     {
-      "key": "user_id",
-      "value": "1"
-    },
-    {
-      "key": "municipality_id",
-      "value": "1"
-    },
-    {
       "key": "project_id",
       "value": "1"
     },
@@ -43,20 +35,16 @@
       "value": "1"
     },
     {
+      "key": "notification_id",
+      "value": ""
+    },
+    {
       "key": "media_asset_id",
       "value": "1"
     },
     {
-      "key": "audit_log_id",
-      "value": "1"
-    },
-    {
-      "key": "export_task_id",
-      "value": "1"
-    },
-    {
-      "key": "fcm_token",
-      "value": "dev-fcm-token-sample"
+      "key": "client_uuid",
+      "value": "11111111-1111-1111-1111-111111111111"
     }
   ],
   "item": [
@@ -78,7 +66,6 @@
               }
             ],
             "url": "{{base_url}}/auth/request-otp",
-            "description": "Request a login OTP.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"country_code\": \"{{country_code}}\",\n  \"phone\": \"{{phone}}\"\n}",
@@ -88,8 +75,7 @@
                 }
               }
             }
-          },
-          "response": []
+          }
         },
         {
           "name": "Verify OTP",
@@ -106,7 +92,6 @@
               }
             ],
             "url": "{{base_url}}/auth/verify-otp",
-            "description": "Verify OTP and receive bearer token.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"country_code\": \"{{country_code}}\",\n  \"phone\": \"{{phone}}\",\n  \"code\": \"{{otp_code}}\",\n  \"preferred_locale\": \"en\"\n}",
@@ -117,7 +102,6 @@
               }
             }
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
@@ -127,8 +111,6 @@
                   "if (pm.response.code < 300) {",
                   "  const json = pm.response.json();",
                   "  if (json.token) pm.collectionVariables.set('token', json.token);",
-                  "  if (json.user && json.user.id) pm.collectionVariables.set('user_id', String(json.user.id));",
-                  "  if (json.user && json.user.municipality && json.user.municipality.id) pm.collectionVariables.set('municipality_id', String(json.user.municipality.id));",
                   "}"
                 ]
               }
@@ -149,10 +131,8 @@
                 "value": "Bearer {{token}}"
               }
             ],
-            "url": "{{base_url}}/auth/me",
-            "description": "Fetch current authenticated user."
-          },
-          "response": []
+            "url": "{{base_url}}/auth/me"
+          }
         },
         {
           "name": "Update Device Token",
@@ -173,18 +153,16 @@
               }
             ],
             "url": "{{base_url}}/auth/device-token",
-            "description": "Register mobile push token.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fcm_token\": \"{{fcm_token}}\"\n}",
+              "raw": "{\n  \"fcm_token\": \"flutter-device-token\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             }
-          },
-          "response": []
+          }
         },
         {
           "name": "Logout",
@@ -198,33 +176,18 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
               }
             ],
-            "url": "{{base_url}}/auth/logout",
-            "description": "Revoke current access token.",
-            "body": {
-              "mode": "raw",
-              "raw": "{}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
+            "url": "{{base_url}}/auth/logout"
+          }
         }
       ]
     },
     {
-      "name": "Reference Data",
+      "name": "Home",
       "item": [
         {
-          "name": "List Roles",
+          "name": "Get Home Dashboard",
           "request": {
             "method": "GET",
             "header": [
@@ -237,81 +200,8 @@
                 "value": "Bearer {{token}}"
               }
             ],
-            "url": "{{base_url}}/roles",
-            "description": "List available roles and permissions."
-          },
-          "response": []
-        },
-        {
-          "name": "List Municipalities",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{base_url}}/municipalities",
-            "description": "List municipalities."
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code < 300) {",
-                  "  const json = pm.response.json();",
-                  "  if (json.data && json.data.length) pm.collectionVariables.set('municipality_id', String(json.data[0].id));",
-                  "}"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Workflow Statuses",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{base_url}}/workflow/statuses",
-            "description": "List workflow statuses."
-          },
-          "response": []
-        },
-        {
-          "name": "Validation Reasons",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{base_url}}/workflow/reasons",
-            "description": "List rejection/rework reasons."
-          },
-          "response": []
+            "url": "{{base_url}}/mobile/home"
+          }
         }
       ]
     },
@@ -319,7 +209,7 @@
       "name": "Projects",
       "item": [
         {
-          "name": "List Projects",
+          "name": "List Mobile Projects",
           "request": {
             "method": "GET",
             "header": [
@@ -332,10 +222,8 @@
                 "value": "Bearer {{token}}"
               }
             ],
-            "url": "{{base_url}}/projects?with_stats=true&per_page=15&municipality_id={{municipality_id}}",
-            "description": "List projects with optional stats."
+            "url": "{{base_url}}/mobile/projects?list_type=all&limit=20"
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
@@ -344,13 +232,30 @@
                 "exec": [
                   "if (pm.response.code < 300) {",
                   "  const json = pm.response.json();",
-                  "  const row = (json.data && json.data[0]) || null;",
-                  "  if (row && row.id) pm.collectionVariables.set('project_id', String(row.id));",
+                  "  const first = json?.data?.items?.[0];",
+                  "  if (first?.id) pm.collectionVariables.set('project_id', String(first.id));",
                   "}"
                 ]
               }
             }
           ]
+        },
+        {
+          "name": "List Invited Projects",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/mobile/projects?list_type=invited"
+          }
         },
         {
           "name": "Get Project Detail",
@@ -366,165 +271,16 @@
                 "value": "Bearer {{token}}"
               }
             ],
-            "url": "{{base_url}}/projects/{{project_id}}",
-            "description": "Get a project plus summary stats and reporters."
-          },
-          "response": []
-        },
-        {
-          "name": "Create Project",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base_url}}/projects",
-            "description": "Create a project.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"municipality_id\": 1,\n  \"name_en\": \"Mobile Pilot Project\",\n  \"name_ar\": \"\\u0645\\u0634\\u0631\\u0648\\u0639 \\u062a\\u062c\\u0631\\u064a\\u0628\\u064a \\u0644\\u0644\\u0647\\u0627\\u062a\\u0641\",\n  \"description\": \"Created from Postman for mobile integration testing.\",\n  \"status\": \"active\",\n  \"latitude\": 32.8872,\n  \"longitude\": 13.1913\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code < 300) {",
-                  "  const json = pm.response.json();",
-                  "  if (json.project && json.project.id) pm.collectionVariables.set('project_id', String(json.project.id));",
-                  "}"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Update Project",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base_url}}/projects/{{project_id}}",
-            "description": "Update a project.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"description\": \"Updated from Postman.\",\n  \"status\": \"active\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
+            "url": "{{base_url}}/mobile/projects/{{project_id}}"
+          }
         }
       ]
     },
     {
-      "name": "Municipalities",
+      "name": "Reporting",
       "item": [
         {
-          "name": "Create Municipality",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base_url}}/municipalities",
-            "description": "Create a municipality.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name_en\": \"Sirte\",\n  \"name_ar\": \"\\u0633\\u0631\\u062a\",\n  \"code\": \"SIR\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Update Municipality",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base_url}}/municipalities/{{municipality_id}}",
-            "description": "Update a municipality.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name_en\": \"Tripoli Updated\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "Users",
-      "item": [
-        {
-          "name": "List Users",
+          "name": "Get Reporting Options",
           "request": {
             "method": "GET",
             "header": [
@@ -537,186 +293,8 @@
                 "value": "Bearer {{token}}"
               }
             ],
-            "url": "{{base_url}}/users?per_page=15",
-            "description": "List users."
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code < 300) {",
-                  "  const json = pm.response.json();",
-                  "  const row = (json.data && json.data[0]) || null;",
-                  "  if (row && row.id) pm.collectionVariables.set('user_id', String(row.id));",
-                  "}"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Create User",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base_url}}/users",
-            "description": "Create a user.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Mobile QA User\",\n  \"email\": \"mobile.qa@example.com\",\n  \"country_code\": \"+218\",\n  \"phone\": \"910009999\",\n  \"role\": \"reporter\",\n  \"municipality_id\": 1,\n  \"preferred_locale\": \"en\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code < 300) {",
-                  "  const json = pm.response.json();",
-                  "  if (json.user && json.user.id) pm.collectionVariables.set('user_id', String(json.user.id));",
-                  "}"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Update User",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base_url}}/users/{{user_id}}",
-            "description": "Update a user; set confirm_role_change=true when changing role.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Mobile QA User Updated\",\n  \"confirm_role_change\": false\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Disable User",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base_url}}/users/{{user_id}}/status",
-            "description": "Disable a user.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"disabled\",\n  \"reason\": \"Temporary access suspension\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Enable User",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base_url}}/users/{{user_id}}/status",
-            "description": "Enable a user.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"active\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "User Audit Trail",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{base_url}}/users/{{user_id}}/audit",
-            "description": "Get audit records for one user."
-          },
-          "response": []
+            "url": "{{base_url}}/mobile/reporting/options?project_id={{project_id}}"
+          }
         }
       ]
     },
@@ -724,7 +302,7 @@
       "name": "Submissions",
       "item": [
         {
-          "name": "List Submissions",
+          "name": "List Submitted",
           "request": {
             "method": "GET",
             "header": [
@@ -737,10 +315,8 @@
                 "value": "Bearer {{token}}"
               }
             ],
-            "url": "{{base_url}}/submissions?per_page=20&municipality_id={{municipality_id}}",
-            "description": "List submissions visible to the current user."
+            "url": "{{base_url}}/mobile/submissions?tab=submitted"
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
@@ -749,8 +325,8 @@
                 "exec": [
                   "if (pm.response.code < 300) {",
                   "  const json = pm.response.json();",
-                  "  const row = (json.data && json.data[0]) || null;",
-                  "  if (row && row.id) pm.collectionVariables.set('submission_id', String(row.id));",
+                  "  const first = json?.data?.items?.[0];",
+                  "  if (first?.id) pm.collectionVariables.set('submission_id', String(first.id));",
                   "}"
                 ]
               }
@@ -758,7 +334,7 @@
           ]
         },
         {
-          "name": "Pending Validation Worklist",
+          "name": "List Drafts",
           "request": {
             "method": "GET",
             "header": [
@@ -771,13 +347,11 @@
                 "value": "Bearer {{token}}"
               }
             ],
-            "url": "{{base_url}}/submissions/pending?per_page=20",
-            "description": "Validator worklist."
-          },
-          "response": []
+            "url": "{{base_url}}/mobile/submissions?tab=drafts"
+          }
         },
         {
-          "name": "Create Submission",
+          "name": "Create Draft Submission",
           "request": {
             "method": "POST",
             "header": [
@@ -794,11 +368,10 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{base_url}}/submissions",
-            "description": "Create a submission.",
+            "url": "{{base_url}}/mobile/submissions",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"client_uuid\": \"11111111-1111-1111-1111-111111111111\",\n  \"project_id\": 1,\n  \"title\": \"Weekly field update\",\n  \"details\": \"Progress update created from Postman.\",\n  \"data\": {\n    \"progress_percent\": 45,\n    \"beneficiaries\": 80\n  },\n  \"media\": [],\n  \"status\": \"submitted\",\n  \"latitude\": 32.8872,\n  \"longitude\": 13.1913\n}",
+              "raw": "{\n  \"client_uuid\": \"{{client_uuid}}\",\n  \"project_id\": {{project_id}},\n  \"mode\": \"draft\",\n  \"title\": \"Phase 1 Reinforcement Progress Update\",\n  \"project_status\": \"in_progress\",\n  \"summary_of_observation\": \"Initial draft content.\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -806,7 +379,6 @@
               }
             }
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
@@ -815,12 +387,43 @@
                 "exec": [
                   "if (pm.response.code < 300) {",
                   "  const json = pm.response.json();",
-                  "  if (json.submission && json.submission.id) pm.collectionVariables.set('submission_id', String(json.submission.id));",
+                  "  const submission = json?.data?.submission;",
+                  "  if (submission?.id) pm.collectionVariables.set('submission_id', String(submission.id));",
                   "}"
                 ]
               }
             }
           ]
+        },
+        {
+          "name": "Submit Final Monitoring Report",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/mobile/submissions/{{submission_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Phase 1 Reinforcement Progress Update\",\n  \"project_status\": \"in_progress\",\n  \"progress_impression\": \"good\",\n  \"physical_progress\": true,\n  \"approximate_completion_percentage\": 25,\n  \"additional_observations\": \"Concrete reinforcement is ongoing.\",\n  \"summary_of_observation\": \"Structural reinforcement of the perimeter wall is progressing steadily.\",\n  \"key_updates\": [\n    \"Reinforced concrete materials delivered on-site\",\n    \"Night shift introduced to accelerate progress\"\n  ],\n  \"actual_beneficiaries\": 123,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"notes\": \"Community members expressed satisfaction with the new facility.\",\n  \"confirm_accuracy\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
         },
         {
           "name": "Get Submission Detail",
@@ -836,13 +439,11 @@
                 "value": "Bearer {{token}}"
               }
             ],
-            "url": "{{base_url}}/submissions/{{submission_id}}",
-            "description": "Get a submission with timeline."
-          },
-          "response": []
+            "url": "{{base_url}}/mobile/submissions/{{submission_id}}"
+          }
         },
         {
-          "name": "Get Submission Timeline",
+          "name": "Get Submission Summary",
           "request": {
             "method": "GET",
             "header": [
@@ -855,106 +456,8 @@
                 "value": "Bearer {{token}}"
               }
             ],
-            "url": "{{base_url}}/submissions/{{submission_id}}/timeline",
-            "description": "Get submission timeline only."
-          },
-          "response": []
-        },
-        {
-          "name": "Approve Submission",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base_url}}/submissions/{{submission_id}}/approve",
-            "description": "Approve a submission.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"comment\": \"Verified and approved from Postman\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Reject Submission",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base_url}}/submissions/{{submission_id}}/reject",
-            "description": "Reject a submission. Comment required.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"comment\": \"Missing evidence in attachment set\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Request Rework",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base_url}}/submissions/{{submission_id}}/rework",
-            "description": "Request rework. Comment required.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"comment\": \"Please add more detail and location confirmation\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": []
+            "url": "{{base_url}}/mobile/submissions/{{submission_id}}/summary"
+          }
         }
       ]
     },
@@ -962,7 +465,7 @@
       "name": "Media",
       "item": [
         {
-          "name": "Presign Media Upload",
+          "name": "Presign Upload",
           "request": {
             "method": "POST",
             "header": [
@@ -979,11 +482,10 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{base_url}}/media/presign-upload",
-            "description": "Create media asset and get signed upload payload.",
+            "url": "{{base_url}}/mobile/media/presign-upload",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"submission_id\": 1,\n  \"client_media_id\": \"mobile-image-1\",\n  \"media_type\": \"image\",\n  \"mime_type\": \"image/jpeg\",\n  \"original_filename\": \"evidence.jpg\",\n  \"size_bytes\": 524288,\n  \"checksum_sha256\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n}",
+              "raw": "{\n  \"submission_id\": {{submission_id}},\n  \"client_media_id\": \"mobile-photo-1\",\n  \"media_type\": \"image\",\n  \"mime_type\": \"image/jpeg\",\n  \"original_filename\": \"site-photo.jpg\",\n  \"size_bytes\": 524288\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -991,7 +493,6 @@
               }
             }
           },
-          "response": [],
           "event": [
             {
               "listen": "test",
@@ -1000,7 +501,7 @@
                 "exec": [
                   "if (pm.response.code < 300) {",
                   "  const json = pm.response.json();",
-                  "  if (json.media_asset_id) pm.collectionVariables.set('media_asset_id', String(json.media_asset_id));",
+                  "  if (json?.media_asset_id) pm.collectionVariables.set('media_asset_id', String(json.media_asset_id));",
                   "}"
                 ]
               }
@@ -1008,7 +509,7 @@
           ]
         },
         {
-          "name": "Complete Media Upload",
+          "name": "Complete Upload",
           "request": {
             "method": "POST",
             "header": [
@@ -1025,8 +526,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{base_url}}/media/{{media_asset_id}}/complete",
-            "description": "Mark upload complete and queue processing.",
+            "url": "{{base_url}}/mobile/media/{{media_asset_id}}/complete",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"size_bytes\": 524288\n}",
@@ -1036,11 +536,10 @@
                 }
               }
             }
-          },
-          "response": []
+          }
         },
         {
-          "name": "Get Media Download URL",
+          "name": "Get Download URL",
           "request": {
             "method": "GET",
             "header": [
@@ -1053,18 +552,16 @@
                 "value": "Bearer {{token}}"
               }
             ],
-            "url": "{{base_url}}/media/{{media_asset_id}}/download-url",
-            "description": "Get signed download URL."
-          },
-          "response": []
+            "url": "{{base_url}}/mobile/media/{{media_asset_id}}/download-url"
+          }
         }
       ]
     },
     {
-      "name": "Dashboard and Reporting",
+      "name": "Inbox",
       "item": [
         {
-          "name": "Dashboard KPIs",
+          "name": "List Inbox",
           "request": {
             "method": "GET",
             "header": [
@@ -1077,91 +574,8 @@
                 "value": "Bearer {{token}}"
               }
             ],
-            "url": "{{base_url}}/dashboard/kpis?municipality_id={{municipality_id}}",
-            "description": "Get dashboard KPIs and trend data."
+            "url": "{{base_url}}/mobile/inbox"
           },
-          "response": []
-        },
-        {
-          "name": "Municipal Overview",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{base_url}}/dashboard/municipal-overview?municipality_id={{municipality_id}}",
-            "description": "Get municipality overview."
-          },
-          "response": []
-        },
-        {
-          "name": "Dashboard Map Data",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{base_url}}/dashboard/map?municipality_id={{municipality_id}}&cluster=false&include_submissions=true",
-            "description": "Get dashboard map markers."
-          },
-          "response": []
-        },
-        {
-          "name": "Partner Dashboard",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{base_url}}/dashboard/partner?municipality_id={{municipality_id}}",
-            "description": "Get partner dashboard data."
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "Audit Logs",
-      "item": [
-        {
-          "name": "List Audit Logs",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{base_url}}/audit-logs?per_page=25",
-            "description": "List audit logs."
-          },
-          "response": [],
           "event": [
             {
               "listen": "test",
@@ -1170,8 +584,8 @@
                 "exec": [
                   "if (pm.response.code < 300) {",
                   "  const json = pm.response.json();",
-                  "  const row = (json.data && json.data[0]) || null;",
-                  "  if (row && row.id) pm.collectionVariables.set('audit_log_id', String(row.id));",
+                  "  const first = json?.data?.items?.[0];",
+                  "  if (first?.id) pm.collectionVariables.set('notification_id', String(first.id));",
                   "}"
                 ]
               }
@@ -1179,7 +593,46 @@
           ]
         },
         {
-          "name": "Get Audit Log Detail",
+          "name": "Mark One Read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/mobile/inbox/{{notification_id}}/read"
+          }
+        },
+        {
+          "name": "Mark All Read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/mobile/inbox/read-all"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "Get Profile",
           "request": {
             "method": "GET",
             "header": [
@@ -1192,10 +645,65 @@
                 "value": "Bearer {{token}}"
               }
             ],
-            "url": "{{base_url}}/audit-logs/{{audit_log_id}}",
-            "description": "Get one audit log entry."
-          },
-          "response": []
+            "url": "{{base_url}}/mobile/profile"
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/mobile/profile",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mobile Reporter\",\n  \"gender\": \"male\",\n  \"preferred_locale\": \"en\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Upload Avatar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/mobile/profile/avatar",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "avatar",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            }
+          }
         }
       ]
     },
@@ -1216,15 +724,13 @@
                 "value": "Bearer {{token}}"
               }
             ],
-            "url": "{{base_url}}/settings",
-            "description": "Get global settings payload."
-          },
-          "response": []
+            "url": "{{base_url}}/mobile/settings"
+          }
         },
         {
-          "name": "Update Settings - Security Section",
+          "name": "Update Language",
           "request": {
-            "method": "PUT",
+            "method": "PATCH",
             "header": [
               {
                 "key": "Accept",
@@ -1239,146 +745,17 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{base_url}}/settings",
-            "description": "Update one settings section (workflow.manage required).",
+            "url": "{{base_url}}/mobile/settings/language",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"security\": {\n    \"require_2fa_admin\": true,\n    \"enable_sso\": false,\n    \"minimum_length\": 8,\n    \"require_uppercase\": true,\n    \"require_numbers\": true,\n    \"require_special_chars\": false,\n    \"password_expiry_days\": 90,\n    \"rbac_enabled\": true,\n    \"ip_restriction_admin\": false,\n    \"log_login_activity\": true,\n    \"log_data_exports\": true\n  }\n}",
+              "raw": "{\n  \"preferred_locale\": \"ar\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "Exports",
-      "item": [
-        {
-          "name": "Create Export Task",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{base_url}}/exports/tasks",
-            "description": "Queue an async export task.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"format\": \"csv\",\n  \"type\": \"submissions\",\n  \"municipality_id\": 1\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code < 300) {",
-                  "  const json = pm.response.json();",
-                  "  if (json.task && json.task.id) pm.collectionVariables.set('export_task_id', String(json.task.id));",
-                  "}"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Get Export Task",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{base_url}}/exports/tasks/{{export_task_id}}",
-            "description": "Poll until ready."
-          },
-          "response": []
-        },
-        {
-          "name": "Download Export Task",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{base_url}}/exports/tasks/{{export_task_id}}/download",
-            "description": "Download async export artifact."
-          },
-          "response": []
-        },
-        {
-          "name": "Direct CSV Export",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{base_url}}/exports/csv?type=submissions&municipality_id={{municipality_id}}",
-            "description": "Direct CSV export."
-          },
-          "response": []
-        },
-        {
-          "name": "Direct PDF Export",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{base_url}}/exports/pdf?municipality_id={{municipality_id}}",
-            "description": "Direct PDF summary export."
-          },
-          "response": []
+          }
         }
       ]
     }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Mobile;
 use App\Enums\UserRole;
 use App\Models\Project;
 use App\Models\Submission;
+use App\Services\ProjectAccessService;
 use App\Services\SubmissionAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -53,7 +54,7 @@ class ProjectController extends MobileController
                 ->values();
         }
 
-        if (($validated['list_type'] ?? 'all') === 'invited') {
+        if (($validated['list_type'] ?? 'all') === 'invited' && ! $user->hasRole(UserRole::REPORTER)) {
             $projects = $projects->filter(fn (Project $project): bool => (bool) $this->projectMeta($project)['is_invited'])
                 ->values();
         }
@@ -61,7 +62,7 @@ class ProjectController extends MobileController
         $limit = $validated['limit'] ?? 25;
 
         return $this->successResponse([
-            'data' => $projects
+            'items' => $projects
                 ->take($limit)
                 ->map(fn (Project $project): array => $this->serializeProject($project, $user))
                 ->values(),
@@ -83,10 +84,7 @@ class ProjectController extends MobileController
 
         $project->loadMissing('municipality');
 
-        if ($user->municipality_id && $user->hasRole([
-            UserRole::REPORTER->value,
-            UserRole::MUNICIPAL_FOCAL_POINT->value,
-        ]) && (int) $project->municipality_id !== (int) $user->municipality_id) {
+        if (! ProjectAccessService::canView($user, $project)) {
             return $this->errorResponse('Access denied.', 403);
         }
 
@@ -113,14 +111,7 @@ class ProjectController extends MobileController
             ->orderByDesc('last_update_at')
             ->orderBy('name_en');
 
-        $user = $request->user();
-
-        if ($user->municipality_id && $user->hasRole([
-            UserRole::REPORTER->value,
-            UserRole::MUNICIPAL_FOCAL_POINT->value,
-        ])) {
-            $query->where('municipality_id', $user->municipality_id);
-        }
+        ProjectAccessService::scope($request->user(), $query);
 
         return $query->get();
     }

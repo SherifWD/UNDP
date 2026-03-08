@@ -89,10 +89,12 @@ const iconPath = (name) => NAV_ICON_PATHS[name] || NAV_ICON_PATHS.dashboard;
     <div class="shell shell--tracky">
         <aside class="shell__sidebar">
             <header class="shell__brand">
-                <div class="shell__brand-icon">
+                <!-- <div class="shell__brand-icon">
                     <span class="shell__brand-shape" aria-hidden="true" />
+                </div> -->
+                <div class="shell__brand-icon">
+                <h1>RASD</h1>
                 </div>
-                <h1>Tracky</h1>
                 <button class="shell__collapse-btn" type="button" aria-label="Toggle sidebar">
                     <span class="shell__collapse-icon" aria-hidden="true" />
                 </button>

@@ -236,6 +236,16 @@ class DatabaseSeeder extends Seeder
         $reportersByMunicipality = $reporters->groupBy('municipality_id');
         $focalsByMunicipality = $focals->keyBy('municipality_id');
 
+        $projects->each(function (Project $project) use ($reportersByMunicipality, $admin): void {
+            $syncPayload = $reportersByMunicipality
+                ->get($project->municipality_id, collect())
+                ->pluck('id')
+                ->mapWithKeys(fn ($id): array => [(int) $id => ['assigned_by' => $admin->id]])
+                ->all();
+
+            $project->assignedReporters()->sync($syncPayload);
+        });
+
         $this->printSeededRoleAccounts([
             'UNDP Admin' => $admin,
             'Auditor' => $auditor,

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UNDP Platform Technical Interview Prep</title>
+<style>
+body {
+    font-family: Helvetica, Arial, sans-serif;
+    line-height: 1.45;
+    margin: 36px;
+    color: #1a1a1a;
+}
+h1, h2, h3 {
+    color: #0f3d57;
+}
+h1 {
+    font-size: 24px;
+    border-bottom: 2px solid #c8d6df;
+    padding-bottom: 8px;
+}
+h2 {
+    font-size: 18px;
+    margin-top: 24px;
+}
+h3 {
+    font-size: 15px;
+    margin-top: 18px;
+}
+p, li {
+    font-size: 11.5pt;
+}
+.note {
+    background: #f4f8fa;
+    border-left: 4px solid #0f3d57;
+    padding: 10px 12px;
+}
+.qa {
+    margin-bottom: 12px;
+}
+.q {
+    font-weight: 700;
+}
+.a {
+    margin-top: 4px;
+}
+.tight li {
+    margin-bottom: 6px;
+}
+</style>
+</head>
+<body>
+<h1>UNDP Platform Technical Interview Prep</h1>
+
+<p><strong>Context used for this prep:</strong> Laravel 12 backend, Vue 3 frontend, Vite build, Pinia auth state, Axios API client, Leaflet maps, role and permission middleware, paginated project listing, project detail and edit modals, and backend validation for project data.</p>
+
+<div class="note">
+<p><strong>Best answer formula for "Why did you use... / Why did you not...":</strong><br>
+1. State the reason.<br>
+2. State the tradeoff.<br>
+3. State the mitigation.<br>
+4. State the next improvement if needed.</p>
+<p><strong>Example:</strong> "I used server-side pagination to keep payloads small and response time stable. The tradeoff is extra API calls during navigation. That is acceptable here because it scales better than loading all rows at once. If the dataset grows further, I would add caching and query indexing."</p>
+</div>
+
+<h2>Fast Opening Script</h2>
+<p>"This dashboard is API-driven with a clear frontend-backend split. Vue handles interactivity and user experience, while Laravel remains the source of truth for validation, authorization, access scoping, and auditability. The design choices prioritize maintainability, controlled data access, and safe scaling."</p>
+
+<h2>Core Principles to Repeat</h2>
+<ul class="tight">
+<li>The frontend improves usability, but the backend enforces security and data rules.</li>
+<li>Permission-based UI improves clarity, but route middleware and access services are what actually protect the data.</li>
+<li>We prefer predictable behavior over clever behavior: reload from the API after writes, clean up resources, and fail safely.</li>
+<li>Resilience means graceful degradation, clear error handling, and safe defaults, not only uptime.</li>
+</ul>
+
+<h2>High-Probability "Why Did You Use..." Questions</h2>
+
+<div class="qa">
+<div class="q">Why did you use Laravel for the backend?</div>
+<div class="a">It gives us mature validation, routing, middleware, Eloquent relationships, and clear API structuring. That reduces boilerplate and makes authorization and audit logging easier to enforce consistently.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you use Vue 3 for the dashboard?</div>
+<div class="a">The dashboard is interaction-heavy, so Vue gives reactive state, component isolation, and fast UI updates without overcomplicating the client. It is a good fit for forms, filters, and modal workflows.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you use an API-driven frontend instead of rendering everything server-side?</div>
+<div class="a">It keeps the UI decoupled from backend logic, which improves maintainability and makes the backend reusable for future clients like mobile or external integrations.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you use Axios with a shared API client?</div>
+<div class="a">A shared client centralizes the base URL, headers, and auth token handling. That keeps request behavior consistent and avoids duplicating auth logic across components.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you use route middleware for permissions?</div>
+<div class="a">Because hiding buttons in the UI is not security. Route middleware ensures protected endpoints are blocked even if someone bypasses the frontend.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you use server-side validation when the frontend already validates inputs?</div>
+<div class="a">Because the API is the trust boundary. Frontend validation improves user experience, but server-side validation protects the system from invalid or manipulated requests.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you use pagination on the project list?</div>
+<div class="a">It keeps payload size controlled and prevents performance degradation as data grows. It is the safer default for scalability.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you debounce search input?</div>
+<div class="a">To avoid firing a request on every keystroke. It reduces unnecessary load on the API and keeps the UI smoother under rapid input.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you use Leaflet for the maps?</div>
+<div class="a">Leaflet is lightweight, reliable, and sufficient for marker-based project location selection and display. It fits the current use case without adding unnecessary platform complexity.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you destroy and recreate map instances when modals close and reopen?</div>
+<div class="a">Because modal-based maps can leak memory or render incorrectly if old instances are reused carelessly. Explicit cleanup keeps behavior stable and prevents stale state.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you reload data after create, update, or delete instead of trusting local state?</div>
+<div class="a">Reloading from the API ensures the UI reflects the real backend state. It is safer than assuming the local copy is fully accurate after a write.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you include audit logging?</div>
+<div class="a">For accountability and traceability. In an administrative platform, being able to track who changed or deleted records is part of operational reliability.</div>
+</div>
+
+<h2>High-Probability "Why Did You Not..." Questions</h2>
+
+<div class="qa">
+<div class="q">Why did you not load all projects at once?</div>
+<div class="a">That works only while the dataset is small. Pagination is more resilient because it keeps response times and memory usage predictable as the system grows.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you not rely only on frontend permission checks?</div>
+<div class="a">Because frontend checks are only for user experience. Real protection must stay on the backend using middleware and access-scoped queries.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you not keep a single long-lived map instance for the page?</div>
+<div class="a">The maps live inside modal lifecycles, so keeping a global instance adds more risk of stale DOM references and rendering issues. Local lifecycle cleanup is simpler and safer here.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you not use optimistic UI updates?</div>
+<div class="a">For an admin dashboard, correctness matters more than perceived speed. I preferred confirming the backend result first to avoid showing users a state that might later fail validation.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you not move everything into one giant global store?</div>
+<div class="a">Not all state benefits from being global. Local view state such as modal state, active filters, and temporary form values is easier to reason about when it stays close to the component.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you not trust client-submitted reporter assignments directly?</div>
+<div class="a">Because assignments affect access and workflow. The backend re-validates that reporters exist, are active, have the correct role, and belong to the expected municipality.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you not allow latitude without longitude, or vice versa?</div>
+<div class="a">A partial coordinate creates broken location data. The backend blocks that to preserve data integrity.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you not allow end dates before start dates?</div>
+<div class="a">That would break timeline logic and reporting accuracy, so the backend explicitly validates chronological consistency.</div>
+</div>
+
+<h2>Project-Specific Questions They May Target in This Screen</h2>
+
+<div class="qa">
+<div class="q">Why are the map elements stored as refs like <code>detailMapEl</code> and <code>formMapEl</code>?</div>
+<div class="a">Because Leaflet needs a real DOM node to mount into. Vue refs let the component safely initialize the map only after the element exists.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why do you wait for the DOM before syncing the map?</div>
+<div class="a">Because the modal content may not be mounted yet. Waiting until the next render tick avoids initializing Leaflet against a missing or hidden container.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why do you keep fallback option sets in the frontend if the backend can return options?</div>
+<div class="a">It improves resilience. If the options endpoint fails, the form can still remain usable with safe defaults instead of fully breaking.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why do you filter assigned reporters again after municipality changes?</div>
+<div class="a">Because a municipality change changes which reporters are valid. Keeping invalid assignments would create inconsistent data and failed saves.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why do you convert multiline text into arrays for fields like objectives and contacts?</div>
+<div class="a">It gives users a simple editing experience in the form while keeping the API payload structured and easier to validate.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why do you use a confirmation dialog before deleting a project?</div>
+<div class="a">Because delete is destructive and may remove linked data. The confirmation is a simple safety barrier against accidental data loss.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why do you keep loading, saving, and deleting states separately?</div>
+<div class="a">Different operations can fail or complete independently. Separate states make the UI more precise and prevent one action from masking another.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why do you clear timers and remove map instances on component unmount?</div>
+<div class="a">That prevents memory leaks, stale listeners, and unexpected behavior if the user navigates away and returns later.</div>
+</div>
+
+<h2>Tougher Follow-Up Questions and Strong Answers</h2>
+
+<div class="qa">
+<div class="q">Why are you storing the token in local storage instead of using an HTTP-only cookie?</div>
+<div class="a">The current implementation uses bearer tokens for simple SPA flow control. The tradeoff is that HTTP-only cookies are stronger against JavaScript access, so if the threat model becomes stricter, moving auth to secure cookies would be the stronger next step.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you not add request cancellation for rapid filter changes?</div>
+<div class="a">Debouncing already reduces request volume, which was the first practical control. Adding cancellation would be a sensible next improvement to prevent stale responses winning under heavy interaction.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why is the map logic still inside the component instead of a reusable composable?</div>
+<div class="a">The current scope is localized to one screen, so keeping it in the component keeps the implementation straightforward. If map behavior spreads to more screens, extracting a composable becomes the better maintainability move.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you not add optimistic locking for concurrent edits yet?</div>
+<div class="a">The current flow is correct for normal usage, but true conflict prevention belongs in backend concurrency control. If simultaneous editing becomes common, I would add version or timestamp checks to stop silent overwrites.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you not centralize all error handling in one system?</div>
+<div class="a">Shared handling exists at the API layer for auth failures, while view-level errors still stay local for precise user feedback. A more centralized notification pattern would be a good next refinement, but local handling keeps the current flows explicit.</div>
+</div>
+
+<div class="qa">
+<div class="q">Why did you not cache project lists aggressively?</div>
+<div class="a">Because correctness is more important than stale speed for administrative data. Caching should be added selectively, with invalidation rules, once the read volume clearly justifies it.</div>
+</div>
+
+<h2>If They Push on Weaknesses, Use Honest Controlled Answers</h2>
+<ul class="tight">
+<li><strong>On security:</strong> "The current pattern is acceptable for this app, but if security requirements tighten, I would prioritize HTTP-only cookie auth and a stricter CSP."</li>
+<li><strong>On performance:</strong> "The current dataset is handled safely with pagination and debounced search. If usage grows, the next steps are query indexing, request cancellation, and targeted caching."</li>
+<li><strong>On maintainability:</strong> "The screen is still readable as one view, but the next refactor would be extracting repeated modal or map logic into composables/components."</li>
+<li><strong>On concurrency:</strong> "Current behavior is functionally correct, but conflict resolution is a backend enhancement I would add if simultaneous edits become likely."</li>
+<li><strong>On UX:</strong> "The current confirmation flow is intentionally simple. If needed, it can be upgraded to a custom confirmation modal with clearer impact messaging."</li>
+</ul>
+
+<h2>Questions You Can Ask Back</h2>
+<ul class="tight">
+<li>Are you evaluating mainly for operational resilience, scaling readiness, or code maintainability?</li>
+<li>Do you want the current implementation defended as-is, or are you also assessing the roadmap for production hardening?</li>
+<li>Would you like me to explain the tradeoffs we accepted now versus what I would strengthen for a larger rollout?</li>
+</ul>
+
+<h2>What Not to Say</h2>
+<ul class="tight">
+<li>Do not say "the frontend blocks it, so users cannot do it."</li>
+<li>Do not say "it works on my machine, so it is fine."</li>
+<li>Do not say "we did not need validation because the form controls are restricted."</li>
+<li>Do not pretend a missing production hardening feature already exists.</li>
+<li>Do not defend every tradeoff as perfect. Defend it as appropriate for the current scope, then name the next upgrade path.</li>
+</ul>
+
+<h2>30-Second Closing Script</h2>
+<p>"The system is designed around safe defaults: backend-enforced authorization, validated API input, scoped data access, and predictable UI state. On the frontend, the choices favor maintainability and controlled interaction. On the backend, the priorities are correctness, access control, and auditability. Where there are future hardening opportunities, I can clearly identify them and explain the next step."</p>
+
+</body>
+</html>

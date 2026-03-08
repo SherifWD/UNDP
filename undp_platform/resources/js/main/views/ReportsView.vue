@@ -461,7 +461,6 @@ onBeforeUnmount(() => {
         <section class="panel">
             <header class="panel__header">
                 <h2>KPI & Geo Reports</h2>
-                <p class="panel__hint">Advanced analytics, drill-down filters, and clustered map markers.</p>
             </header>
 
             <p class="field-error" v-if="error">{{ error }}</p>
@@ -539,7 +538,6 @@ onBeforeUnmount(() => {
                             </li>
                         </ul>
                     </div>
-                    <p class="panel__hint">Click a status to drill into filtered analytics.</p>
                 </div>
 
                 <div class="detail-block">
@@ -592,7 +590,6 @@ onBeforeUnmount(() => {
                 <div class="map-shell__head">
                     <div>
                         <h3>Interactive Map</h3>
-                        <p class="panel__hint">Zoom out for clusters. Zoom in for spiderfied overlapping markers and raw points.</p>
                     </div>
                     <button class="btn btn--ghost" type="button" @click="toggleMapFullscreen">
                         {{ isMapFullscreen ? 'Exit Full Screen' : 'Full Screen Map' }}

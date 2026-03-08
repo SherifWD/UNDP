@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -73,6 +74,13 @@ class User extends Authenticatable
     public function validatedSubmissions(): HasMany
     {
         return $this->hasMany(Submission::class, 'validated_by');
+    }
+
+    public function assignedProjects(): BelongsToMany
+    {
+        return $this->belongsToMany(Project::class, 'project_reporter_assignments', 'reporter_id', 'project_id')
+            ->withPivot('assigned_by')
+            ->withTimestamps();
     }
 
     public function uploadedMediaAssets(): HasMany

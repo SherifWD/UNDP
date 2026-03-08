@@ -19,20 +19,22 @@ abstract class MobileController extends Controller
             $stored['execution_status'] ?? null,
             $progressPercent,
         );
-        $expectedEndDate = $stored['expected_end_date'] ?? now()->addMonths(9)->endOfMonth()->toDateString();
+        $expectedEndDate = $stored['end_date']
+            ?? $stored['expected_end_date']
+            ?? now()->addMonths(9)->endOfMonth()->toDateString();
 
         return [
             'code' => (string) ($stored['code'] ?? sprintf('PRJ-%03d', $project->id)),
-            'goal_area' => (string) ($stored['goal_area'] ?? ($project->municipality?->name ?? 'General Area')),
+            'goal_area' => (string) ($stored['development_goal_area'] ?? $stored['goal_area'] ?? ($project->municipality?->name ?? 'General Area')),
             'location_label' => (string) ($stored['location_label'] ?? ($project->municipality?->name ?? 'Unassigned area')),
-            'component_category' => (string) ($stored['component_category'] ?? 'Hard Component - Infrastructure'),
-            'donors' => collect($stored['donors'] ?? ['UNDP Libya'])
+            'component_category' => (string) ($stored['project_category'] ?? $stored['component_category'] ?? 'Hard Component - Infrastructure'),
+            'donors' => collect($stored['funding_sources'] ?? $stored['donors'] ?? ['UNDP Libya'])
                 ->filter(fn ($value): bool => is_string($value) && trim($value) !== '')
                 ->values()
                 ->all(),
             'program_lead' => (string) ($stored['program_lead'] ?? 'UNDP Libya'),
             'duration_months' => max(1, (int) ($stored['duration_months'] ?? 3)),
-            'implemented_by' => (string) ($stored['implemented_by'] ?? ($project->municipality?->name ?? 'UNDP Partner')),
+            'implemented_by' => (string) ($stored['implementing_partner'] ?? $stored['implemented_by'] ?? ($project->municipality?->name ?? 'UNDP Partner')),
             'contacts' => collect($stored['contacts'] ?? [])
                 ->filter(fn ($value): bool => is_string($value) && trim($value) !== '')
                 ->values()

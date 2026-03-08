@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Mobile;
 use App\Enums\UserRole;
 use App\Models\Project;
 use App\Models\Submission;
+use App\Services\ProjectAccessService;
 use App\Services\SubmissionAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,17 +34,14 @@ class HomeController extends MobileController
             ->orderByDesc('last_update_at')
             ->orderBy('name_en');
 
-        if ($user->municipality_id && $user->hasRole([
-            UserRole::REPORTER->value,
-            UserRole::MUNICIPAL_FOCAL_POINT->value,
-        ])) {
-            $projectQuery->where('municipality_id', $user->municipality_id);
-        }
+        ProjectAccessService::scope($user, $projectQuery);
 
         $projects = $projectQuery->get();
-        $invitedProjects = $projects
-            ->filter(fn (Project $project): bool => (bool) $this->projectMeta($project)['is_invited'])
-            ->values();
+        $invitedProjects = $user->hasRole(UserRole::REPORTER)
+            ? $projects->values()
+            : $projects
+                ->filter(fn (Project $project): bool => (bool) $this->projectMeta($project)['is_invited'])
+                ->values();
 
         return $this->successResponse([
             'presence' => [

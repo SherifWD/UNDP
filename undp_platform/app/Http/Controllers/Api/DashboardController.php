@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\UserRole;
 use App\Enums\SubmissionStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Municipality;
 use App\Models\Project;
 use App\Models\Submission;
+use App\Services\ProjectAccessService;
 use App\Services\SubmissionAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -245,13 +245,7 @@ class DashboardController extends Controller
             SubmissionAccessService::scope($user, $submissionQuery);
         }
 
-        if ($user->hasRole(UserRole::MUNICIPAL_FOCAL_POINT) && $user->municipality_id) {
-            $projectQuery->where('municipality_id', $user->municipality_id);
-        }
-
-        if ($user->hasRole(UserRole::REPORTER) && $user->municipality_id) {
-            $projectQuery->where('municipality_id', $user->municipality_id);
-        }
+        ProjectAccessService::scope($user, $projectQuery);
 
         if (! empty($validated['municipality_id']) && $user->hasPermission('dashboards.view.system')) {
             $projectQuery->where('municipality_id', $validated['municipality_id']);
