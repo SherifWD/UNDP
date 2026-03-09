@@ -123,6 +123,85 @@ class MobileApiTest extends TestCase
             ->assertJsonPath('data.project.can_report', true);
     }
 
+    public function test_mobile_home_supports_independent_invited_and_area_filters_with_generic_search(): void
+    {
+        $municipality = Municipality::query()->create([
+            'name_en' => 'Benghazi',
+            'name_ar' => 'بنغازي',
+            'code' => 'BEN',
+        ]);
+
+        Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Clinic Rehabilitation',
+            'name_ar' => 'إعادة تأهيل العيادة',
+            'description' => 'Main district health clinic rehabilitation.',
+            'status' => 'active',
+            'latitude' => 32.1167,
+            'longitude' => 20.0667,
+            'last_update_at' => now(),
+            'mobile_meta' => [
+                'code' => 'PRJ-BEN-001',
+                'execution_status' => 'planned',
+                'is_invited' => true,
+            ],
+        ]);
+
+        Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Market Water Network',
+            'name_ar' => 'شبكة مياه السوق',
+            'description' => 'Central market water line replacement in progress.',
+            'status' => 'active',
+            'latitude' => 32.119,
+            'longitude' => 20.064,
+            'last_update_at' => now()->subMinutes(10),
+            'mobile_meta' => [
+                'code' => 'PRJ-BEN-002',
+                'execution_status' => 'in_progress',
+                'is_invited' => true,
+            ],
+        ]);
+
+        Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'School Rehabilitation',
+            'name_ar' => 'تأهيل المدرسة',
+            'description' => 'School work has been completed and handed over.',
+            'status' => 'active',
+            'latitude' => 32.121,
+            'longitude' => 20.061,
+            'last_update_at' => now()->subMinutes(30),
+            'mobile_meta' => [
+                'code' => 'PRJ-BEN-003',
+                'execution_status' => 'completed',
+                'is_invited' => false,
+            ],
+        ]);
+
+        $focalPoint = User::factory()->create([
+            'role' => UserRole::MUNICIPAL_FOCAL_POINT->value,
+            'municipality_id' => $municipality->id,
+            'status' => 'active',
+        ]);
+
+        Sanctum::actingAs($focalPoint);
+
+        $response = $this->getJson('/api/mobile/home?invited_status=inprogress&invited_search=market&area_status=planned&area_search=clinic');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('result', true)
+            ->assertJsonPath('data.projects.invited_count', 1)
+            ->assertJsonPath('data.projects.invited.0.code', 'PRJ-BEN-002')
+            ->assertJsonPath('data.projects.invited.0.execution_status', 'in_progress')
+            ->assertJsonPath('data.projects.area_count', 1)
+            ->assertJsonPath('data.projects.area.0.code', 'PRJ-BEN-001')
+            ->assertJsonPath('data.projects.area.0.execution_status', 'planned')
+            ->assertJsonPath('data.projects.filters.invited.status', 'in_progress')
+            ->assertJsonPath('data.projects.filters.area.status', 'planned');
+    }
+
     public function test_reporter_can_save_draft_and_submit_mobile_submission(): void
     {
         $municipality = Municipality::query()->create([

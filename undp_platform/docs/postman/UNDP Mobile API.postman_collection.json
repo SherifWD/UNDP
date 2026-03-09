@@ -376,13 +376,39 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/mobile/home",
+              "raw": "{{base_url}}/mobile/home?invited_status=all&invited_search=&invited_limit=10&area_status=all&area_search=&area_limit=10",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "mobile",
                 "home"
+              ],
+              "query": [
+                {
+                  "key": "invited_status",
+                  "value": "all"
+                },
+                {
+                  "key": "invited_search",
+                  "value": ""
+                },
+                {
+                  "key": "invited_limit",
+                  "value": "10"
+                },
+                {
+                  "key": "area_status",
+                  "value": "all"
+                },
+                {
+                  "key": "area_search",
+                  "value": ""
+                },
+                {
+                  "key": "area_limit",
+                  "value": "10"
+                }
               ]
             }
           },
