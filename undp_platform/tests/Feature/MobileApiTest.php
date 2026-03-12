@@ -11,6 +11,7 @@ use App\Models\Submission;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -200,6 +201,264 @@ class MobileApiTest extends TestCase
             ->assertJsonPath('data.projects.area.0.execution_status', 'planned')
             ->assertJsonPath('data.projects.filters.invited.status', 'in_progress')
             ->assertJsonPath('data.projects.filters.area.status', 'planned');
+    }
+
+    public function test_mobile_home_invited_projects_support_pagination(): void
+    {
+        $municipality = Municipality::query()->create([
+            'name_en' => 'Alkufraa',
+            'name_ar' => 'الكفرة',
+            'code' => 'ALK',
+        ]);
+
+        $reporter = User::factory()->create([
+            'role' => UserRole::REPORTER->value,
+            'municipality_id' => $municipality->id,
+            'status' => 'active',
+        ]);
+
+        $firstProject = Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Project One',
+            'name_ar' => 'المشروع الأول',
+            'status' => 'active',
+            'latitude' => 23.31,
+            'longitude' => 21.85,
+            'last_update_at' => now(),
+            'mobile_meta' => [
+                'code' => 'PRJ-ALK-001',
+                'execution_status' => 'planned',
+            ],
+        ]);
+
+        $secondProject = Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Project Two',
+            'name_ar' => 'المشروع الثاني',
+            'status' => 'active',
+            'latitude' => 23.32,
+            'longitude' => 21.86,
+            'last_update_at' => now()->subMinute(),
+            'mobile_meta' => [
+                'code' => 'PRJ-ALK-002',
+                'execution_status' => 'in_progress',
+            ],
+        ]);
+
+        $thirdProject = Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Project Three',
+            'name_ar' => 'المشروع الثالث',
+            'status' => 'active',
+            'latitude' => 23.33,
+            'longitude' => 21.87,
+            'last_update_at' => now()->subMinutes(2),
+            'mobile_meta' => [
+                'code' => 'PRJ-ALK-003',
+                'execution_status' => 'completed',
+            ],
+        ]);
+
+        $firstProject->assignedReporters()->syncWithoutDetaching([$reporter->id => ['assigned_by' => $reporter->id]]);
+        $secondProject->assignedReporters()->syncWithoutDetaching([$reporter->id => ['assigned_by' => $reporter->id]]);
+        $thirdProject->assignedReporters()->syncWithoutDetaching([$reporter->id => ['assigned_by' => $reporter->id]]);
+
+        Sanctum::actingAs($reporter);
+
+        $response = $this->getJson('/api/mobile/home?invited_limit=2&invited_page=2');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('result', true)
+            ->assertJsonPath('data.projects.invited_count', 3)
+            ->assertJsonPath('data.projects.invited_pagination.page', 2)
+            ->assertJsonPath('data.projects.invited_pagination.per_page', 2)
+            ->assertJsonPath('data.projects.invited_pagination.total_pages', 2)
+            ->assertJsonPath('data.projects.invited_pagination.has_previous', true)
+            ->assertJsonPath('data.projects.invited_pagination.has_more', false)
+            ->assertJsonCount(1, 'data.projects.invited')
+            ->assertJsonPath('data.projects.invited.0.code', 'PRJ-ALK-003');
+    }
+
+    public function test_mobile_submissions_support_status_filters_and_pagination(): void
+    {
+        $municipality = Municipality::query()->create([
+            'name_en' => 'Alkufraa',
+            'name_ar' => 'الكفرة',
+            'code' => 'ALK',
+        ]);
+
+        $project = Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Alkufraa Police Station Project',
+            'name_ar' => 'مشروع مركز شرطة الكفرة',
+            'status' => 'active',
+            'latitude' => 23.3112,
+            'longitude' => 21.8569,
+            'last_update_at' => now(),
+        ]);
+
+        $reporter = User::factory()->create([
+            'role' => UserRole::REPORTER->value,
+            'municipality_id' => $municipality->id,
+            'status' => 'active',
+        ]);
+
+        $project->assignedReporters()->sync([
+            $reporter->id => ['assigned_by' => $reporter->id],
+        ]);
+
+        $approvedOlder = Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $project->id,
+            'municipality_id' => $municipality->id,
+            'status' => SubmissionStatus::APPROVED->value,
+            'title' => 'Approved older',
+        ]);
+
+        $approvedLatest = Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $project->id,
+            'municipality_id' => $municipality->id,
+            'status' => SubmissionStatus::APPROVED->value,
+            'title' => 'Approved latest',
+        ]);
+
+        $rejected = Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $project->id,
+            'municipality_id' => $municipality->id,
+            'status' => SubmissionStatus::REJECTED->value,
+            'title' => 'Rejected report',
+        ]);
+
+        $reworkRequested = Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $project->id,
+            'municipality_id' => $municipality->id,
+            'status' => SubmissionStatus::REWORK_REQUESTED->value,
+            'title' => 'Needs rework',
+        ]);
+
+        $draft = Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $project->id,
+            'municipality_id' => $municipality->id,
+            'status' => SubmissionStatus::DRAFT->value,
+            'title' => 'Draft report',
+        ]);
+
+        DB::table('submissions')->where('id', $approvedLatest->id)->update([
+            'updated_at' => now()->subMinute(),
+        ]);
+        DB::table('submissions')->where('id', $approvedOlder->id)->update([
+            'updated_at' => now()->subMinutes(2),
+        ]);
+        DB::table('submissions')->where('id', $rejected->id)->update([
+            'updated_at' => now()->subMinutes(3),
+        ]);
+        DB::table('submissions')->where('id', $reworkRequested->id)->update([
+            'updated_at' => now()->subMinutes(4),
+        ]);
+        DB::table('submissions')->where('id', $draft->id)->update([
+            'updated_at' => now()->subMinutes(5),
+        ]);
+
+        Sanctum::actingAs($reporter);
+
+        $approvedPageOne = $this->getJson('/api/mobile/submissions?tab=submitted&status=approved&per_page=1&page=1');
+        $approvedPageOne
+            ->assertOk()
+            ->assertJsonPath('result', true)
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.items.0.id', $approvedLatest->id)
+            ->assertJsonPath('data.items.0.status', SubmissionStatus::APPROVED->value)
+            ->assertJsonPath('data.pagination.page', 1)
+            ->assertJsonPath('data.pagination.per_page', 1)
+            ->assertJsonPath('data.pagination.total', 2)
+            ->assertJsonPath('data.pagination.total_pages', 2)
+            ->assertJsonPath('data.pagination.has_more', true);
+
+        $approvedPageTwo = $this->getJson('/api/mobile/submissions?tab=submitted&status=approved&per_page=1&page=2');
+        $approvedPageTwo
+            ->assertOk()
+            ->assertJsonPath('data.items.0.id', $approvedOlder->id)
+            ->assertJsonPath('data.pagination.page', 2)
+            ->assertJsonPath('data.pagination.has_previous', true)
+            ->assertJsonPath('data.pagination.has_more', false);
+
+        $rejectedResponse = $this->getJson('/api/mobile/submissions?status=rejected&per_page=10&page=1');
+        $rejectedResponse
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath('data.items.0.id', $rejected->id)
+            ->assertJsonPath('data.items.0.status', SubmissionStatus::REJECTED->value);
+
+        $reworkResponse = $this->getJson('/api/mobile/submissions?status=rework&per_page=10&page=1');
+        $reworkResponse
+            ->assertOk()
+            ->assertJsonPath('data.filters.status', SubmissionStatus::REWORK_REQUESTED->value)
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath('data.items.0.id', $reworkRequested->id)
+            ->assertJsonPath('data.items.0.status', SubmissionStatus::REWORK_REQUESTED->value);
+
+        $draftsResponse = $this->getJson('/api/mobile/submissions?tab=drafts&per_page=1&page=1');
+        $draftsResponse
+            ->assertOk()
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath('data.items.0.id', $draft->id)
+            ->assertJsonPath('data.items.0.status', SubmissionStatus::DRAFT->value);
+    }
+
+    public function test_create_mobile_submission_defaults_to_draft_when_mode_is_missing(): void
+    {
+        $municipality = Municipality::query()->create([
+            'name_en' => 'Alkufraa',
+            'name_ar' => 'الكفرة',
+            'code' => 'ALK',
+        ]);
+
+        $project = Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Alkufraa Police Station Project',
+            'name_ar' => 'مشروع مركز شرطة الكفرة',
+            'status' => 'active',
+            'latitude' => 23.3112,
+            'longitude' => 21.8569,
+            'last_update_at' => now(),
+            'mobile_meta' => [
+                'code' => 'PRJ-ALK-001',
+                'location_label' => 'South Region - Alkufraa',
+                'execution_status' => 'in_progress',
+                'progress_percent' => 55,
+                'is_invited' => true,
+            ],
+        ]);
+
+        $reporter = User::factory()->create([
+            'role' => UserRole::REPORTER->value,
+            'municipality_id' => $municipality->id,
+            'status' => 'active',
+        ]);
+
+        $project->assignedReporters()->sync([
+            $reporter->id => ['assigned_by' => $reporter->id],
+        ]);
+
+        Sanctum::actingAs($reporter);
+
+        $response = $this->postJson('/api/mobile/submissions', [
+            'project_id' => $project->id,
+            'title' => 'Phase 1 Reinforcement Progress Update',
+            'project_status' => 'in_progress',
+            'summary_of_observation' => 'Initial draft content.',
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('result', true)
+            ->assertJsonPath('data.submission.status', SubmissionStatus::DRAFT->value)
+            ->assertJsonPath('data.submission.data.project_status', 'in_progress');
     }
 
     public function test_reporter_can_save_draft_and_submit_mobile_submission(): void

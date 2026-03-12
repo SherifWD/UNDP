@@ -218,7 +218,6 @@ onBeforeUnmount(() => {
                     <div>
                         <h2>Submission Review</h2>
                         <p v-if="scope?.municipality_name">Scoped to {{ scope.municipality_name }}</p>
-                        <p v-else>Pending submissions available in your current role scope.</p>
                     </div>
                 </div>
 

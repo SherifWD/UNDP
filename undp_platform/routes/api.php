@@ -21,6 +21,7 @@ Route::prefix('auth')->group(function (): void {
     Route::post('/register-reporter', [AuthController::class, 'registerReporter'])->middleware('throttle:otp');
     Route::post('/request-otp', [AuthController::class, 'requestOtp'])->middleware('throttle:otp');
     Route::post('/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:otp');
+    Route::post('/refresh-token', [AuthController::class, 'refreshToken'])->middleware('throttle:api');
 
     Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function (): void {
         Route::get('/me', [AuthController::class, 'me']);

@@ -21,9 +21,14 @@ class SubmissionController extends MobileController
 {
     public function index(Request $request): JsonResponse
     {
+        $statusFilterOptions = array_merge(SubmissionStatus::values(), ['rework']);
+
         $validator = Validator::make($request->all(), [
             'tab' => ['nullable', Rule::in(['submitted', 'drafts', 'all'])],
+            'status' => ['nullable', Rule::in($statusFilterOptions)],
             'search' => ['nullable', 'string', 'max:255'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -44,6 +49,11 @@ class SubmissionController extends MobileController
             $query->where('status', '!=', SubmissionStatus::DRAFT->value);
         }
 
+        $status = $this->normalizeSubmissionStatusFilter($validated['status'] ?? null);
+        if ($status) {
+            $query->where('status', $status);
+        }
+
         if (! empty($validated['search'])) {
             $search = trim((string) $validated['search']);
 
@@ -60,19 +70,36 @@ class SubmissionController extends MobileController
             });
         }
 
-        $limit = $validated['limit'] ?? 25;
-        $submissions = $query->limit($limit)->get();
+        $perPage = (int) ($validated['per_page'] ?? $validated['limit'] ?? 25);
+        $page = (int) ($validated['page'] ?? 1);
+        $submissions = $query->paginate($perPage, ['*'], 'page', $page);
 
         $countsBase = Submission::query();
         SubmissionAccessService::scope($request->user(), $countsBase);
 
         return $this->successResponse([
-            'items' => $submissions
+            'items' => $submissions->getCollection()
                 ->map(fn (Submission $submission): array => $this->serializeSubmissionCard($submission))
                 ->values(),
             'counts' => [
                 'submitted' => (clone $countsBase)->where('status', '!=', SubmissionStatus::DRAFT->value)->count(),
                 'drafts' => (clone $countsBase)->where('status', SubmissionStatus::DRAFT->value)->count(),
+                'approved' => (clone $countsBase)->where('status', SubmissionStatus::APPROVED->value)->count(),
+                'rejected' => (clone $countsBase)->where('status', SubmissionStatus::REJECTED->value)->count(),
+                'rework' => (clone $countsBase)->where('status', SubmissionStatus::REWORK_REQUESTED->value)->count(),
+            ],
+            'pagination' => [
+                'page' => $submissions->currentPage(),
+                'per_page' => $submissions->perPage(),
+                'total' => $submissions->total(),
+                'total_pages' => $submissions->lastPage(),
+                'has_previous' => $submissions->currentPage() > 1,
+                'has_more' => $submissions->hasMorePages(),
+            ],
+            'filters' => [
+                'tab' => $validated['tab'] ?? 'submitted',
+                'status' => $status,
+                'search' => $validated['search'] ?? null,
             ],
         ]);
     }
@@ -311,7 +338,12 @@ class SubmissionController extends MobileController
 
         $validator->after(function ($validator) use ($request, $creating): void {
             $input = $validator->safe()->all();
-            $mode = $input['mode'] ?? 'submit';
+            $routeSubmission = $request->route('submission');
+            $mode = $this->resolveSubmissionMode(
+                is_string($input['mode'] ?? null) ? $input['mode'] : null,
+                $creating,
+                $routeSubmission instanceof Submission ? $routeSubmission : null,
+            );
 
             $mediaRows = collect($input['media'] ?? [])->filter(fn ($row): bool => is_array($row));
             $mediaIds = $mediaRows
@@ -329,7 +361,6 @@ class SubmissionController extends MobileController
                 $validator->errors()->add('media', 'Attach media after creating the draft submission.');
             }
 
-            $routeSubmission = $request->route('submission');
             if (! $creating && $routeSubmission instanceof Submission && $mediaIds->isNotEmpty()) {
                 $ownedMediaCount = MediaAsset::query()
                     ->where('submission_id', $routeSubmission->id)
@@ -431,7 +462,11 @@ class SubmissionController extends MobileController
             return $this->errorResponse('You can only report projects within your assigned scope.', 403);
         }
 
-        $mode = $validated['mode'] ?? 'submit';
+        $mode = $this->resolveSubmissionMode(
+            isset($validated['mode']) && is_string($validated['mode']) ? $validated['mode'] : null,
+            $isNew,
+            $submission,
+        );
         $targetStatus = $mode === 'draft'
             ? SubmissionStatus::DRAFT->value
             : SubmissionStatus::SUBMITTED->value;
@@ -713,6 +748,34 @@ class SubmissionController extends MobileController
         }
 
         return $data;
+    }
+
+    private function resolveSubmissionMode(?string $mode, bool $creating, ?Submission $submission = null): string
+    {
+        if ($mode === 'draft' || $mode === 'submit') {
+            return $mode;
+        }
+
+        if ($creating || $submission?->status === SubmissionStatus::DRAFT->value) {
+            return 'draft';
+        }
+
+        return 'submit';
+    }
+
+    private function normalizeSubmissionStatusFilter(?string $status): ?string
+    {
+        if (! is_string($status) || trim($status) === '') {
+            return null;
+        }
+
+        $normalized = mb_strtolower(trim($status));
+
+        if ($normalized === 'rework') {
+            return SubmissionStatus::REWORK_REQUESTED->value;
+        }
+
+        return in_array($normalized, SubmissionStatus::values(), true) ? $normalized : null;
     }
 
     private function canViewSubmissionMedia(User $user, Submission $submission): bool

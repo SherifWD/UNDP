@@ -14,7 +14,9 @@ use App\Support\PhoneNumber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Laravel\Sanctum\PersonalAccessToken;
 use Throwable;
 
 class AuthController extends Controller
@@ -39,7 +41,7 @@ class AuthController extends Controller
                 'user_exists' => false,
                 'requires_registration' => true,
                 'phone_e164' => $phoneData['phone_e164'],
-            ], 404);
+            ], 200);
         }
 
         if (! $user->isActive()) {
@@ -199,7 +201,7 @@ class AuthController extends Controller
             $user->syncRoleSafely($user->role);
         }
 
-        $token = $user->createToken('mobile-api-token')->plainTextToken;
+        $tokens = $this->issueMobileTokens($user);
 
         AuditLogger::log(
             action: 'auth.login_success',
@@ -215,9 +217,77 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => $isReturning ? __('Welcome back') : __('Account verified successfully'),
-            'token' => $token,
-            'token_type' => 'Bearer',
+            'token' => $tokens['access_token'],
+            'access_token' => $tokens['access_token'],
+            'refresh_token' => $tokens['refresh_token'],
+            'token_type' => $tokens['token_type'],
+            'expires_in' => $tokens['expires_in'],
+            'refresh_expires_in' => $tokens['refresh_expires_in'],
             'is_returning_user' => $isReturning,
+            'user' => $this->serializeUser($user),
+        ]);
+    }
+
+    public function refreshToken(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'refresh_token' => ['required', 'string'],
+            'preferred_locale' => ['nullable', Rule::in(['ar', 'en'])],
+        ]);
+
+        $personalAccessToken = PersonalAccessToken::findToken($validated['refresh_token']);
+
+        if (! $personalAccessToken
+            || ! $personalAccessToken->tokenable instanceof User
+            || $personalAccessToken->name !== 'mobile-refresh-token'
+            || ! $personalAccessToken->can('token:refresh')) {
+            return response()->json([
+                'message' => __('Invalid refresh token.'),
+            ], 401);
+        }
+
+        if ($personalAccessToken->expires_at && $personalAccessToken->expires_at->isPast()) {
+            $personalAccessToken->delete();
+
+            return response()->json([
+                'message' => __('Refresh token expired. Please login again.'),
+            ], 401);
+        }
+
+        /** @var User $user */
+        $user = $personalAccessToken->tokenable;
+
+        if (! $user->isActive()) {
+            $personalAccessToken->delete();
+
+            return response()->json([
+                'message' => __('Your account is disabled. Please contact an administrator.'),
+            ], 403);
+        }
+
+        $user->forceFill([
+            'preferred_locale' => $validated['preferred_locale'] ?? $user->preferred_locale,
+        ])->save();
+
+        $personalAccessToken->delete();
+        $tokens = $this->issueMobileTokens($user);
+
+        AuditLogger::log(
+            action: 'auth.token_refreshed',
+            entityType: 'users',
+            entityId: $user->id,
+            request: $request,
+            actor: $user,
+        );
+
+        return response()->json([
+            'message' => __('Token refreshed successfully.'),
+            'token' => $tokens['access_token'],
+            'access_token' => $tokens['access_token'],
+            'refresh_token' => $tokens['refresh_token'],
+            'token_type' => $tokens['token_type'],
+            'expires_in' => $tokens['expires_in'],
+            'refresh_expires_in' => $tokens['refresh_expires_in'],
             'user' => $this->serializeUser($user),
         ]);
     }
@@ -371,6 +441,8 @@ class AuthController extends Controller
             'role' => $user->role,
             'status' => $user->status,
             'preferred_locale' => $user->preferred_locale,
+            'avatar_url' => $user->avatar_path ? Storage::disk('public')->url($user->avatar_path) : null,
+            'image_url' => $user->avatar_path ? Storage::disk('public')->url($user->avatar_path) : null,
             'municipality' => $user->municipality ? [
                 'id' => $user->municipality->id,
                 'name_en' => $user->municipality->name_en,
@@ -379,6 +451,32 @@ class AuthController extends Controller
             ] : null,
             'permissions' => $user->permissionNames(),
             'last_login_at' => optional($user->last_login_at)->toIso8601String(),
+        ];
+    }
+
+    private function issueMobileTokens(User $user): array
+    {
+        $accessTtlMinutes = max(1, (int) config('mobile.auth.access_token_ttl_minutes', 60));
+        $refreshTtlDays = max(1, (int) config('mobile.auth.refresh_token_ttl_days', 30));
+
+        $accessToken = $user->createToken(
+            'mobile-api-token',
+            ['token:access'],
+            now()->addMinutes($accessTtlMinutes),
+        )->plainTextToken;
+
+        $refreshToken = $user->createToken(
+            'mobile-refresh-token',
+            ['token:refresh'],
+            now()->addDays($refreshTtlDays),
+        )->plainTextToken;
+
+        return [
+            'access_token' => $accessToken,
+            'refresh_token' => $refreshToken,
+            'token_type' => 'Bearer',
+            'expires_in' => $accessTtlMinutes * 60,
+            'refresh_expires_in' => $refreshTtlDays * 24 * 60 * 60,
         ];
     }
 }

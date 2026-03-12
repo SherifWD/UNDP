@@ -406,9 +406,7 @@ onMounted(async () => {
             <header class="tracky-projects__head tracky-settings-head">
                 <div>
                     <h2>Settings</h2>
-                    <p class="tracky-settings-note">
-                        Manage platform defaults, workflow rules, and security policies.
-                    </p>
+                    
                 </div>
 
                 <div class="tracky-settings-head__actions">

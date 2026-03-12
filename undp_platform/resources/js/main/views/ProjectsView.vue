@@ -898,7 +898,6 @@ onBeforeUnmount(() => {
             <header class="tracky-projects__head">
                 <div>
                     <h2>{{ t('projectsPage.title') }}</h2>
-                    <p>{{ t('projectsPage.subtitle') }}</p>
                 </div>
                 <div class="tracky-projects__head-actions">
                     <button

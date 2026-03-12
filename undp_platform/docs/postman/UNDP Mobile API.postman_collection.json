@@ -82,7 +82,7 @@
                 "request-otp"
               ]
             },
-            "description": "Expected response: 404 with `requires_registration: true` when phone number is not registered."
+            "description": "Expected response: 200 with `requires_registration: true` when phone number is not registered."
           },
           "response": [],
           "event": [
@@ -92,7 +92,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (pm.response.code === 404 && json?.requires_registration === true) {",
+                  "if (pm.response.code === 200 && json?.requires_registration === true) {",
                   "  pm.collectionVariables.set(\"requires_registration\", \"true\");",
                   "}"
                 ]
@@ -212,7 +212,9 @@
                   "if (pm.response.code < 300) {",
                   "  const json = pm.response.json();",
                   "  const token = json?.token ?? json?.data?.token;",
+                  "  const refreshToken = json?.refresh_token ?? json?.data?.refresh_token;",
                   "  if (token) pm.collectionVariables.set(\"token\", token);",
+                  "  if (refreshToken) pm.collectionVariables.set(\"refresh_token\", refreshToken);",
                   "}"
                 ]
               }
@@ -247,6 +249,59 @@
               "path": [
                 "auth",
                 "verify-otp"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) {",
+                  "  const json = pm.response.json();",
+                  "  const token = json?.token ?? json?.data?.token;",
+                  "  const refreshToken = json?.refresh_token ?? json?.data?.refresh_token;",
+                  "  if (token) pm.collectionVariables.set(\"token\", token);",
+                  "  if (refreshToken) pm.collectionVariables.set(\"refresh_token\", refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\",\n  \"preferred_locale\": \"{{preferred_locale}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/refresh-token",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh-token"
               ]
             }
           },
@@ -376,7 +431,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/mobile/home?invited_status=all&invited_search=&invited_limit=10&area_status=all&area_search=&area_limit=10",
+              "raw": "{{base_url}}/mobile/home?invited_status=all&invited_search=&invited_page=1&invited_limit=10&area_status=all&area_search=&area_limit=10",
               "host": [
                 "{{base_url}}"
               ],
@@ -392,6 +447,10 @@
                 {
                   "key": "invited_search",
                   "value": ""
+                },
+                {
+                  "key": "invited_page",
+                  "value": "1"
                 },
                 {
                   "key": "invited_limit",
@@ -1395,6 +1454,10 @@
     },
     {
       "key": "token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
       "value": ""
     },
     {

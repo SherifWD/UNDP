@@ -23,11 +23,12 @@ class AuthOtpTest extends TestCase
         ]);
 
         $requestResponse
-            ->assertNotFound()
+            ->assertOk()
             ->assertJsonPath('message', 'User does not exist. Please create an account first.')
             ->assertJsonPath('requires_registration', true)
             ->assertJsonPath('user_exists', false)
-            ->assertJsonPath('result', false);
+            ->assertJsonPath('result', true)
+            ->assertJsonPath('data.requires_registration', true);
     }
 
     public function test_register_reporter_then_request_and_verify_otp(): void
@@ -88,10 +89,13 @@ class AuthOtpTest extends TestCase
             ->assertJsonPath('user.age', 27)
             ->assertJsonPath('user.gender', 'male')
             ->assertJsonPath('user.status', UserStatus::ACTIVE->value)
+            ->assertJsonPath('user.avatar_url', null)
+            ->assertJsonPath('user.image_url', null)
             ->assertJsonPath('result', true)
-            ->assertJsonStructure(['token', 'user', 'msg', 'data']);
+            ->assertJsonStructure(['token', 'refresh_token', 'user', 'msg', 'data']);
 
         $this->assertSame($verifyResponse->json('token'), $verifyResponse->json('data.token'));
+        $this->assertSame($verifyResponse->json('refresh_token'), $verifyResponse->json('data.refresh_token'));
         $this->assertSame($verifyResponse->json('user.id'), $verifyResponse->json('data.user.id'));
 
         $this->assertDatabaseHas('users', [
@@ -99,6 +103,53 @@ class AuthOtpTest extends TestCase
             'role' => UserRole::REPORTER->value,
             'age' => 27,
         ]);
+    }
+
+    public function test_refresh_token_issues_new_access_and_refresh_tokens(): void
+    {
+        $user = User::factory()->create([
+            'country_code' => '+218',
+            'phone' => '933333333',
+            'phone_e164' => '+218933333333',
+            'status' => UserStatus::ACTIVE->value,
+            'role' => UserRole::REPORTER->value,
+            'avatar_path' => 'mobile/avatars/reporter.png',
+        ]);
+
+        $issuedRefreshToken = $user->createToken(
+            'mobile-refresh-token',
+            ['token:refresh'],
+            now()->addDay(),
+        );
+
+        $response = $this->postJson('/api/auth/refresh-token', [
+            'refresh_token' => $issuedRefreshToken->plainTextToken,
+            'preferred_locale' => 'en',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('result', true)
+            ->assertJsonPath('user.id', $user->id)
+            ->assertJsonPath('user.avatar_url', url('/storage/mobile/avatars/reporter.png'))
+            ->assertJsonPath('user.image_url', url('/storage/mobile/avatars/reporter.png'))
+            ->assertJsonStructure([
+                'token',
+                'access_token',
+                'refresh_token',
+                'token_type',
+                'expires_in',
+                'refresh_expires_in',
+                'user',
+                'msg',
+                'data',
+            ]);
+
+        $this->assertDatabaseMissing('personal_access_tokens', [
+            'id' => $issuedRefreshToken->accessToken->id,
+        ]);
+
+        $this->assertNotSame($issuedRefreshToken->plainTextToken, $response->json('refresh_token'));
     }
 
     public function test_registration_meta_returns_municipalities_and_gender_options(): void

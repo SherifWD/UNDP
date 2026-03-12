@@ -20,6 +20,7 @@ class HomeController extends MobileController
         $validator = Validator::make($request->all(), [
             'invited_status' => ['nullable', Rule::in(['all', 'planned', 'inprogress', 'in_progress', 'completed'])],
             'invited_search' => ['nullable', 'string', 'max:255'],
+            'invited_page' => ['nullable', 'integer', 'min:1'],
             'invited_limit' => ['nullable', 'integer', 'min:1', 'max:100'],
             'area_status' => ['nullable', Rule::in(['all', 'planned', 'inprogress', 'in_progress', 'completed'])],
             'area_search' => ['nullable', 'string', 'max:255'],
@@ -75,8 +76,16 @@ class HomeController extends MobileController
             $areaExecutionFilter,
         );
 
+        $invitedPage = (int) ($validated['invited_page'] ?? 1);
         $invitedLimit = (int) ($validated['invited_limit'] ?? 10);
         $areaLimit = (int) ($validated['area_limit'] ?? 10);
+
+        $invitedCount = $invitedProjects->count();
+        $invitedTotalPages = $invitedCount > 0 ? (int) ceil($invitedCount / $invitedLimit) : 0;
+        $invitedOffset = ($invitedPage - 1) * $invitedLimit;
+        $paginatedInvitedProjects = $invitedProjects
+            ->slice($invitedOffset, $invitedLimit)
+            ->values();
 
         return $this->successResponse([
             'presence' => [
@@ -96,11 +105,18 @@ class HomeController extends MobileController
                 'total' => $approved + $rejected + $pending,
             ],
             'projects' => [
-                'invited_count' => $invitedProjects->count(),
-                'invited' => $invitedProjects
-                    ->take($invitedLimit)
+                'invited_count' => $invitedCount,
+                'invited' => $paginatedInvitedProjects
                     ->map(fn (Project $project): array => $this->serializeProject($project, $user))
                     ->values(),
+                'invited_pagination' => [
+                    'page' => $invitedPage,
+                    'per_page' => $invitedLimit,
+                    'total' => $invitedCount,
+                    'total_pages' => $invitedTotalPages,
+                    'has_previous' => $invitedPage > 1,
+                    'has_more' => $invitedTotalPages > 0 && $invitedPage < $invitedTotalPages,
+                ],
                 'area_count' => $areaProjects->count(),
                 'area' => $areaProjects
                     ->take($areaLimit)
@@ -110,6 +126,8 @@ class HomeController extends MobileController
                     'invited' => [
                         'status' => $invitedExecutionFilter ?? 'all',
                         'search' => $validated['invited_search'] ?? null,
+                        'page' => $invitedPage,
+                        'limit' => $invitedLimit,
                     ],
                     'area' => [
                         'status' => $areaExecutionFilter ?? 'all',
