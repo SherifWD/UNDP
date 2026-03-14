@@ -148,6 +148,7 @@ abstract class MobileController extends Controller
             'progress_impression_label' => $labels['progress_impression'] ?? null,
             'functional_status_label' => $labels['functional_status'] ?? null,
             'is_project_being_used_label' => $labels['is_project_being_used'] ?? null,
+            'activities_started_label' => $labels['activities_started'] ?? null,
             'is_used_as_intended_label' => $labels['is_used_as_intended'] ?? null,
             'negative_environmental_impact_label' => $labels['negative_environmental_impact'] ?? null,
             'user_categories_labels' => $labels['user_categories'] ?? [],
@@ -248,6 +249,7 @@ abstract class MobileController extends Controller
             'functional_status' => $this->reportingOptionLabel('functional_statuses', $form['functional_status'] ?? null),
             'delay_constraint' => $this->reportingOptionLabel('constraint_types', $form['delay_constraint'] ?? null),
             'is_project_being_used' => $this->yesNoLabel($form['is_project_being_used'] ?? null),
+            'activities_started' => $this->yesNoLabel($form['activities_started'] ?? null),
             'is_used_as_intended' => $this->yesNoLabel($form['is_used_as_intended'] ?? null),
             'negative_environmental_impact' => $this->yesNoLabel($form['negative_environmental_impact'] ?? null),
             'user_categories' => collect($form['user_categories'] ?? [])

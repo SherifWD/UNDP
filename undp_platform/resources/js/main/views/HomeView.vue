@@ -42,6 +42,7 @@ const canOpenProjectSubmissions = computed(() => (
     || auth.hasPermission('submissions.view.all')
     || auth.hasPermission('submissions.view.approved_aggregated')
 ));
+const canCreateProject = computed(() => auth.hasPermission('projects.manage'));
 
 const greetingName = computed(() => {
     const fullName = auth.user?.name || 'User';
@@ -486,7 +487,7 @@ onBeforeUnmount(() => {
                 <div>
                     <h2>{{ t('dashboard.greeting', { name: greetingName }) }}</h2>
                 </div>
-                <button class="tracky-btn tracky-btn--primary" type="button" @click="addNewProject">
+                <button v-if="canCreateProject" class="tracky-btn tracky-btn--primary" type="button" @click="addNewProject">
                     <span>+</span>
                     <span>{{ t('dashboard.addNewProject') }}</span>
                 </button>

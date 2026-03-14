@@ -306,6 +306,7 @@ class SubmissionController extends MobileController
             'approximate_completion_percentage' => ['nullable', 'integer', 'min:0', 'max:100'],
             'additional_observations' => ['nullable', 'string', 'max:5000'],
             'is_project_being_used' => ['nullable', 'boolean'],
+            'activities_started' => ['nullable', 'boolean'],
             'user_categories' => ['nullable', 'array'],
             'user_categories.*' => ['string', Rule::in(array_keys(config('mobile.reporting.user_categories', [])))],
             'is_used_as_intended' => ['nullable', 'boolean'],
@@ -322,6 +323,10 @@ class SubmissionController extends MobileController
             'media.*.id' => ['nullable', 'integer', 'exists:media_assets,id'],
             'media.*.type' => ['nullable', Rule::in(['image', 'video'])],
             'media.*.label' => ['nullable', 'string', 'max:255'],
+            'assets' => ['nullable', 'array'],
+            'assets.*.id' => ['nullable', 'integer', 'exists:media_assets,id'],
+            'assets.*.type' => ['nullable', Rule::in(['image', 'video'])],
+            'assets.*.label' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'confirm_accuracy' => ['nullable', 'boolean'],
             'summary_of_observation' => ['nullable', 'string', 'max:5000'],
@@ -345,7 +350,7 @@ class SubmissionController extends MobileController
                 $routeSubmission instanceof Submission ? $routeSubmission : null,
             );
 
-            $mediaRows = collect($input['media'] ?? [])->filter(fn ($row): bool => is_array($row));
+            $mediaRows = collect($this->resolveMediaRows($input))->filter(fn ($row): bool => is_array($row));
             $mediaIds = $mediaRows
                 ->pluck('id')
                 ->filter(fn ($id): bool => is_numeric($id))
@@ -487,8 +492,9 @@ class SubmissionController extends MobileController
             ?? $validated['notes']
             ?? $submission?->details;
 
-        $mediaReferences = array_key_exists('media', $validated)
-            ? $this->normalizeMediaReferences($validated['media'] ?? [])
+        $hasMediaPayload = array_key_exists('media', $validated) || array_key_exists('assets', $validated);
+        $mediaReferences = $hasMediaPayload
+            ? $this->normalizeMediaReferences($this->resolveMediaRows($validated))
             : ($submission ? $this->submissionMediaReferences($submission) : []);
 
         $submission ??= new Submission();
@@ -580,6 +586,7 @@ class SubmissionController extends MobileController
             'approximate_completion_percentage' => $this->valueFromPayload($validated, $existing, 'approximate_completion_percentage'),
             'additional_observations' => $this->valueFromPayload($validated, $existing, 'additional_observations'),
             'is_project_being_used' => $this->valueFromPayload($validated, $existing, 'is_project_being_used'),
+            'activities_started' => $this->valueFromPayload($validated, $existing, 'activities_started'),
             'user_categories' => $this->normalizeStringArray($this->valueFromPayload($validated, $existing, 'user_categories', [])),
             'is_used_as_intended' => $this->valueFromPayload($validated, $existing, 'is_used_as_intended'),
             'functional_status' => $this->valueFromPayload($validated, $existing, 'functional_status'),
@@ -655,6 +662,23 @@ class SubmissionController extends MobileController
             ->all();
     }
 
+    private function resolveMediaRows(array $payload): array
+    {
+        $mediaRows = $payload['media'] ?? null;
+
+        if (is_array($mediaRows)) {
+            return $mediaRows;
+        }
+
+        $assetRows = $payload['assets'] ?? null;
+
+        if (is_array($assetRows)) {
+            return $assetRows;
+        }
+
+        return [];
+    }
+
     private function syncMediaAssetsMetadata(Submission $submission, array $mediaReferences): void
     {
         $orderedIds = collect($mediaReferences)
@@ -718,6 +742,7 @@ class SubmissionController extends MobileController
             $data['approximate_completion_percentage'] = null;
             $data['additional_observations'] = null;
             $data['is_project_being_used'] = null;
+            $data['activities_started'] = null;
             $data['user_categories'] = [];
             $data['is_used_as_intended'] = null;
             $data['functional_status'] = null;
@@ -726,6 +751,7 @@ class SubmissionController extends MobileController
         } elseif ($status === 'in_progress') {
             $data['delay_reason'] = null;
             $data['is_project_being_used'] = null;
+            $data['activities_started'] = null;
             $data['user_categories'] = [];
             $data['is_used_as_intended'] = null;
             $data['functional_status'] = null;

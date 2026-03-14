@@ -201,7 +201,7 @@ class ExportController extends Controller
             $query->where('project_id', $validated['project_id']);
         }
 
-        if (! empty($validated['municipality_id']) && $request->user()->hasPermission('dashboards.view.system')) {
+        if (! empty($validated['municipality_id'])) {
             $query->where('municipality_id', $validated['municipality_id']);
         }
 
@@ -252,7 +252,7 @@ class ExportController extends Controller
             $query->where('project_id', $filters['project_id']);
         }
 
-        if (! empty($filters['municipality_id']) && $request->user()->hasPermission('dashboards.view.system')) {
+        if (! empty($filters['municipality_id'])) {
             $query->where('municipality_id', $filters['municipality_id']);
         }
 

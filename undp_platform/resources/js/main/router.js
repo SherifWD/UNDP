@@ -141,6 +141,17 @@ router.beforeEach(async (to) => {
         return { name: 'home' };
     }
 
+    if (to.name === 'home' && auth.isAuthenticated) {
+        const isPartnerOnlyDashboardUser = auth.hasPermission('dashboards.view.partner')
+            && !auth.hasPermission('dashboards.view.system')
+            && !auth.hasPermission('dashboards.view.municipality')
+            && !auth.hasPermission('dashboards.view.own');
+
+        if (isPartnerOnlyDashboardUser) {
+            return { name: 'partner-dashboard' };
+        }
+    }
+
     if (to.meta.permission && !auth.hasPermission(to.meta.permission)) {
         return { name: 'access-denied' };
     }

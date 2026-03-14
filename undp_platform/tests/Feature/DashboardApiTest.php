@@ -171,6 +171,7 @@ class DashboardApiTest extends TestCase
             'role' => UserRole::REPORTER->value,
             'municipality_id' => $tripoli->id,
         ]);
+        $tripoliProject->assignedReporters()->attach($reporter->id);
 
         Submission::query()->create([
             'reporter_id' => $reporter->id,
@@ -186,6 +187,7 @@ class DashboardApiTest extends TestCase
             'role' => UserRole::REPORTER->value,
             'municipality_id' => $benghazi->id,
         ]);
+        $benghaziProject->assignedReporters()->attach($otherReporter->id);
 
         Submission::query()->create([
             'reporter_id' => $otherReporter->id,
@@ -218,5 +220,96 @@ class DashboardApiTest extends TestCase
         $this->assertNotContains($benghaziProject->id, $projectIds);
         $this->assertContains('Reporter own submission', $submissionTitles);
         $this->assertNotContains('Other reporter submission', $submissionTitles);
+    }
+
+    public function test_partner_dashboard_returns_approved_aggregates_with_breakdowns(): void
+    {
+        $municipalityA = Municipality::query()->create([
+            'name_en' => 'Tripoli',
+            'name_ar' => 'طرابلس',
+            'code' => 'TRI',
+        ]);
+
+        $municipalityB = Municipality::query()->create([
+            'name_en' => 'Benghazi',
+            'name_ar' => 'بنغازي',
+            'code' => 'BEN',
+        ]);
+
+        $projectA = Project::query()->create([
+            'municipality_id' => $municipalityA->id,
+            'name_en' => 'Water Network',
+            'name_ar' => 'شبكة المياه',
+            'status' => 'active',
+        ]);
+
+        $projectB = Project::query()->create([
+            'municipality_id' => $municipalityB->id,
+            'name_en' => 'School Rehab',
+            'name_ar' => 'تأهيل المدارس',
+            'status' => 'active',
+        ]);
+
+        $reporter = User::factory()->create([
+            'role' => UserRole::REPORTER->value,
+            'municipality_id' => $municipalityA->id,
+        ]);
+
+        Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $projectA->id,
+            'municipality_id' => $municipalityA->id,
+            'status' => SubmissionStatus::APPROVED->value,
+            'title' => 'Approved update A1',
+            'data' => [
+                'actual_beneficiaries' => 120,
+                'approximate_completion_percentage' => 75,
+            ],
+        ]);
+
+        Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $projectA->id,
+            'municipality_id' => $municipalityA->id,
+            'status' => SubmissionStatus::APPROVED->value,
+            'title' => 'Approved update A2',
+            'data' => [
+                'actual_beneficiaries' => 80,
+                'approximate_completion_percentage' => 95,
+            ],
+        ]);
+
+        Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $projectB->id,
+            'municipality_id' => $municipalityB->id,
+            'status' => SubmissionStatus::REJECTED->value,
+            'title' => 'Rejected update B1',
+        ]);
+
+        $partner = User::factory()->create([
+            'role' => UserRole::PARTNER_DONOR_VIEWER->value,
+        ]);
+
+        Sanctum::actingAs($partner);
+
+        $response = $this->getJson('/api/dashboard/partner');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('kpis.approved_total', 2)
+            ->assertJsonPath('kpis.projects_covered', 1)
+            ->assertJsonPath('kpis.municipalities_covered', 1)
+            ->assertJsonPath('kpis.total_actual_beneficiaries', 200)
+            ->assertJsonPath('kpis.average_completion_percentage', 85)
+            ->assertJsonPath('status_breakdown.approved', 2);
+
+        $municipalityCounts = collect($response->json('municipality_breakdown'));
+        $projectCounts = collect($response->json('project_breakdown'));
+
+        $this->assertSame(1, $municipalityCounts->count());
+        $this->assertSame(1, $projectCounts->count());
+        $this->assertSame($municipalityA->id, (int) $municipalityCounts->first()['municipality_id']);
+        $this->assertSame($projectA->id, (int) $projectCounts->first()['project_id']);
     }
 }

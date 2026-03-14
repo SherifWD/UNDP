@@ -252,7 +252,7 @@ class GenerateExportTaskJob implements ShouldQueue
             $query->where('project_id', $filters['project_id']);
         }
 
-        if (! empty($filters['municipality_id']) && $user->hasPermission('dashboards.view.system')) {
+        if (! empty($filters['municipality_id'])) {
             $query->where('municipality_id', $filters['municipality_id']);
         }
 

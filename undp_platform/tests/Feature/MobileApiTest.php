@@ -544,6 +544,84 @@ class MobileApiTest extends TestCase
         ]);
     }
 
+    public function test_reporter_can_submit_using_assets_alias(): void
+    {
+        $municipality = Municipality::query()->create([
+            'name_en' => 'Alkufraa',
+            'name_ar' => 'الكفرة',
+            'code' => 'ALK',
+        ]);
+
+        $project = Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Alkufraa Police Station Project',
+            'name_ar' => 'مشروع مركز شرطة الكفرة',
+            'status' => 'active',
+            'latitude' => 23.3112,
+            'longitude' => 21.8569,
+            'last_update_at' => now(),
+        ]);
+
+        $reporter = User::factory()->create([
+            'role' => UserRole::REPORTER->value,
+            'municipality_id' => $municipality->id,
+            'status' => 'active',
+        ]);
+
+        $project->assignedReporters()->sync([
+            $reporter->id => ['assigned_by' => $reporter->id],
+        ]);
+
+        Sanctum::actingAs($reporter);
+
+        $draftResponse = $this->postJson('/api/mobile/submissions', [
+            'client_uuid' => (string) Str::uuid(),
+            'project_id' => $project->id,
+            'mode' => 'draft',
+            'title' => 'Planned Status Draft',
+            'project_status' => 'planned',
+        ])->assertCreated();
+
+        $submissionId = $draftResponse->json('data.submission.id');
+
+        $mediaAsset = MediaAsset::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'submission_id' => $submissionId,
+            'uploaded_by' => $reporter->id,
+            'client_media_id' => 'assets-alias-1',
+            'disk' => 'public',
+            'bucket' => null,
+            'object_key' => 'test/mobile/'.$submissionId.'/assets-alias-1.jpg',
+            'media_type' => 'image',
+            'mime_type' => 'image/jpeg',
+            'original_filename' => 'assets-alias-1.jpg',
+            'status' => 'uploaded',
+            'label' => 'Training room',
+            'display_order' => 0,
+        ]);
+
+        $submitResponse = $this->putJson('/api/mobile/submissions/'.$submissionId, [
+            'mode' => 'submit',
+            'project_status' => 'planned',
+            'delay_reason' => 'funding_gap',
+            'actual_beneficiaries' => 0,
+            'location_label' => 'South Region - Alkufraa',
+            'confirm_accuracy' => true,
+            'assets' => [
+                [
+                    'id' => $mediaAsset->id,
+                    'type' => 'image',
+                    'label' => 'Training room',
+                ],
+            ],
+        ]);
+
+        $submitResponse
+            ->assertOk()
+            ->assertJsonPath('data.submission.status', SubmissionStatus::SUBMITTED->value)
+            ->assertJsonPath('data.submission.media_assets.0.id', $mediaAsset->id);
+    }
+
     public function test_reporter_can_resubmit_submitted_report_before_validator_action(): void
     {
         $municipality = Municipality::query()->create([
@@ -664,11 +742,14 @@ class MobileApiTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertJsonPath('data.flow.version', '2026.03.mobile-reporting.v1')
+            ->assertJsonPath('data.version', config('mobile.reporting.options_version'))
+            ->assertJsonPath('data.flow.version', config('mobile.reporting.options_version'))
             ->assertJsonPath('data.flow.steps.1.key', 'project_status')
             ->assertJsonPath('data.flow.steps.1.status_sections.0.status', 'planned')
             ->assertJsonPath('data.flow.steps.1.status_sections.2.status', 'completed')
+            ->assertJsonPath('data.flow.steps.1.status_sections.2.fields.1.key', 'activities_started')
             ->assertJsonPath('data.available_options.functional_statuses.1.label', 'Operational but needs maintenance')
+            ->assertJsonPath('data.available_options.functional_statuses.1.label_ar', 'تشغيلي لكنه يحتاج صيانة')
             ->assertJsonPath('data.media_limits.images.max_count', 10);
     }
 
@@ -741,6 +822,7 @@ class MobileApiTest extends TestCase
             'mode' => 'submit',
             'project_status' => 'completed',
             'is_project_being_used' => true,
+            'activities_started' => true,
             'user_categories' => ['all_of_the_above'],
             'is_used_as_intended' => true,
             'functional_status' => 'fully_functional',
@@ -754,6 +836,7 @@ class MobileApiTest extends TestCase
         $validSubmit
             ->assertOk()
             ->assertJsonPath('data.submission.status', SubmissionStatus::SUBMITTED->value)
+            ->assertJsonPath('data.submission.data.activities_started', true)
             ->assertJsonPath('data.submission.data.functional_status', 'fully_functional')
             ->assertJsonPath('data.submission.data.user_categories.0', 'all_of_the_above');
     }

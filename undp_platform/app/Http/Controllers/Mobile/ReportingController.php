@@ -22,6 +22,7 @@ class ReportingController extends MobileController
 
         $validated = $validator->validated();
         $projectPayload = null;
+        $optionsVersion = (string) config('mobile.reporting.options_version', '2026.03.mobile-reporting.v2');
 
         if (! empty($validated['project_id'])) {
             $project = Project::query()->with('municipality')->findOrFail($validated['project_id']);
@@ -40,6 +41,7 @@ class ReportingController extends MobileController
         $availableOptions = $this->availableOptions();
 
         return $this->successResponse([
+            'version' => $optionsVersion,
             'report_type' => config('mobile.reporting.report_type'),
             'available_options' => $availableOptions,
             'defaults' => [
@@ -49,7 +51,7 @@ class ReportingController extends MobileController
                 'location_source' => 'manual',
             ],
             'flow' => [
-                'version' => '2026.03.mobile-reporting.v1',
+                'version' => $optionsVersion,
                 'steps' => $this->statusDrivenFlow(),
             ],
             'media_limits' => [
@@ -69,13 +71,13 @@ class ReportingController extends MobileController
     private function availableOptions(): array
     {
         return [
-            'component_categories' => $this->toOptionList(config('mobile.reporting.component_categories', [])),
-            'project_statuses' => $this->toOptionList(config('mobile.reporting.project_statuses', [])),
-            'delay_reasons' => $this->toOptionList(config('mobile.reporting.delay_reasons', [])),
-            'progress_impressions' => $this->toOptionList(config('mobile.reporting.progress_impressions', [])),
-            'functional_statuses' => $this->toOptionList(config('mobile.reporting.functional_statuses', [])),
-            'user_categories' => $this->toOptionList(config('mobile.reporting.user_categories', [])),
-            'constraint_types' => $this->toOptionList(config('mobile.reporting.constraint_types', [])),
+            'component_categories' => $this->toOptionList('component_categories'),
+            'project_statuses' => $this->toOptionList('project_statuses'),
+            'delay_reasons' => $this->toOptionList('delay_reasons'),
+            'progress_impressions' => $this->toOptionList('progress_impressions'),
+            'functional_statuses' => $this->toOptionList('functional_statuses'),
+            'user_categories' => $this->toOptionList('user_categories'),
+            'constraint_types' => $this->toOptionList('constraint_types'),
             'yes_no' => $this->yesNoOptions(),
         ];
     }
@@ -173,6 +175,13 @@ class ReportingController extends MobileController
                                 'options_key' => 'yes_no',
                             ],
                             [
+                                'key' => 'activities_started',
+                                'label' => 'Have the activities, workshops, or training sessions actually started?',
+                                'type' => 'single_choice',
+                                'required' => false,
+                                'options_key' => 'yes_no',
+                            ],
+                            [
                                 'key' => 'user_categories',
                                 'label' => 'User Categories',
                                 'type' => 'multi_choice',
@@ -239,8 +248,8 @@ class ReportingController extends MobileController
                         'type' => 'single_choice',
                         'required' => false,
                         'options' => [
-                            ['value' => 'manual', 'label' => 'Manual'],
-                            ['value' => 'gps', 'label' => 'Auto GPS'],
+                            ['value' => 'manual', 'label' => 'Manual', 'label_ar' => 'يدوي'],
+                            ['value' => 'gps', 'label' => 'Auto GPS', 'label_ar' => 'تحديد تلقائي عبر GPS'],
                         ],
                     ],
                     [
@@ -269,18 +278,27 @@ class ReportingController extends MobileController
     private function yesNoOptions(): array
     {
         return [
-            ['value' => true, 'label' => 'Yes'],
-            ['value' => false, 'label' => 'No'],
+            ['value' => true, 'label' => 'Yes', 'label_en' => 'Yes', 'label_ar' => 'نعم'],
+            ['value' => false, 'label' => 'No', 'label_en' => 'No', 'label_ar' => 'لا'],
         ];
     }
 
-    private function toOptionList(array $items): array
+    private function toOptionList(string $group): array
     {
+        $items = config("mobile.reporting.{$group}", []);
+        $arabicLabels = config("mobile.reporting.{$group}_ar", []);
+
         return collect($items)
-            ->map(fn (string $label, string $value): array => [
-                'value' => $value,
-                'label' => $label,
-            ])
+            ->map(function (string $label, string $value) use ($arabicLabels): array {
+                $labelAr = data_get($arabicLabels, $value);
+
+                return [
+                    'value' => $value,
+                    'label' => $label,
+                    'label_en' => $label,
+                    'label_ar' => is_string($labelAr) && trim($labelAr) !== '' ? $labelAr : $label,
+                ];
+            })
             ->values()
             ->all();
     }

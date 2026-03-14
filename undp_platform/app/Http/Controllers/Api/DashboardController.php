@@ -42,6 +42,15 @@ class DashboardController extends Controller
         $underReview = (clone $query)->where('status', 'under_review')->count();
         $rework = (clone $query)->where('status', 'rework_requested')->count();
         $rejected = (clone $query)->where('status', 'rejected')->count();
+        $submitted = (clone $query)->where('status', SubmissionStatus::SUBMITTED->value)->count();
+        $queued = (clone $query)->where('status', SubmissionStatus::QUEUED->value)->count();
+        $draft = (clone $query)->where('status', SubmissionStatus::DRAFT->value)->count();
+
+        $approvalRate = $total > 0 ? round(($approved / $total) * 100, 1) : 0.0;
+        $rejectionRate = $total > 0 ? round(($rejected / $total) * 100, 1) : 0.0;
+        $pendingValidation = $underReview + $submitted + $queued;
+
+        $dataMetrics = $this->extractSubmissionDataMetrics($query);
 
         $statusBreakdown = (clone $query)
             ->selectRaw('status, COUNT(*) as total')
@@ -107,6 +116,14 @@ class DashboardController extends Controller
                 'under_review' => $underReview,
                 'rework_requested' => $rework,
                 'rejected' => $rejected,
+                'submitted' => $submitted,
+                'queued' => $queued,
+                'draft' => $draft,
+                'pending_validation' => $pendingValidation,
+                'approval_rate_percent' => $approvalRate,
+                'rejection_rate_percent' => $rejectionRate,
+                'total_actual_beneficiaries' => $dataMetrics['total_actual_beneficiaries'],
+                'average_completion_percentage' => $dataMetrics['average_completion_percentage'],
             ],
             'status_breakdown' => $statusBreakdown,
             'municipality_breakdown' => $municipalityBreakdown,
@@ -290,7 +307,9 @@ class DashboardController extends Controller
                 'lat' => (float) $project->latitude,
                 'lng' => (float) $project->longitude,
                 'last_update_at' => optional($project->last_update_at)->toIso8601String(),
-            ]);
+            ])
+            ->values()
+            ->toBase();
 
         $submissions = $submissionQuery
             ? $submissionQuery
@@ -308,6 +327,8 @@ class DashboardController extends Controller
                     'lng' => (float) $submission->longitude,
                     'last_update_at' => optional($submission->updated_at)->toIso8601String(),
                 ])
+                ->values()
+                ->toBase()
             : collect();
 
         $markers = $projects->merge($submissions)->values();
@@ -345,9 +366,11 @@ class DashboardController extends Controller
             'date_to' => ['nullable', 'date'],
             'municipality_id' => ['nullable', 'integer', 'exists:municipalities,id'],
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
+            'status' => ['nullable', Rule::in([SubmissionStatus::APPROVED->value])],
         ]);
 
-        $query = Submission::query()->where('status', 'approved');
+        $query = Submission::query()->where('status', SubmissionStatus::APPROVED->value);
+        SubmissionAccessService::scope($request->user(), $query);
 
         if (! empty($validated['date_from'])) {
             $query->whereDate('created_at', '>=', $validated['date_from']);
@@ -368,6 +391,51 @@ class DashboardController extends Controller
         $approvedTotal = (clone $query)->count();
         $municipalitiesCovered = (clone $query)->distinct('municipality_id')->count('municipality_id');
         $projectsCovered = (clone $query)->distinct('project_id')->count('project_id');
+        $approvedLast30Days = (clone $query)->whereDate('created_at', '>=', now()->subDays(30))->count();
+        $approvedLast7Days = (clone $query)->whereDate('created_at', '>=', now()->subDays(7))->count();
+        $dataMetrics = $this->extractSubmissionDataMetrics($query);
+
+        $municipalityRows = (clone $query)
+            ->selectRaw('municipality_id, COUNT(*) as total')
+            ->groupBy('municipality_id')
+            ->orderByDesc('total')
+            ->get();
+
+        $municipalities = Municipality::query()
+            ->whereIn('id', $municipalityRows->pluck('municipality_id')->filter()->all())
+            ->get()
+            ->keyBy('id');
+
+        $municipalityBreakdown = $municipalityRows->map(function ($row) use ($municipalities): array {
+            $municipality = $municipalities->get($row->municipality_id);
+
+            return [
+                'municipality_id' => (int) $row->municipality_id,
+                'municipality_name' => $municipality?->name,
+                'count' => (int) $row->total,
+            ];
+        })->values();
+
+        $projectRows = (clone $query)
+            ->selectRaw('project_id, COUNT(*) as total')
+            ->groupBy('project_id')
+            ->orderByDesc('total')
+            ->get();
+
+        $projects = Project::query()
+            ->whereIn('id', $projectRows->pluck('project_id')->all())
+            ->get()
+            ->keyBy('id');
+
+        $projectBreakdown = $projectRows->map(function ($row) use ($projects): array {
+            $project = $projects->get($row->project_id);
+
+            return [
+                'project_id' => (int) $row->project_id,
+                'project_name' => $project?->name,
+                'count' => (int) $row->total,
+            ];
+        })->values();
 
         $trend = (clone $query)
             ->selectRaw('DATE(created_at) as day, COUNT(*) as total')
@@ -384,7 +452,16 @@ class DashboardController extends Controller
                 'approved_total' => $approvedTotal,
                 'municipalities_covered' => $municipalitiesCovered,
                 'projects_covered' => $projectsCovered,
+                'approved_last_30_days' => $approvedLast30Days,
+                'approved_last_7_days' => $approvedLast7Days,
+                'total_actual_beneficiaries' => $dataMetrics['total_actual_beneficiaries'],
+                'average_completion_percentage' => $dataMetrics['average_completion_percentage'],
             ],
+            'status_breakdown' => [
+                SubmissionStatus::APPROVED->value => $approvedTotal,
+            ],
+            'municipality_breakdown' => $municipalityBreakdown,
+            'project_breakdown' => $projectBreakdown,
             'trend' => $trend,
         ]);
     }
@@ -477,5 +554,36 @@ class DashboardController extends Controller
             $zoom <= 15 => 0.05,
             default => 0.02,
         };
+    }
+
+    /**
+     * @return array{total_actual_beneficiaries:int,average_completion_percentage:float}
+     */
+    private function extractSubmissionDataMetrics(Builder $query): array
+    {
+        $rows = (clone $query)->get(['data']);
+        $beneficiariesTotal = 0;
+        $completionValues = [];
+
+        foreach ($rows as $row) {
+            $beneficiariesValue = data_get($row->data, 'actual_beneficiaries');
+            if (is_numeric($beneficiariesValue)) {
+                $beneficiariesTotal += max(0, (int) $beneficiariesValue);
+            }
+
+            $completionValue = data_get($row->data, 'approximate_completion_percentage');
+            if (is_numeric($completionValue)) {
+                $completionValues[] = max(0.0, min(100.0, (float) $completionValue));
+            }
+        }
+
+        $averageCompletion = count($completionValues) > 0
+            ? round(array_sum($completionValues) / count($completionValues), 1)
+            : 0.0;
+
+        return [
+            'total_actual_beneficiaries' => $beneficiariesTotal,
+            'average_completion_percentage' => $averageCompletion,
+        ];
     }
 }

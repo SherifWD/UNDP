@@ -1,13 +1,15 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import L from 'leaflet';
 import AppShell from '../components/AppShell.vue';
 import KpiCards from '../components/KpiCards.vue';
 import api from '../api';
 import { useAsyncExport } from '../composables/useAsyncExport';
+import { useAuthStore } from '../stores/auth';
 
 const FILTER_STORAGE_KEY = 'undp_reports_filters_v1';
 const asyncExport = useAsyncExport();
+const auth = useAuthStore();
 
 const kpis = ref({});
 const statusBreakdown = ref({});
@@ -20,6 +22,25 @@ const markers = ref([]);
 const clusters = ref([]);
 const loading = ref(false);
 const error = ref('');
+const detailRows = ref([]);
+const detailLoading = ref(false);
+const detailError = ref('');
+const reportType = ref('submissions');
+const reportPagination = reactive({
+    current_page: 1,
+    last_page: 1,
+    per_page: 15,
+    total: 0,
+});
+const detailFilters = reactive({
+    search: '',
+    action: '',
+    role: '',
+    user_id: '',
+    status: '',
+    sort_by: '',
+    sort_dir: 'desc',
+});
 
 const filters = reactive({
     date_from: '',
@@ -131,6 +152,80 @@ const activeFilterChips = computed(() => {
     }
 
     return chips;
+});
+
+const detailFilterChips = computed(() => {
+    const chips = [`Report: ${reportTypeLabel.value}`];
+
+    if (detailFilters.search) {
+        chips.push(`Search: ${detailFilters.search}`);
+    }
+
+    if (reportType.value === 'audit_logs' && detailFilters.action) {
+        chips.push(`Action: ${detailFilters.action}`);
+    }
+
+    if (reportType.value === 'users' && detailFilters.role) {
+        chips.push(`Role: ${detailFilters.role}`);
+    }
+
+    if (detailFilters.status) {
+        chips.push(`Status: ${detailFilters.status}`);
+    }
+
+    if (detailFilters.user_id) {
+        chips.push(`User ID: ${detailFilters.user_id}`);
+    }
+
+    return chips;
+});
+
+const canExportCsv = computed(() => auth.hasPermission('reports.export.csv'));
+const canExportPdf = computed(() => auth.hasPermission('reports.export.pdf'));
+const canViewAudit = computed(() => auth.hasPermission('audit.view'));
+const canViewUsers = computed(() => auth.hasPermission('users.view'));
+
+const availableReportTypes = computed(() => {
+    const options = [
+        { value: 'submissions', label: 'Submissions Report' },
+    ];
+
+    if (canViewAudit.value) {
+        options.push({ value: 'audit_logs', label: 'Audit Log Report' });
+    }
+
+    if (canViewUsers.value) {
+        options.push({ value: 'users', label: 'Users Report' });
+    }
+
+    return options;
+});
+
+const reportTypeLabel = computed(() => {
+    return availableReportTypes.value.find((option) => option.value === reportType.value)?.label || 'Submissions Report';
+});
+
+const detailSortOptions = computed(() => {
+    if (reportType.value === 'users') {
+        return [
+            { value: 'created_at', label: 'Created At' },
+            { value: 'last_login_at', label: 'Last Login' },
+            { value: 'name', label: 'Name' },
+            { value: 'role', label: 'Role' },
+            { value: 'status', label: 'Status' },
+        ];
+    }
+
+    if (reportType.value === 'submissions') {
+        return [
+            { value: 'created_at', label: 'Created At' },
+            { value: 'submitted_at', label: 'Submitted At' },
+            { value: 'updated_at', label: 'Updated At' },
+            { value: 'status', label: 'Status' },
+        ];
+    }
+
+    return [];
 });
 
 const exportStatusLabel = computed(() => {
@@ -339,6 +434,95 @@ const loadMapData = async (silent = false) => {
     }
 };
 
+const normalizeDetailPagination = (payload) => {
+    detailRows.value = payload.data || [];
+    reportPagination.current_page = Number(payload.current_page || 1);
+    reportPagination.last_page = Number(payload.last_page || 1);
+    reportPagination.per_page = Number(payload.per_page || reportPagination.per_page || 15);
+    reportPagination.total = Number(payload.total || detailRows.value.length || 0);
+};
+
+const ensureReportTypeAllowed = () => {
+    const allowed = availableReportTypes.value.map((option) => option.value);
+
+    if (!allowed.includes(reportType.value)) {
+        reportType.value = allowed[0] || 'submissions';
+    }
+};
+
+const detailParamsForReportType = (page = 1) => {
+    const base = {
+        page,
+        per_page: reportPagination.per_page,
+        date_from: filters.date_from || undefined,
+        date_to: filters.date_to || undefined,
+    };
+
+    if (reportType.value === 'submissions') {
+        return {
+            endpoint: '/submissions',
+            params: {
+                ...base,
+                search: detailFilters.search || undefined,
+                status: filters.status || detailFilters.status || undefined,
+                municipality_id: filters.municipality_id || undefined,
+                project_id: filters.project_id || undefined,
+                sort_by: detailFilters.sort_by || 'created_at',
+                sort_dir: detailFilters.sort_dir || 'desc',
+            },
+        };
+    }
+
+    if (reportType.value === 'audit_logs') {
+        return {
+            endpoint: '/audit-logs',
+            params: {
+                ...base,
+                action: detailFilters.action || detailFilters.search || undefined,
+                user_id: detailFilters.user_id || undefined,
+                role: detailFilters.role || undefined,
+                status: detailFilters.status || undefined,
+                municipality_id: filters.municipality_id || undefined,
+                project_id: filters.project_id || undefined,
+            },
+        };
+    }
+
+    return {
+        endpoint: '/users',
+        params: {
+            page,
+            per_page: reportPagination.per_page,
+            search: detailFilters.search || undefined,
+            role: detailFilters.role || undefined,
+            status: detailFilters.status || undefined,
+            municipality_id: filters.municipality_id || undefined,
+            sort_by: detailFilters.sort_by || 'created_at',
+            sort_dir: detailFilters.sort_dir || 'desc',
+        },
+    };
+};
+
+const loadDetailedReport = async (page = 1) => {
+    detailLoading.value = true;
+    detailError.value = '';
+
+    try {
+        ensureReportTypeAllowed();
+        const request = detailParamsForReportType(page);
+        const { data } = await api.get(request.endpoint, { params: request.params });
+        normalizeDetailPagination(data);
+    } catch (err) {
+        detailError.value = err.response?.data?.message || 'Unable to load detailed report data.';
+        detailRows.value = [];
+        reportPagination.current_page = 1;
+        reportPagination.last_page = 1;
+        reportPagination.total = 0;
+    } finally {
+        detailLoading.value = false;
+    }
+};
+
 const loadReports = async () => {
     loading.value = true;
     error.value = '';
@@ -349,6 +533,7 @@ const loadReports = async () => {
             loadKpis(),
             loadMapData(true),
         ]);
+        await loadDetailedReport(1);
     } catch (err) {
         error.value = err.response?.data?.message || 'Unable to load report data.';
     } finally {
@@ -371,6 +556,7 @@ const resetFilters = async () => {
 
     projectOptionsLoaded.value = false;
     projects.value = [];
+    detailFilters.status = '';
 
     await loadReports();
 };
@@ -386,19 +572,84 @@ const drillStatus = async (status) => {
     await loadReports();
 };
 
-const startSubmissionsCsvExport = async () => {
-    await asyncExport.startExport({
+const applyDetailedFilters = async () => {
+    await loadDetailedReport(1);
+};
+
+const resetDetailedFilters = async () => {
+    Object.assign(detailFilters, {
+        search: '',
+        action: '',
+        role: '',
+        user_id: '',
+        status: '',
+        sort_by: '',
+        sort_dir: 'desc',
+    });
+
+    await loadDetailedReport(1);
+};
+
+const goToDetailPage = async (page) => {
+    if (page < 1 || page > reportPagination.last_page || page === reportPagination.current_page) {
+        return;
+    }
+
+    await loadDetailedReport(page);
+};
+
+const exportPayloadForReportType = () => {
+    const base = {
         format: 'csv',
-        type: 'submissions',
-        status: filters.status || null,
-        municipality_id: filters.municipality_id || null,
-        project_id: filters.project_id || null,
+        type: reportType.value,
         date_from: filters.date_from || null,
         date_to: filters.date_to || null,
+        municipality_id: filters.municipality_id || null,
+        project_id: filters.project_id || null,
+    };
+
+    if (reportType.value === 'submissions') {
+        return {
+            ...base,
+            status: filters.status || detailFilters.status || null,
+            search: detailFilters.search || null,
+        };
+    }
+
+    if (reportType.value === 'audit_logs') {
+        return {
+            ...base,
+            action: detailFilters.action || detailFilters.search || null,
+            role: detailFilters.role || null,
+            status: detailFilters.status || null,
+        };
+    }
+
+    return {
+        ...base,
+        search: detailFilters.search || null,
+        role: detailFilters.role || null,
+        status: detailFilters.status || null,
+        sort_by: detailFilters.sort_by || null,
+        sort_dir: detailFilters.sort_dir || null,
+    };
+};
+
+const startCsvExport = async () => {
+    if (!canExportCsv.value) {
+        return;
+    }
+
+    await asyncExport.startExport({
+        ...exportPayloadForReportType(),
     });
 };
 
 const startSummaryPdfExport = async () => {
+    if (!canExportPdf.value) {
+        return;
+    }
+
     await asyncExport.startExport({
         format: 'pdf',
         type: 'summary',
@@ -408,6 +659,16 @@ const startSummaryPdfExport = async () => {
         date_from: filters.date_from || null,
         date_to: filters.date_to || null,
     });
+};
+
+const rowStatusLabel = (value) => String(value || '-').replaceAll('_', ' ');
+
+const formatDateTime = (value) => {
+    if (!value) {
+        return '-';
+    }
+
+    return new Date(value).toLocaleString();
 };
 
 const onFullscreenChange = () => {
@@ -431,7 +692,25 @@ const toggleMapFullscreen = async () => {
     setTimeout(() => map?.invalidateSize(), 80);
 };
 
+watch(reportType, async () => {
+    Object.assign(detailFilters, {
+        action: '',
+        role: '',
+        user_id: '',
+        status: reportType.value === 'submissions' ? filters.status : '',
+        sort_by: '',
+        sort_dir: 'desc',
+    });
+
+    await loadDetailedReport(1);
+});
+
+watch(availableReportTypes, () => {
+    ensureReportTypeAllowed();
+});
+
 onMounted(async () => {
+    ensureReportTypeAllowed();
     Object.assign(filters, persistedFilters());
     await initMap();
     await loadMunicipalities();
@@ -487,10 +766,29 @@ onBeforeUnmount(() => {
                     <option value="rework_requested">Rework Requested</option>
                     <option value="rejected">Rejected</option>
                 </select>
+                <select v-model="reportType">
+                    <option v-for="option in availableReportTypes" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                    </option>
+                </select>
                 <button class="btn btn--primary" @click="applyFilters">Apply</button>
                 <button class="btn btn--ghost" @click="resetFilters">Reset Filters</button>
-                <button class="btn btn--ghost" :disabled="asyncExport.loading.value" @click="startSubmissionsCsvExport">Export CSV</button>
-                <button class="btn btn--ghost" :disabled="asyncExport.loading.value" @click="startSummaryPdfExport">Export PDF</button>
+                <button
+                    v-if="canExportCsv"
+                    class="btn btn--ghost"
+                    :disabled="asyncExport.loading.value"
+                    @click="startCsvExport"
+                >
+                    Export CSV
+                </button>
+                <button
+                    v-if="canExportPdf && reportType === 'submissions'"
+                    class="btn btn--ghost"
+                    :disabled="asyncExport.loading.value"
+                    @click="startSummaryPdfExport"
+                >
+                    Export PDF
+                </button>
                 <button
                     v-if="asyncExport.task.value?.status === 'ready'"
                     class="btn btn--primary"
@@ -583,6 +881,168 @@ onBeforeUnmount(() => {
                             <strong>{{ item.count }}</strong>
                         </li>
                     </ul>
+                </div>
+            </div>
+
+            <div class="detail-block">
+                <div class="map-shell__head">
+                    <h3>{{ reportTypeLabel }}</h3>
+                    <p class="panel__hint">All filters and exports respect current role permissions and scoped data.</p>
+                </div>
+
+                <div class="toolbar">
+                    <input v-model="detailFilters.search" placeholder="Search records">
+                    <input
+                        v-if="reportType === 'audit_logs'"
+                        v-model="detailFilters.action"
+                        placeholder="Action contains"
+                    >
+                    <input
+                        v-if="reportType === 'audit_logs'"
+                        v-model="detailFilters.user_id"
+                        type="number"
+                        min="1"
+                        placeholder="Actor user ID"
+                    >
+                    <select v-if="reportType !== 'audit_logs'" v-model="detailFilters.status">
+                        <option value="">All statuses</option>
+                        <option v-if="reportType === 'submissions'" value="under_review">Under Review</option>
+                        <option v-if="reportType === 'submissions'" value="approved">Approved</option>
+                        <option v-if="reportType === 'submissions'" value="rework_requested">Rework Requested</option>
+                        <option v-if="reportType === 'submissions'" value="rejected">Rejected</option>
+                        <option v-if="reportType === 'users'" value="active">Active</option>
+                        <option v-if="reportType === 'users'" value="disabled">Disabled</option>
+                    </select>
+                    <select v-if="reportType !== 'submissions'" v-model="detailFilters.role">
+                        <option value="">All roles</option>
+                        <option value="reporter">Reporter</option>
+                        <option value="municipal_focal_point">Municipal Focal Point</option>
+                        <option value="undp_admin">UNDP Admin</option>
+                        <option value="partner_donor_viewer">Partner / Donor Viewer</option>
+                        <option value="auditor">Auditor</option>
+                    </select>
+                    <select v-if="detailSortOptions.length" v-model="detailFilters.sort_by">
+                        <option value="">Default sort</option>
+                        <option v-for="option in detailSortOptions" :key="option.value" :value="option.value">
+                            {{ option.label }}
+                        </option>
+                    </select>
+                    <select v-if="detailSortOptions.length" v-model="detailFilters.sort_dir">
+                        <option value="desc">Descending</option>
+                        <option value="asc">Ascending</option>
+                    </select>
+                    <button class="btn btn--primary" @click="applyDetailedFilters">Apply Table Filters</button>
+                    <button class="btn btn--ghost" @click="resetDetailedFilters">Reset Table Filters</button>
+                </div>
+
+                <div class="chips-row" v-if="detailFilterChips.length">
+                    <span class="filter-chip" v-for="chip in detailFilterChips" :key="chip">{{ chip }}</span>
+                </div>
+
+                <p class="field-error" v-if="detailError">{{ detailError }}</p>
+
+                <div class="table-wrap">
+                    <table class="table" v-if="!detailLoading && detailRows.length">
+                        <thead v-if="reportType === 'submissions'">
+                            <tr>
+                                <th>ID</th>
+                                <th>Title</th>
+                                <th>Status</th>
+                                <th>Reporter</th>
+                                <th>Project</th>
+                                <th>Municipality</th>
+                                <th>Submitted</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <thead v-else-if="reportType === 'audit_logs'">
+                            <tr>
+                                <th>ID</th>
+                                <th>Timestamp</th>
+                                <th>Action</th>
+                                <th>Actor</th>
+                                <th>Role</th>
+                                <th>Entity</th>
+                            </tr>
+                        </thead>
+                        <thead v-else>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Email / Phone</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Municipality</th>
+                                <th>Last Login</th>
+                            </tr>
+                        </thead>
+                        <tbody v-if="reportType === 'submissions'">
+                            <tr v-for="row in detailRows" :key="`submission-${row.id}`">
+                                <td>#{{ row.id }}</td>
+                                <td>{{ row.title || '-' }}</td>
+                                <td>
+                                    <span class="status-pill">{{ rowStatusLabel(row.status) }}</span>
+                                </td>
+                                <td>{{ row.reporter?.name || '-' }}</td>
+                                <td>{{ row.project?.name || '-' }}</td>
+                                <td>{{ row.municipality?.name || '-' }}</td>
+                                <td>{{ formatDateTime(row.submitted_at || row.created_at) }}</td>
+                                <td>
+                                    <a :href="`/submissions/${row.id}`" target="_blank" rel="noopener">View</a>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tbody v-else-if="reportType === 'audit_logs'">
+                            <tr v-for="row in detailRows" :key="`audit-${row.id}`">
+                                <td>#{{ row.id }}</td>
+                                <td>{{ formatDateTime(row.timestamp) }}</td>
+                                <td>{{ row.action || '-' }}</td>
+                                <td>{{ row.actor?.name || '-' }}</td>
+                                <td>{{ rowStatusLabel(row.actor?.role) }}</td>
+                                <td>{{ row.entity_type || '-' }} #{{ row.entity_id || '-' }}</td>
+                            </tr>
+                        </tbody>
+                        <tbody v-else>
+                            <tr v-for="row in detailRows" :key="`user-${row.id}`">
+                                <td>#{{ row.id }}</td>
+                                <td>{{ row.name || '-' }}</td>
+                                <td>{{ row.email || row.phone_e164 || '-' }}</td>
+                                <td>{{ rowStatusLabel(row.role) }}</td>
+                                <td>
+                                    <span class="status-pill" :class="row.status === 'active' ? 'status-pill--active' : 'status-pill--disabled'">
+                                        {{ rowStatusLabel(row.status) }}
+                                    </span>
+                                </td>
+                                <td>{{ row.municipality?.name || '-' }}</td>
+                                <td>{{ formatDateTime(row.last_login_at) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p class="panel__hint" v-else-if="detailLoading">Loading report records...</p>
+                    <p class="panel__hint" v-else>No records found for current filters.</p>
+                </div>
+
+                <div class="pagination-bar" v-if="!detailLoading && reportPagination.last_page > 1">
+                    <button
+                        class="btn btn--ghost"
+                        type="button"
+                        :disabled="reportPagination.current_page <= 1"
+                        @click="goToDetailPage(reportPagination.current_page - 1)"
+                    >
+                        Previous
+                    </button>
+                    <button
+                        class="btn btn--ghost"
+                        type="button"
+                        :disabled="reportPagination.current_page >= reportPagination.last_page"
+                        @click="goToDetailPage(reportPagination.current_page + 1)"
+                    >
+                        Next
+                    </button>
+                    <span class="pagination-meta">
+                        Page {{ reportPagination.current_page }} of {{ reportPagination.last_page }}
+                        ({{ reportPagination.total }} records)
+                    </span>
                 </div>
             </div>
 
