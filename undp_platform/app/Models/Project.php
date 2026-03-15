@@ -48,6 +48,11 @@ class Project extends Model
         return $this->hasMany(Submission::class);
     }
 
+    public function fundingRequests(): HasMany
+    {
+        return $this->hasMany(FundingRequest::class);
+    }
+
     public function assignedReporters(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'project_reporter_assignments', 'project_id', 'reporter_id')

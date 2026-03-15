@@ -41,6 +41,10 @@ const detailFilters = reactive({
     sort_by: '',
     sort_dir: 'desc',
 });
+const fundingRequests = ref([]);
+const fundingLoading = ref(false);
+const fundingError = ref('');
+const fundingReviewComment = ref('');
 
 const filters = reactive({
     date_from: '',
@@ -184,6 +188,7 @@ const canExportCsv = computed(() => auth.hasPermission('reports.export.csv'));
 const canExportPdf = computed(() => auth.hasPermission('reports.export.pdf'));
 const canViewAudit = computed(() => auth.hasPermission('audit.view'));
 const canViewUsers = computed(() => auth.hasPermission('users.view'));
+const canReviewFundingRequests = computed(() => auth.hasPermission('funding_requests.review'));
 
 const availableReportTypes = computed(() => {
     const options = [
@@ -523,6 +528,34 @@ const loadDetailedReport = async (page = 1) => {
     }
 };
 
+const loadFundingRequests = async () => {
+    if (!canReviewFundingRequests.value) {
+        fundingRequests.value = [];
+        return;
+    }
+
+    fundingLoading.value = true;
+    fundingError.value = '';
+
+    try {
+        const { data } = await api.get('/funding-requests', {
+            params: {
+                status: 'pending',
+                municipality_id: filters.municipality_id || undefined,
+                project_id: filters.project_id || undefined,
+                per_page: 30,
+            },
+        });
+
+        fundingRequests.value = data.data || [];
+    } catch (err) {
+        fundingRequests.value = [];
+        fundingError.value = err.response?.data?.message || 'Unable to load funding requests.';
+    } finally {
+        fundingLoading.value = false;
+    }
+};
+
 const loadReports = async () => {
     loading.value = true;
     error.value = '';
@@ -534,6 +567,7 @@ const loadReports = async () => {
             loadMapData(true),
         ]);
         await loadDetailedReport(1);
+        await loadFundingRequests();
     } catch (err) {
         error.value = err.response?.data?.message || 'Unable to load report data.';
     } finally {
@@ -669,6 +703,31 @@ const formatDateTime = (value) => {
     }
 
     return new Date(value).toLocaleString();
+};
+
+const reviewFundingRequest = async (row, decision) => {
+    if (!row?.id || !canReviewFundingRequests.value) {
+        return;
+    }
+
+    fundingError.value = '';
+
+    try {
+        if (decision === 'approve') {
+            await api.post(`/funding-requests/${row.id}/approve`, {
+                review_comment: fundingReviewComment.value || null,
+            });
+        } else {
+            await api.post(`/funding-requests/${row.id}/decline`, {
+                review_comment: fundingReviewComment.value || null,
+            });
+        }
+
+        fundingReviewComment.value = '';
+        await loadFundingRequests();
+    } catch (err) {
+        fundingError.value = err.response?.data?.message || 'Unable to review funding request.';
+    }
 };
 
 const onFullscreenChange = () => {
@@ -1043,6 +1102,58 @@ onBeforeUnmount(() => {
                         Page {{ reportPagination.current_page }} of {{ reportPagination.last_page }}
                         ({{ reportPagination.total }} records)
                     </span>
+                </div>
+            </div>
+
+            <div class="detail-block" v-if="canReviewFundingRequests">
+                <div class="map-shell__head">
+                    <h3>Funding Requests Review (Admin)</h3>
+                    <p class="panel__hint">Review donor funding requests and approve or decline with an optional note.</p>
+                </div>
+
+                <p class="field-error" v-if="fundingError">{{ fundingError }}</p>
+
+                <div class="toolbar">
+                    <input v-model="fundingReviewComment" placeholder="Optional review comment">
+                    <button class="btn btn--ghost" type="button" @click="loadFundingRequests">Refresh Requests</button>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="table" v-if="!fundingLoading && fundingRequests.length">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Project</th>
+                                <th>Donor</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Reason</th>
+                                <th>Requested</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="row in fundingRequests" :key="`funding-${row.id}`">
+                                <td>#{{ row.id }}</td>
+                                <td>{{ row.project?.name || '-' }}</td>
+                                <td>{{ row.donor?.name || '-' }}</td>
+                                <td>{{ row.currency }} {{ Number(row.amount || 0).toLocaleString() }}</td>
+                                <td>
+                                    <span class="status-pill">{{ row.status_label }}</span>
+                                </td>
+                                <td>{{ row.reason || '-' }}</td>
+                                <td>{{ formatDateTime(row.created_at) }}</td>
+                                <td>
+                                    <div class="inline-group">
+                                        <button class="btn btn--primary" type="button" @click="reviewFundingRequest(row, 'approve')">Approve</button>
+                                        <button class="btn btn--danger" type="button" @click="reviewFundingRequest(row, 'decline')">Decline</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p class="panel__hint" v-else-if="fundingLoading">Loading funding requests...</p>
+                    <p class="panel__hint" v-else>No pending funding requests for the current scope.</p>
                 </div>
             </div>
 

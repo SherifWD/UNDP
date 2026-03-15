@@ -170,12 +170,18 @@ class DashboardController extends Controller
             ->withCount([
                 'submissions as total_submissions',
                 'submissions as approved_submissions' => fn (Builder $query) => $query->where('status', 'approved'),
+                'submissions as under_review_submissions' => fn (Builder $query) => $query->where('status', 'under_review'),
+                'submissions as rework_submissions' => fn (Builder $query) => $query->where('status', 'rework_requested'),
+                'submissions as rejected_submissions' => fn (Builder $query) => $query->where('status', 'rejected'),
             ])
             ->orderByDesc('last_update_at')
             ->get()
             ->map(function (Project $project): array {
                 $total = (int) $project->total_submissions;
                 $approved = (int) $project->approved_submissions;
+                $underReview = (int) $project->under_review_submissions;
+                $rework = (int) $project->rework_submissions;
+                $rejected = (int) $project->rejected_submissions;
                 $progress = $total > 0 ? (int) round(($approved / $total) * 100) : 0;
 
                 return [
@@ -185,10 +191,20 @@ class DashboardController extends Controller
                     'name' => $project->name,
                     'total_submissions' => $total,
                     'approved_submissions' => $approved,
+                    'under_review_submissions' => $underReview,
+                    'rework_submissions' => $rework,
+                    'rejected_submissions' => $rejected,
                     'progress' => $progress,
                     'last_update_at' => optional($project->last_update_at)->toIso8601String(),
                 ];
             });
+
+        $statusBreakdown = [
+            'under_review' => (int) ($kpis['under_review'] ?? 0),
+            'approved' => (int) ($kpis['approved'] ?? 0),
+            'rework_requested' => (int) ($kpis['rework_requested'] ?? 0),
+            'rejected' => (int) ($kpis['rejected'] ?? 0),
+        ];
 
         return response()->json([
             'municipality' => [
@@ -198,7 +214,9 @@ class DashboardController extends Controller
                 'name' => $municipality->name,
             ],
             'kpis' => $kpis,
+            'status_breakdown' => $statusBreakdown,
             'projects' => $projects,
+            'generated_at' => now()->toIso8601String(),
         ]);
     }
 

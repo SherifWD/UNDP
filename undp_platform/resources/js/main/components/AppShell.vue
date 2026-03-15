@@ -37,6 +37,13 @@ const navItems = computed(() => {
             icon: 'reports',
             group: 'main',
         },
+        {
+            name: 'municipal-overview',
+            label: t('nav.municipal'),
+            anyPermissions: ['dashboards.view.system', 'dashboards.view.municipality'],
+            icon: 'municipal',
+            group: 'main',
+        },
         { name: 'partner-dashboard', label: t('nav.partner'), permission: 'dashboards.view.partner', icon: 'partner', group: 'main' },
         { name: 'users', label: t('nav.users'), permission: 'users.view', icon: 'users', group: 'main' },
         { name: 'audit-logs', label: t('nav.audit'), permission: 'audit.view', icon: 'audit', group: 'main' },

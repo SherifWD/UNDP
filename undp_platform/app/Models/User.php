@@ -95,6 +95,16 @@ class User extends Authenticatable
         return $this->hasMany(ExportTask::class);
     }
 
+    public function fundingRequests(): HasMany
+    {
+        return $this->hasMany(FundingRequest::class, 'donor_user_id');
+    }
+
+    public function reviewedFundingRequests(): HasMany
+    {
+        return $this->hasMany(FundingRequest::class, 'reviewed_by');
+    }
+
     public function roleEnum(): UserRole
     {
         return UserRole::from($this->role);

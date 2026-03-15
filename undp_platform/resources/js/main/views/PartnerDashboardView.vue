@@ -1,22 +1,38 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import AppShell from '../components/AppShell.vue';
 import KpiCards from '../components/KpiCards.vue';
 import api from '../api';
 import { useAsyncExport } from '../composables/useAsyncExport';
 
+const STATUS_COLORS = {
+    approved: '#16a34a',
+    under_review: '#f59e0b',
+    rework_requested: '#f97316',
+    rejected: '#dc2626',
+};
+
 const asyncExport = useAsyncExport();
+const router = useRouter();
 
 const kpis = ref({});
 const trend = ref([]);
+const statusBreakdown = ref({});
 const municipalityBreakdown = ref([]);
 const projectBreakdown = ref([]);
+const projectCards = ref([]);
 const submissions = ref([]);
+const fundingRequests = ref([]);
 const municipalities = ref([]);
 const projects = ref([]);
 const loading = ref(false);
 const tableLoading = ref(false);
+const projectCardsLoading = ref(false);
+const fundingLoading = ref(false);
 const error = ref('');
+const fundingError = ref('');
+const selectedStatus = ref('approved');
 
 const filters = reactive({
     date_from: '',
@@ -33,6 +49,12 @@ const pagination = reactive({
     total: 0,
 });
 
+const fundingForm = reactive({
+    project_id: '',
+    amount: '',
+    reason: '',
+});
+
 const exportStatusLabel = computed(() => {
     if (!asyncExport.task.value) {
         return '';
@@ -43,7 +65,7 @@ const exportStatusLabel = computed(() => {
 });
 
 const activeFilterChips = computed(() => {
-    const chips = ['Status: approved'];
+    const chips = [`Status: ${selectedStatus.value || 'approved'}`];
 
     if (filters.date_from) {
         chips.push(`From: ${filters.date_from}`);
@@ -68,6 +90,31 @@ const activeFilterChips = computed(() => {
     }
 
     return chips;
+});
+
+const statusSlices = computed(() => {
+    const rows = Object.entries(statusBreakdown.value || {})
+        .map(([status, count]) => ({
+            key: status,
+            count: Number(count || 0),
+            color: STATUS_COLORS[status] || '#0ea5e9',
+        }))
+        .filter((row) => row.count > 0);
+
+    const total = rows.reduce((sum, row) => sum + row.count, 0);
+    let offset = 0;
+
+    return rows.map((row) => {
+        const ratio = total > 0 ? row.count / total : 0;
+        const arc = ratio * 100;
+        const slice = {
+            ...row,
+            dash: `${arc} ${100 - arc}`,
+            offset: -offset,
+        };
+        offset += arc;
+        return slice;
+    });
 });
 
 const municipalityMax = computed(() => {
@@ -123,6 +170,41 @@ const formatDateTime = (value) => {
 
 const rowStatusLabel = (value) => String(value || '-').replaceAll('_', ' ');
 
+const filteredProjectCards = computed(() => {
+    if (!projectCards.value.length) {
+        return [];
+    }
+
+    const search = filters.search.trim().toLowerCase();
+
+    return projectCards.value.filter((project) => {
+        if (search) {
+            const haystack = `${project.name || ''} ${project.id}`.toLowerCase();
+            if (!haystack.includes(search)) {
+                return false;
+            }
+        }
+
+        if (selectedStatus.value === 'approved') {
+            return Number(project.stats?.approved_submissions || 0) > 0;
+        }
+
+        if (selectedStatus.value === 'under_review') {
+            return Number(project.stats?.pending_submissions || 0) > 0;
+        }
+
+        if (selectedStatus.value === 'rejected') {
+            return Number(project.stats?.rejected_submissions || 0) > 0;
+        }
+
+        if (selectedStatus.value === 'rework_requested') {
+            return Number(project.stats?.pending_submissions || 0) > 0;
+        }
+
+        return true;
+    });
+});
+
 const loadMunicipalities = async () => {
     try {
         const { data } = await api.get('/municipalities');
@@ -147,6 +229,26 @@ const loadProjectOptions = async () => {
     }
 };
 
+const loadProjectCards = async () => {
+    projectCardsLoading.value = true;
+
+    try {
+        const { data } = await api.get('/projects', {
+            params: {
+                with_stats: 1,
+                per_page: 200,
+                municipality_id: filters.municipality_id || undefined,
+            },
+        });
+
+        projectCards.value = data.data || [];
+    } catch {
+        projectCards.value = [];
+    } finally {
+        projectCardsLoading.value = false;
+    }
+};
+
 const loadPartnerDashboard = async () => {
     loading.value = true;
     error.value = '';
@@ -163,12 +265,14 @@ const loadPartnerDashboard = async () => {
 
         kpis.value = data.kpis || {};
         trend.value = data.trend || [];
+        statusBreakdown.value = data.status_breakdown || {};
         municipalityBreakdown.value = data.municipality_breakdown || [];
         projectBreakdown.value = data.project_breakdown || [];
     } catch (err) {
         error.value = err.response?.data?.message || 'Unable to load partner dashboard.';
         kpis.value = {};
         trend.value = [];
+        statusBreakdown.value = {};
         municipalityBreakdown.value = [];
         projectBreakdown.value = [];
     } finally {
@@ -184,7 +288,7 @@ const loadApprovedSubmissions = async (page = 1) => {
             params: {
                 page,
                 per_page: pagination.per_page,
-                status: 'approved',
+                status: selectedStatus.value || 'approved',
                 search: filters.search || undefined,
                 date_from: filters.date_from || undefined,
                 date_to: filters.date_to || undefined,
@@ -210,10 +314,34 @@ const loadApprovedSubmissions = async (page = 1) => {
     }
 };
 
+const loadFundingRequests = async () => {
+    fundingLoading.value = true;
+    fundingError.value = '';
+
+    try {
+        const { data } = await api.get('/funding-requests', {
+            params: {
+                per_page: 20,
+                project_id: filters.project_id || undefined,
+                municipality_id: filters.municipality_id || undefined,
+            },
+        });
+
+        fundingRequests.value = data.data || [];
+    } catch (err) {
+        fundingRequests.value = [];
+        fundingError.value = err.response?.data?.message || 'Unable to load funding requests.';
+    } finally {
+        fundingLoading.value = false;
+    }
+};
+
 const applyFilters = async () => {
     await Promise.all([
         loadPartnerDashboard(),
+        loadProjectCards(),
         loadApprovedSubmissions(1),
+        loadFundingRequests(),
     ]);
 };
 
@@ -225,6 +353,7 @@ const resetFilters = async () => {
         project_id: '',
         search: '',
     });
+    selectedStatus.value = 'approved';
 
     await loadProjectOptions();
     await applyFilters();
@@ -233,6 +362,20 @@ const resetFilters = async () => {
 const onMunicipalityChange = async () => {
     filters.project_id = '';
     await loadProjectOptions();
+};
+
+const toggleStatusFilter = async (status) => {
+    selectedStatus.value = selectedStatus.value === status ? 'approved' : status;
+    await loadApprovedSubmissions(1);
+};
+
+const openProjectDetails = (project) => {
+    router.push({
+        name: 'project-submissions',
+        params: {
+            id: String(project.id),
+        },
+    });
 };
 
 const goToPage = async (page) => {
@@ -266,6 +409,33 @@ const startSummaryPdfExport = async () => {
         date_from: filters.date_from || null,
         date_to: filters.date_to || null,
     });
+};
+
+const submitFundingRequest = async () => {
+    fundingError.value = '';
+
+    if (!fundingForm.project_id || !fundingForm.amount) {
+        fundingError.value = 'Project and amount are required to submit a funding request.';
+        return;
+    }
+
+    try {
+        await api.post('/funding-requests', {
+            project_id: Number(fundingForm.project_id),
+            amount: Number(fundingForm.amount),
+            reason: fundingForm.reason || null,
+        });
+
+        Object.assign(fundingForm, {
+            project_id: '',
+            amount: '',
+            reason: '',
+        });
+
+        await loadFundingRequests();
+    } catch (err) {
+        fundingError.value = err.response?.data?.message || 'Unable to submit funding request.';
+    }
 };
 
 onMounted(async () => {
@@ -323,6 +493,66 @@ onMounted(async () => {
             </div>
 
             <KpiCards :kpis="kpis" />
+
+            <div class="split-grid">
+                <div class="detail-block">
+                    <h3>Submission Status Breakdown</h3>
+                    <div class="status-chart-wrap">
+                        <svg viewBox="0 0 42 42" class="status-donut" role="img" aria-label="Donor status breakdown chart">
+                            <circle cx="21" cy="21" r="15.9155" fill="transparent" stroke="#e2e8f0" stroke-width="6" />
+                            <circle
+                                v-for="slice in statusSlices"
+                                :key="slice.key"
+                                cx="21"
+                                cy="21"
+                                r="15.9155"
+                                fill="transparent"
+                                :stroke="slice.color"
+                                stroke-width="6"
+                                :stroke-dasharray="slice.dash"
+                                :stroke-dashoffset="slice.offset"
+                                stroke-linecap="round"
+                                @click="toggleStatusFilter(slice.key)"
+                            />
+                        </svg>
+                        <ul class="status-legend">
+                            <li v-for="slice in statusSlices" :key="slice.key">
+                                <button class="status-legend__btn" type="button" @click="toggleStatusFilter(slice.key)">
+                                    <span class="status-legend__dot" :style="{ backgroundColor: slice.color }" />
+                                    <span>{{ rowStatusLabel(slice.key) }}</span>
+                                    <strong>{{ slice.count }}</strong>
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                    <p class="panel__hint">Click a status segment to filter submission rows and project cards.</p>
+                </div>
+
+                <div class="detail-block">
+                    <h3>Project List</h3>
+                    <p class="panel__hint">Card grid with progress and latest updates.</p>
+                    <div v-if="projectCardsLoading" class="panel__hint">Loading projects...</div>
+                    <div v-else-if="!filteredProjectCards.length" class="panel__hint">No projects match the selected filters.</div>
+                    <div v-else v-for="project in filteredProjectCards" :key="project.id" class="project-card">
+                        <div class="project-card__top">
+                            <strong>{{ project.name }}</strong>
+                            <span>{{ Number(project.stats?.progress_percent || 0) }}%</span>
+                        </div>
+                        <div class="project-progress">
+                            <div class="project-progress__bar" :style="{ width: `${Number(project.stats?.progress_percent || 0)}%` }" />
+                        </div>
+                        <small>
+                            Total: {{ Number(project.stats?.total_submissions || 0) }} |
+                            Approved: {{ Number(project.stats?.approved_submissions || 0) }} |
+                            Rejected: {{ Number(project.stats?.rejected_submissions || 0) }}
+                        </small>
+                        <small>Last update: {{ formatDateTime(project.last_update_at) }}</small>
+                        <button class="btn btn--ghost" type="button" @click="openProjectDetails(project)">
+                            View Project Details
+                        </button>
+                    </div>
+                </div>
+            </div>
 
             <div class="split-grid">
                 <div class="detail-block">
@@ -429,6 +659,57 @@ onMounted(async () => {
                         Page {{ pagination.current_page }} of {{ pagination.last_page }}
                         ({{ pagination.total }} records)
                     </span>
+                </div>
+            </div>
+
+            <div class="detail-block">
+                <h3>Project Funding Request</h3>
+                <p class="panel__hint">Request a funding amount for a project. Admin will approve or decline it.</p>
+                <p class="field-error" v-if="fundingError">{{ fundingError }}</p>
+
+                <div class="toolbar">
+                    <select v-model="fundingForm.project_id">
+                        <option value="">Select project</option>
+                        <option v-for="project in projects" :key="project.id" :value="project.id">
+                            {{ project.name }}
+                        </option>
+                    </select>
+                    <input v-model="fundingForm.amount" type="number" min="1" step="0.01" placeholder="Funding amount">
+                    <input v-model="fundingForm.reason" placeholder="Optional reason">
+                    <button class="btn btn--primary" type="button" @click="submitFundingRequest">Submit Request</button>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="table" v-if="!fundingLoading && fundingRequests.length">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Project</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Reason</th>
+                                <th>Review</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="request in fundingRequests" :key="request.id">
+                                <td>#{{ request.id }}</td>
+                                <td>{{ request.project?.name || '-' }}</td>
+                                <td>{{ request.currency }} {{ Number(request.amount || 0).toLocaleString() }}</td>
+                                <td>
+                                    <span class="status-pill" :class="request.status === 'approved' ? 'status-pill--active' : request.status === 'declined' ? 'status-pill--disabled' : ''">
+                                        {{ request.status_label }}
+                                    </span>
+                                </td>
+                                <td>{{ request.reason || '-' }}</td>
+                                <td>{{ request.review_comment || '-' }}</td>
+                                <td>{{ formatDateTime(request.created_at) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p class="panel__hint" v-else-if="fundingLoading">Loading funding requests...</p>
+                    <p class="panel__hint" v-else>No funding requests yet.</p>
                 </div>
             </div>
         </section>

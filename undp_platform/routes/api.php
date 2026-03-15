@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ExportController;
+use App\Http\Controllers\Api\FundingRequestController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\MunicipalityController;
 use App\Http\Controllers\Api\ProjectController;
@@ -91,6 +92,15 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
 
     Route::get('/exports/csv', [ExportController::class, 'csv'])->middleware('permission:reports.export.csv');
     Route::get('/exports/pdf', [ExportController::class, 'pdf'])->middleware('permission:reports.export.pdf');
+
+    Route::get('/funding-requests', [FundingRequestController::class, 'index'])
+        ->middleware('any_permission:funding_requests.view.all,funding_requests.view.own');
+    Route::post('/funding-requests', [FundingRequestController::class, 'store'])
+        ->middleware('permission:funding_requests.create');
+    Route::post('/funding-requests/{fundingRequest}/approve', [FundingRequestController::class, 'approve'])
+        ->middleware('permission:funding_requests.review');
+    Route::post('/funding-requests/{fundingRequest}/decline', [FundingRequestController::class, 'decline'])
+        ->middleware('permission:funding_requests.review');
 });
 
 require __DIR__.'/api_mobile.php';

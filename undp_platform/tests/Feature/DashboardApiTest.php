@@ -312,4 +312,80 @@ class DashboardApiTest extends TestCase
         $this->assertSame($municipalityA->id, (int) $municipalityCounts->first()['municipality_id']);
         $this->assertSame($projectA->id, (int) $projectCounts->first()['project_id']);
     }
+
+    public function test_municipal_overview_returns_status_breakdown_and_project_metrics(): void
+    {
+        $municipality = Municipality::query()->create([
+            'name_en' => 'Sabha',
+            'name_ar' => 'سبها',
+            'code' => 'SAB',
+        ]);
+
+        $project = Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Community Center',
+            'name_ar' => 'مركز المجتمع',
+            'status' => 'active',
+        ]);
+
+        $reporter = User::factory()->create([
+            'role' => UserRole::REPORTER->value,
+            'municipality_id' => $municipality->id,
+        ]);
+        $project->assignedReporters()->attach($reporter->id);
+
+        Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $project->id,
+            'municipality_id' => $municipality->id,
+            'status' => SubmissionStatus::UNDER_REVIEW->value,
+            'title' => 'Under Review item',
+        ]);
+
+        Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $project->id,
+            'municipality_id' => $municipality->id,
+            'status' => SubmissionStatus::APPROVED->value,
+            'title' => 'Approved item',
+        ]);
+
+        Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $project->id,
+            'municipality_id' => $municipality->id,
+            'status' => SubmissionStatus::REWORK_REQUESTED->value,
+            'title' => 'Rework item',
+        ]);
+
+        Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $project->id,
+            'municipality_id' => $municipality->id,
+            'status' => SubmissionStatus::REJECTED->value,
+            'title' => 'Rejected item',
+        ]);
+
+        $focal = User::factory()->create([
+            'role' => UserRole::MUNICIPAL_FOCAL_POINT->value,
+            'municipality_id' => $municipality->id,
+        ]);
+
+        Sanctum::actingAs($focal);
+
+        $response = $this->getJson('/api/dashboard/municipal-overview');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('kpis.total_submissions', 4)
+            ->assertJsonPath('status_breakdown.under_review', 1)
+            ->assertJsonPath('status_breakdown.approved', 1)
+            ->assertJsonPath('status_breakdown.rework_requested', 1)
+            ->assertJsonPath('status_breakdown.rejected', 1)
+            ->assertJsonPath('projects.0.total_submissions', 4)
+            ->assertJsonPath('projects.0.approved_submissions', 1)
+            ->assertJsonPath('projects.0.under_review_submissions', 1)
+            ->assertJsonPath('projects.0.rework_submissions', 1)
+            ->assertJsonPath('projects.0.rejected_submissions', 1);
+    }
 }

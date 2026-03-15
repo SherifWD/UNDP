@@ -61,6 +61,8 @@ return [
                 'media.upload',
                 'media.view.all',
                 'notifications.send',
+                'funding_requests.view.all',
+                'funding_requests.review',
             ],
         ],
         UserRole::PARTNER_DONOR_VIEWER->value => [
@@ -73,6 +75,8 @@ return [
                 'projects.view',
                 'municipalities.view',
                 'submissions.view.approved_aggregated',
+                'funding_requests.create',
+                'funding_requests.view.own',
             ],
         ],
         UserRole::AUDITOR->value => [
