@@ -54,6 +54,60 @@ class ReportingController extends MobileController
                 'version' => $optionsVersion,
                 'steps' => $this->statusDrivenFlow(),
             ],
+            'submission_contract' => [
+                'create' => [
+                    'method' => 'POST',
+                    'path' => '/api/mobile/submissions',
+                    'accepted_modes' => ['draft', 'submit'],
+                    'allows_media_references' => false,
+                    'notes' => [
+                        'Use POST /api/mobile/submissions to create the submission first.',
+                        'Do not send assets or media ids on the first create request.',
+                    ],
+                ],
+                'update' => [
+                    'method' => 'PUT',
+                    'path' => '/api/mobile/submissions/{submission_id}',
+                    'accepted_media_reference_keys' => ['assets', 'media'],
+                    'media_item_schema' => [
+                        'id' => 'integer|required',
+                        'type' => 'image|video|optional',
+                        'label' => 'string|optional',
+                    ],
+                ],
+                'field_aliases' => [
+                    'activities_started' => [
+                        'activities_workshops_or_training_started',
+                    ],
+                ],
+                'media_upload_flow' => [
+                    [
+                        'step' => 1,
+                        'action' => 'Create the draft submission first to receive submission_id.',
+                        'endpoint' => 'POST /api/mobile/submissions',
+                    ],
+                    [
+                        'step' => 2,
+                        'action' => 'Request an upload URL and media asset id for each file.',
+                        'endpoint' => 'POST /api/mobile/media/presign-upload',
+                    ],
+                    [
+                        'step' => 3,
+                        'action' => 'Upload the binary file to the returned upload.url using the returned method and headers.',
+                        'endpoint' => 'upload.url',
+                    ],
+                    [
+                        'step' => 4,
+                        'action' => 'Mark the upload as completed after the binary upload succeeds.',
+                        'endpoint' => 'POST /api/mobile/media/{media_asset_id}/complete',
+                    ],
+                    [
+                        'step' => 5,
+                        'action' => 'Attach uploaded media to the submission using assets or media.',
+                        'endpoint' => 'PUT /api/mobile/submissions/{submission_id}',
+                    ],
+                ],
+            ],
             'media_limits' => [
                 'images' => [
                     'max_count' => (int) config('media.images.max_count', 10),
@@ -180,6 +234,9 @@ class ReportingController extends MobileController
                                 'type' => 'single_choice',
                                 'required' => false,
                                 'options_key' => 'yes_no',
+                                'aliases' => [
+                                    'activities_workshops_or_training_started',
+                                ],
                             ],
                             [
                                 'key' => 'user_categories',

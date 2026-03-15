@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Exceptions\RoleDoesNotExist;
@@ -118,6 +119,23 @@ class User extends Authenticatable
     public function isActive(): bool
     {
         return $this->status === UserStatus::ACTIVE->value;
+    }
+
+    public function publicAvatarUrl(): ?string
+    {
+        if (! $this->avatar_path) {
+            return null;
+        }
+
+        $path = trim((string) $this->avatar_path, '/');
+
+        if (str_starts_with($path, 'mobile/avatars/')) {
+            return route('storage.mobile-avatar', [
+                'filename' => basename($path),
+            ]);
+        }
+
+        return Storage::disk('public')->url($path);
     }
 
     public function hasRole(UserRole|string|array $role, ?string $guard = null): bool

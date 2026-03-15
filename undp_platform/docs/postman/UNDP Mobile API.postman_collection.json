@@ -1598,7 +1598,7 @@
                 "me"
               ]
             },
-            "description": "Get the authenticated user profile + permissions for mobile session bootstrap."
+            "description": "Get the authenticated user record. `avatar_url` and `image_url` both return the direct image URL when an avatar exists."
           },
           "response": [
             {
@@ -1625,7 +1625,7 @@
                     "me"
                   ]
                 },
-                "description": "Get the authenticated user profile + permissions for mobile session bootstrap."
+                "description": "Get the authenticated user record. `avatar_url` and `image_url` both return the direct image URL when an avatar exists."
               },
               "status": "OK",
               "code": 200,
@@ -1663,7 +1663,7 @@
                     "me"
                   ]
                 },
-                "description": "Get the authenticated user profile + permissions for mobile session bootstrap."
+                "description": "Get the authenticated user record. `avatar_url` and `image_url` both return the direct image URL when an avatar exists."
               },
               "status": "Unauthorized",
               "code": 401,
@@ -1701,7 +1701,7 @@
                     "me"
                   ]
                 },
-                "description": "Get the authenticated user profile + permissions for mobile session bootstrap."
+                "description": "Get the authenticated user record. `avatar_url` and `image_url` both return the direct image URL when an avatar exists."
               },
               "status": "Forbidden",
               "code": 403,
@@ -3248,7 +3248,7 @@
                 }
               ]
             },
-            "description": "Get dynamic reporting schema/options for mobile submission UI.\n\nFilters:\n- `project_id` (optional): returns project defaults and enforces municipality scope for reporter/focal point.\n\nFilter URL examples:\n- `{{base_url}}/mobile/reporting/options`\n- `{{base_url}}/mobile/reporting/options?project_id={{project_id}}`"
+            "description": "Get dynamic reporting schema/options for the mobile submission UI.\n\nFilters:\n- `project_id` (optional): returns project defaults and enforces municipality scope for reporter/focal point.\n\nImportant response sections:\n- `flow.steps`: question-by-question reporting schema by project status.\n- `submission_contract.field_aliases.activities_started`: alias for the completed-status question.\n- `submission_contract.media_upload_flow`: exact draft -> presign -> upload binary -> complete -> attach flow for assets.\n\nCompleted-status question key:\n- Preferred field: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nFilter URL examples:\n- `{{base_url}}/mobile/reporting/options`\n- `{{base_url}}/mobile/reporting/options?project_id={{project_id}}`"
           },
           "response": [
             {
@@ -3282,7 +3282,7 @@
                     }
                   ]
                 },
-                "description": "Get dynamic reporting schema/options for mobile submission UI.\n\nFilters:\n- `project_id` (optional): returns project defaults and enforces municipality scope for reporter/focal point.\n\nFilter URL examples:\n- `{{base_url}}/mobile/reporting/options`\n- `{{base_url}}/mobile/reporting/options?project_id={{project_id}}`"
+                "description": "Get dynamic reporting schema/options for the mobile submission UI.\n\nFilters:\n- `project_id` (optional): returns project defaults and enforces municipality scope for reporter/focal point.\n\nImportant response sections:\n- `flow.steps`: question-by-question reporting schema by project status.\n- `submission_contract.field_aliases.activities_started`: alias for the completed-status question.\n- `submission_contract.media_upload_flow`: exact draft -> presign -> upload binary -> complete -> attach flow for assets.\n\nCompleted-status question key:\n- Preferred field: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nFilter URL examples:\n- `{{base_url}}/mobile/reporting/options`\n- `{{base_url}}/mobile/reporting/options?project_id={{project_id}}`"
               },
               "status": "OK",
               "code": 200,
@@ -3327,7 +3327,7 @@
                     }
                   ]
                 },
-                "description": "Get dynamic reporting schema/options for mobile submission UI.\n\nFilters:\n- `project_id` (optional): returns project defaults and enforces municipality scope for reporter/focal point.\n\nFilter URL examples:\n- `{{base_url}}/mobile/reporting/options`\n- `{{base_url}}/mobile/reporting/options?project_id={{project_id}}`"
+                "description": "Get dynamic reporting schema/options for the mobile submission UI.\n\nFilters:\n- `project_id` (optional): returns project defaults and enforces municipality scope for reporter/focal point.\n\nImportant response sections:\n- `flow.steps`: question-by-question reporting schema by project status.\n- `submission_contract.field_aliases.activities_started`: alias for the completed-status question.\n- `submission_contract.media_upload_flow`: exact draft -> presign -> upload binary -> complete -> attach flow for assets.\n\nCompleted-status question key:\n- Preferred field: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nFilter URL examples:\n- `{{base_url}}/mobile/reporting/options`\n- `{{base_url}}/mobile/reporting/options?project_id={{project_id}}`"
               },
               "status": "Forbidden",
               "code": 403,
@@ -3372,7 +3372,7 @@
                     }
                   ]
                 },
-                "description": "Get dynamic reporting schema/options for mobile submission UI.\n\nFilters:\n- `project_id` (optional): returns project defaults and enforces municipality scope for reporter/focal point.\n\nFilter URL examples:\n- `{{base_url}}/mobile/reporting/options`\n- `{{base_url}}/mobile/reporting/options?project_id={{project_id}}`"
+                "description": "Get dynamic reporting schema/options for the mobile submission UI.\n\nFilters:\n- `project_id` (optional): returns project defaults and enforces municipality scope for reporter/focal point.\n\nImportant response sections:\n- `flow.steps`: question-by-question reporting schema by project status.\n- `submission_contract.field_aliases.activities_started`: alias for the completed-status question.\n- `submission_contract.media_upload_flow`: exact draft -> presign -> upload binary -> complete -> attach flow for assets.\n\nCompleted-status question key:\n- Preferred field: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nFilter URL examples:\n- `{{base_url}}/mobile/reporting/options`\n- `{{base_url}}/mobile/reporting/options?project_id={{project_id}}`"
               },
               "status": "Unprocessable Content",
               "code": 422,
@@ -3417,7 +3417,7 @@
                     }
                   ]
                 },
-                "description": "Get dynamic reporting schema/options for mobile submission UI.\n\nFilters:\n- `project_id` (optional): returns project defaults and enforces municipality scope for reporter/focal point.\n\nFilter URL examples:\n- `{{base_url}}/mobile/reporting/options`\n- `{{base_url}}/mobile/reporting/options?project_id={{project_id}}`"
+                "description": "Get dynamic reporting schema/options for the mobile submission UI.\n\nFilters:\n- `project_id` (optional): returns project defaults and enforces municipality scope for reporter/focal point.\n\nImportant response sections:\n- `flow.steps`: question-by-question reporting schema by project status.\n- `submission_contract.field_aliases.activities_started`: alias for the completed-status question.\n- `submission_contract.media_upload_flow`: exact draft -> presign -> upload binary -> complete -> attach flow for assets.\n\nCompleted-status question key:\n- Preferred field: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nFilter URL examples:\n- `{{base_url}}/mobile/reporting/options`\n- `{{base_url}}/mobile/reporting/options?project_id={{project_id}}`"
               },
               "status": "Unauthorized",
               "code": 401,
@@ -3927,7 +3927,7 @@
                 "submissions"
               ]
             },
-            "description": "Create or idempotently reuse a mobile draft submission.\n\nNotes:\n- `mode` can be `draft` or `submit`.\n- If `mode` is omitted on create, backend defaults to `draft`.\n- `client_uuid` enables idempotent create/retry behavior.\n- Submit-only required fields are enforced only when mode resolves to `submit`."
+            "description": "Create or idempotently reuse a mobile submission.\n\nNotes:\n- `mode` can be `draft` or `submit`.\n- If `mode` is omitted on create, backend defaults to `draft`.\n- `client_uuid` enables idempotent create/retry behavior.\n- Submit-only required fields are enforced only when mode resolves to `submit`.\n- Do not send `assets` or `media` ids on the first create request. Media assets require an existing `submission_id`.\n\nIf you need to attach photos/videos:\n1. Create the submission first with `POST /mobile/submissions`.\n2. Call `POST /mobile/media/presign-upload` with the returned `submission_id`.\n3. Upload the binary file to the returned `upload.url`.\n4. Call `POST /mobile/media/{media_asset_id}/complete`.\n5. Call `PUT /mobile/submissions/{submission_id}` with `assets` or `media`."
           },
           "response": [
             {
@@ -3967,7 +3967,7 @@
                     "submissions"
                   ]
                 },
-                "description": "Create or idempotently reuse a mobile draft submission.\n\nNotes:\n- `mode` can be `draft` or `submit`.\n- If `mode` is omitted on create, backend defaults to `draft`.\n- `client_uuid` enables idempotent create/retry behavior.\n- Submit-only required fields are enforced only when mode resolves to `submit`."
+                "description": "Create or idempotently reuse a mobile submission.\n\nNotes:\n- `mode` can be `draft` or `submit`.\n- If `mode` is omitted on create, backend defaults to `draft`.\n- `client_uuid` enables idempotent create/retry behavior.\n- Submit-only required fields are enforced only when mode resolves to `submit`.\n- Do not send `assets` or `media` ids on the first create request. Media assets require an existing `submission_id`.\n\nIf you need to attach photos/videos:\n1. Create the submission first with `POST /mobile/submissions`.\n2. Call `POST /mobile/media/presign-upload` with the returned `submission_id`.\n3. Upload the binary file to the returned `upload.url`.\n4. Call `POST /mobile/media/{media_asset_id}/complete`.\n5. Call `PUT /mobile/submissions/{submission_id}` with `assets` or `media`."
               },
               "status": "Created",
               "code": 201,
@@ -4018,7 +4018,7 @@
                     "submissions"
                   ]
                 },
-                "description": "Create or idempotently reuse a mobile draft submission.\n\nNotes:\n- `mode` can be `draft` or `submit`.\n- If `mode` is omitted on create, backend defaults to `draft`.\n- `client_uuid` enables idempotent create/retry behavior.\n- Submit-only required fields are enforced only when mode resolves to `submit`."
+                "description": "Create or idempotently reuse a mobile submission.\n\nNotes:\n- `mode` can be `draft` or `submit`.\n- If `mode` is omitted on create, backend defaults to `draft`.\n- `client_uuid` enables idempotent create/retry behavior.\n- Submit-only required fields are enforced only when mode resolves to `submit`.\n- Do not send `assets` or `media` ids on the first create request. Media assets require an existing `submission_id`.\n\nIf you need to attach photos/videos:\n1. Create the submission first with `POST /mobile/submissions`.\n2. Call `POST /mobile/media/presign-upload` with the returned `submission_id`.\n3. Upload the binary file to the returned `upload.url`.\n4. Call `POST /mobile/media/{media_asset_id}/complete`.\n5. Call `PUT /mobile/submissions/{submission_id}` with `assets` or `media`."
               },
               "status": "OK",
               "code": 200,
@@ -4069,7 +4069,7 @@
                     "submissions"
                   ]
                 },
-                "description": "Create or idempotently reuse a mobile draft submission.\n\nNotes:\n- `mode` can be `draft` or `submit`.\n- If `mode` is omitted on create, backend defaults to `draft`.\n- `client_uuid` enables idempotent create/retry behavior.\n- Submit-only required fields are enforced only when mode resolves to `submit`."
+                "description": "Create or idempotently reuse a mobile submission.\n\nNotes:\n- `mode` can be `draft` or `submit`.\n- If `mode` is omitted on create, backend defaults to `draft`.\n- `client_uuid` enables idempotent create/retry behavior.\n- Submit-only required fields are enforced only when mode resolves to `submit`.\n- Do not send `assets` or `media` ids on the first create request. Media assets require an existing `submission_id`.\n\nIf you need to attach photos/videos:\n1. Create the submission first with `POST /mobile/submissions`.\n2. Call `POST /mobile/media/presign-upload` with the returned `submission_id`.\n3. Upload the binary file to the returned `upload.url`.\n4. Call `POST /mobile/media/{media_asset_id}/complete`.\n5. Call `PUT /mobile/submissions/{submission_id}` with `assets` or `media`."
               },
               "status": "Forbidden",
               "code": 403,
@@ -4120,7 +4120,7 @@
                     "submissions"
                   ]
                 },
-                "description": "Create or idempotently reuse a mobile draft submission.\n\nNotes:\n- `mode` can be `draft` or `submit`.\n- If `mode` is omitted on create, backend defaults to `draft`.\n- `client_uuid` enables idempotent create/retry behavior.\n- Submit-only required fields are enforced only when mode resolves to `submit`."
+                "description": "Create or idempotently reuse a mobile submission.\n\nNotes:\n- `mode` can be `draft` or `submit`.\n- If `mode` is omitted on create, backend defaults to `draft`.\n- `client_uuid` enables idempotent create/retry behavior.\n- Submit-only required fields are enforced only when mode resolves to `submit`.\n- Do not send `assets` or `media` ids on the first create request. Media assets require an existing `submission_id`.\n\nIf you need to attach photos/videos:\n1. Create the submission first with `POST /mobile/submissions`.\n2. Call `POST /mobile/media/presign-upload` with the returned `submission_id`.\n3. Upload the binary file to the returned `upload.url`.\n4. Call `POST /mobile/media/{media_asset_id}/complete`.\n5. Call `PUT /mobile/submissions/{submission_id}` with `assets` or `media`."
               },
               "status": "Forbidden",
               "code": 403,
@@ -4171,7 +4171,7 @@
                     "submissions"
                   ]
                 },
-                "description": "Create or idempotently reuse a mobile draft submission.\n\nNotes:\n- `mode` can be `draft` or `submit`.\n- If `mode` is omitted on create, backend defaults to `draft`.\n- `client_uuid` enables idempotent create/retry behavior.\n- Submit-only required fields are enforced only when mode resolves to `submit`."
+                "description": "Create or idempotently reuse a mobile submission.\n\nNotes:\n- `mode` can be `draft` or `submit`.\n- If `mode` is omitted on create, backend defaults to `draft`.\n- `client_uuid` enables idempotent create/retry behavior.\n- Submit-only required fields are enforced only when mode resolves to `submit`.\n- Do not send `assets` or `media` ids on the first create request. Media assets require an existing `submission_id`.\n\nIf you need to attach photos/videos:\n1. Create the submission first with `POST /mobile/submissions`.\n2. Call `POST /mobile/media/presign-upload` with the returned `submission_id`.\n3. Upload the binary file to the returned `upload.url`.\n4. Call `POST /mobile/media/{media_asset_id}/complete`.\n5. Call `PUT /mobile/submissions/{submission_id}` with `assets` or `media`."
               },
               "status": "Unprocessable Content",
               "code": 422,
@@ -4222,7 +4222,7 @@
                     "submissions"
                   ]
                 },
-                "description": "Create or idempotently reuse a mobile draft submission.\n\nNotes:\n- `mode` can be `draft` or `submit`.\n- If `mode` is omitted on create, backend defaults to `draft`.\n- `client_uuid` enables idempotent create/retry behavior.\n- Submit-only required fields are enforced only when mode resolves to `submit`."
+                "description": "Create or idempotently reuse a mobile submission.\n\nNotes:\n- `mode` can be `draft` or `submit`.\n- If `mode` is omitted on create, backend defaults to `draft`.\n- `client_uuid` enables idempotent create/retry behavior.\n- Submit-only required fields are enforced only when mode resolves to `submit`.\n- Do not send `assets` or `media` ids on the first create request. Media assets require an existing `submission_id`.\n\nIf you need to attach photos/videos:\n1. Create the submission first with `POST /mobile/submissions`.\n2. Call `POST /mobile/media/presign-upload` with the returned `submission_id`.\n3. Upload the binary file to the returned `upload.url`.\n4. Call `POST /mobile/media/{media_asset_id}/complete`.\n5. Call `PUT /mobile/submissions/{submission_id}` with `assets` or `media`."
               },
               "status": "Unauthorized",
               "code": 401,
@@ -4276,7 +4276,7 @@
                 "{{submission_id}}"
               ]
             },
-            "description": "Submit/update an in-progress report (`project_status=in_progress`).\n\nRequired on submit for in-progress:\n- `project_status`, `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)\n- `progress_impression`, `physical_progress`, `approximate_completion_percentage`, `additional_observations`"
+            "description": "Submit/update an in-progress report (`project_status=in_progress`).\n\nRequired on submit for in-progress:\n- `project_status`, `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)\n- `progress_impression`, `physical_progress`, `approximate_completion_percentage`, `additional_observations`\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` on this `PUT` request.\n- Each item shape: `{ \"id\": media_asset_id, \"type\": \"image|video\", \"label\": \"optional\" }`"
           },
           "response": [
             {
@@ -4317,7 +4317,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update an in-progress report (`project_status=in_progress`).\n\nRequired on submit for in-progress:\n- `project_status`, `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)\n- `progress_impression`, `physical_progress`, `approximate_completion_percentage`, `additional_observations`"
+                "description": "Submit/update an in-progress report (`project_status=in_progress`).\n\nRequired on submit for in-progress:\n- `project_status`, `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)\n- `progress_impression`, `physical_progress`, `approximate_completion_percentage`, `additional_observations`\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` on this `PUT` request.\n- Each item shape: `{ \"id\": media_asset_id, \"type\": \"image|video\", \"label\": \"optional\" }`"
               },
               "status": "OK",
               "code": 200,
@@ -4369,7 +4369,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update an in-progress report (`project_status=in_progress`).\n\nRequired on submit for in-progress:\n- `project_status`, `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)\n- `progress_impression`, `physical_progress`, `approximate_completion_percentage`, `additional_observations`"
+                "description": "Submit/update an in-progress report (`project_status=in_progress`).\n\nRequired on submit for in-progress:\n- `project_status`, `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)\n- `progress_impression`, `physical_progress`, `approximate_completion_percentage`, `additional_observations`\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` on this `PUT` request.\n- Each item shape: `{ \"id\": media_asset_id, \"type\": \"image|video\", \"label\": \"optional\" }`"
               },
               "status": "Unprocessable Content",
               "code": 422,
@@ -4421,7 +4421,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update an in-progress report (`project_status=in_progress`).\n\nRequired on submit for in-progress:\n- `project_status`, `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)\n- `progress_impression`, `physical_progress`, `approximate_completion_percentage`, `additional_observations`"
+                "description": "Submit/update an in-progress report (`project_status=in_progress`).\n\nRequired on submit for in-progress:\n- `project_status`, `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)\n- `progress_impression`, `physical_progress`, `approximate_completion_percentage`, `additional_observations`\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` on this `PUT` request.\n- Each item shape: `{ \"id\": media_asset_id, \"type\": \"image|video\", \"label\": \"optional\" }`"
               },
               "status": "Unprocessable Content",
               "code": 422,
@@ -4473,7 +4473,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update an in-progress report (`project_status=in_progress`).\n\nRequired on submit for in-progress:\n- `project_status`, `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)\n- `progress_impression`, `physical_progress`, `approximate_completion_percentage`, `additional_observations`"
+                "description": "Submit/update an in-progress report (`project_status=in_progress`).\n\nRequired on submit for in-progress:\n- `project_status`, `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)\n- `progress_impression`, `physical_progress`, `approximate_completion_percentage`, `additional_observations`\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` on this `PUT` request.\n- Each item shape: `{ \"id\": media_asset_id, \"type\": \"image|video\", \"label\": \"optional\" }`"
               },
               "status": "Forbidden",
               "code": 403,
@@ -4525,7 +4525,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update an in-progress report (`project_status=in_progress`).\n\nRequired on submit for in-progress:\n- `project_status`, `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)\n- `progress_impression`, `physical_progress`, `approximate_completion_percentage`, `additional_observations`"
+                "description": "Submit/update an in-progress report (`project_status=in_progress`).\n\nRequired on submit for in-progress:\n- `project_status`, `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)\n- `progress_impression`, `physical_progress`, `approximate_completion_percentage`, `additional_observations`\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` on this `PUT` request.\n- Each item shape: `{ \"id\": media_asset_id, \"type\": \"image|video\", \"label\": \"optional\" }`"
               },
               "status": "Not Found",
               "code": 404,
@@ -4577,7 +4577,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update an in-progress report (`project_status=in_progress`).\n\nRequired on submit for in-progress:\n- `project_status`, `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)\n- `progress_impression`, `physical_progress`, `approximate_completion_percentage`, `additional_observations`"
+                "description": "Submit/update an in-progress report (`project_status=in_progress`).\n\nRequired on submit for in-progress:\n- `project_status`, `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)\n- `progress_impression`, `physical_progress`, `approximate_completion_percentage`, `additional_observations`\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` on this `PUT` request.\n- Each item shape: `{ \"id\": media_asset_id, \"type\": \"image|video\", \"label\": \"optional\" }`"
               },
               "status": "Unauthorized",
               "code": 401,
@@ -4631,7 +4631,7 @@
                 "{{submission_id}}"
               ]
             },
-            "description": "Submit/update a planned report (`project_status=planned`).\n\nPlanned-specific required on submit:\n- `delay_reason`\n- Common submit fields: `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)."
+            "description": "Submit/update a planned report (`project_status=planned`).\n\nPlanned-specific required on submit:\n- `delay_reason`\n- Common submit fields: `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng).\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` after they are created through the presign/complete flow."
           },
           "response": [
             {
@@ -4672,7 +4672,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update a planned report (`project_status=planned`).\n\nPlanned-specific required on submit:\n- `delay_reason`\n- Common submit fields: `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)."
+                "description": "Submit/update a planned report (`project_status=planned`).\n\nPlanned-specific required on submit:\n- `delay_reason`\n- Common submit fields: `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng).\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` after they are created through the presign/complete flow."
               },
               "status": "OK",
               "code": 200,
@@ -4724,7 +4724,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update a planned report (`project_status=planned`).\n\nPlanned-specific required on submit:\n- `delay_reason`\n- Common submit fields: `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)."
+                "description": "Submit/update a planned report (`project_status=planned`).\n\nPlanned-specific required on submit:\n- `delay_reason`\n- Common submit fields: `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng).\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` after they are created through the presign/complete flow."
               },
               "status": "Unprocessable Content",
               "code": 422,
@@ -4776,7 +4776,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update a planned report (`project_status=planned`).\n\nPlanned-specific required on submit:\n- `delay_reason`\n- Common submit fields: `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)."
+                "description": "Submit/update a planned report (`project_status=planned`).\n\nPlanned-specific required on submit:\n- `delay_reason`\n- Common submit fields: `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng).\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` after they are created through the presign/complete flow."
               },
               "status": "Unprocessable Content",
               "code": 422,
@@ -4828,7 +4828,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update a planned report (`project_status=planned`).\n\nPlanned-specific required on submit:\n- `delay_reason`\n- Common submit fields: `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)."
+                "description": "Submit/update a planned report (`project_status=planned`).\n\nPlanned-specific required on submit:\n- `delay_reason`\n- Common submit fields: `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng).\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` after they are created through the presign/complete flow."
               },
               "status": "Forbidden",
               "code": 403,
@@ -4880,7 +4880,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update a planned report (`project_status=planned`).\n\nPlanned-specific required on submit:\n- `delay_reason`\n- Common submit fields: `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)."
+                "description": "Submit/update a planned report (`project_status=planned`).\n\nPlanned-specific required on submit:\n- `delay_reason`\n- Common submit fields: `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng).\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` after they are created through the presign/complete flow."
               },
               "status": "Not Found",
               "code": 404,
@@ -4932,7 +4932,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update a planned report (`project_status=planned`).\n\nPlanned-specific required on submit:\n- `delay_reason`\n- Common submit fields: `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng)."
+                "description": "Submit/update a planned report (`project_status=planned`).\n\nPlanned-specific required on submit:\n- `delay_reason`\n- Common submit fields: `confirm_accuracy`, `actual_beneficiaries`, `location_label` (or lat/lng).\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` after they are created through the presign/complete flow."
               },
               "status": "Unauthorized",
               "code": 401,
@@ -4968,7 +4968,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Completed Project Verification\",\n  \"project_status\": \"completed\",\n  \"is_project_being_used\": true,\n  \"activities_started\": true,\n  \"user_categories\": [\"all_of_the_above\"],\n  \"is_used_as_intended\": true,\n  \"functional_status\": \"fully_functional\",\n  \"negative_environmental_impact\": true,\n  \"negative_impact_details\": \"Minor construction debris left near the entrance area.\",\n  \"summary_of_observation\": \"Project assets are operational and in daily use.\",\n  \"actual_beneficiaries\": 460,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"manual\",\n  \"notes\": \"Community feedback indicates high satisfaction with service quality.\",\n  \"confirm_accuracy\": true\n}",
+              "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Completed Project Verification\",\n  \"project_status\": \"completed\",\n  \"is_project_being_used\": true,\n  \"activities_started\": true,\n  \"user_categories\": [\"all_of_the_above\"],\n  \"is_used_as_intended\": true,\n  \"functional_status\": \"fully_functional\",\n  \"negative_environmental_impact\": true,\n  \"negative_impact_details\": \"Minor construction debris left near the entrance area.\",\n  \"summary_of_observation\": \"Project assets are operational and in daily use.\",\n  \"actual_beneficiaries\": 460,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"manual\",\n  \"assets\": [\n    {\n      \"id\": {{media_asset_id}},\n      \"type\": \"image\",\n      \"label\": \"Completed site condition\"\n    }\n  ],\n  \"notes\": \"Community feedback indicates high satisfaction with service quality.\",\n  \"confirm_accuracy\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4986,7 +4986,7 @@
                 "{{submission_id}}"
               ]
             },
-            "description": "Submit/update a completed report (`project_status=completed`).\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`"
+            "description": "Submit/update a completed report (`project_status=completed`).\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`\n\nCompleted-status question field:\n- Preferred key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` on this `PUT` request."
           },
           "response": [
             {
@@ -5009,7 +5009,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Completed Project Verification\",\n  \"project_status\": \"completed\",\n  \"is_project_being_used\": true,\n  \"user_categories\": [\"all_of_the_above\"],\n  \"is_used_as_intended\": true,\n  \"functional_status\": \"fully_functional\",\n  \"negative_environmental_impact\": true,\n  \"negative_impact_details\": \"Minor construction debris left near the entrance area.\",\n  \"summary_of_observation\": \"Project assets are operational and in daily use.\",\n  \"actual_beneficiaries\": 460,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"manual\",\n  \"notes\": \"Community feedback indicates high satisfaction with service quality.\",\n  \"confirm_accuracy\": true\n}",
+                  "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Completed Project Verification\",\n  \"project_status\": \"completed\",\n  \"is_project_being_used\": true,\n  \"activities_started\": true,\n  \"user_categories\": [\"all_of_the_above\"],\n  \"is_used_as_intended\": true,\n  \"functional_status\": \"fully_functional\",\n  \"negative_environmental_impact\": true,\n  \"negative_impact_details\": \"Minor construction debris left near the entrance area.\",\n  \"summary_of_observation\": \"Project assets are operational and in daily use.\",\n  \"actual_beneficiaries\": 460,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"manual\",\n  \"assets\": [\n    {\n      \"id\": {{media_asset_id}},\n      \"type\": \"image\",\n      \"label\": \"Completed site condition\"\n    }\n  ],\n  \"notes\": \"Community feedback indicates high satisfaction with service quality.\",\n  \"confirm_accuracy\": true\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5027,7 +5027,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update a completed report (`project_status=completed`).\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`"
+                "description": "Submit/update a completed report (`project_status=completed`).\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`\n\nCompleted-status question field:\n- Preferred key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` on this `PUT` request."
               },
               "status": "OK",
               "code": 200,
@@ -5039,7 +5039,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"result\": true,\n  \"message\": \"Monitoring report submitted successfully.\",\n  \"msg\": \"Monitoring report submitted successfully.\",\n  \"data\": {\n    \"submission\": {\n      \"id\": 15,\n      \"status\": \"submitted\",\n      \"title\": \"Phase 1 Reinforcement Progress Update\",\n      \"data\": {\n        \"project_status\": \"in_progress\",\n        \"progress_impression\": \"good\",\n        \"approximate_completion_percentage\": 25,\n        \"confirm_accuracy\": true\n      }\n    },\n    \"idempotent_reuse\": false\n  }\n}"
+              "body": "{\n  \"result\": true,\n  \"message\": \"Monitoring report submitted successfully.\",\n  \"msg\": \"Monitoring report submitted successfully.\",\n  \"data\": {\n    \"submission\": {\n      \"id\": 15,\n      \"status\": \"submitted\",\n      \"title\": \"Completed Project Verification\",\n      \"data\": {\n        \"project_status\": \"completed\",\n        \"is_project_being_used\": true,\n        \"activities_started\": true,\n        \"functional_status\": \"fully_functional\",\n        \"negative_environmental_impact\": true,\n        \"confirm_accuracy\": true\n      },\n      \"media_assets\": [\n        {\n          \"id\": 44,\n          \"media_type\": \"image\",\n          \"label\": \"Completed site condition\"\n        }\n      ]\n    },\n    \"idempotent_reuse\": false\n  }\n}"
             },
             {
               "name": "422 Conditional Validation Error",
@@ -5061,7 +5061,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Completed Project Verification\",\n  \"project_status\": \"completed\",\n  \"is_project_being_used\": true,\n  \"user_categories\": [\"all_of_the_above\"],\n  \"is_used_as_intended\": true,\n  \"functional_status\": \"fully_functional\",\n  \"negative_environmental_impact\": true,\n  \"negative_impact_details\": \"Minor construction debris left near the entrance area.\",\n  \"summary_of_observation\": \"Project assets are operational and in daily use.\",\n  \"actual_beneficiaries\": 460,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"manual\",\n  \"notes\": \"Community feedback indicates high satisfaction with service quality.\",\n  \"confirm_accuracy\": true\n}",
+                  "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Completed Project Verification\",\n  \"project_status\": \"completed\",\n  \"is_project_being_used\": true,\n  \"activities_started\": true,\n  \"user_categories\": [\"all_of_the_above\"],\n  \"is_used_as_intended\": true,\n  \"functional_status\": \"fully_functional\",\n  \"negative_environmental_impact\": true,\n  \"negative_impact_details\": \"Minor construction debris left near the entrance area.\",\n  \"summary_of_observation\": \"Project assets are operational and in daily use.\",\n  \"actual_beneficiaries\": 460,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"manual\",\n  \"assets\": [\n    {\n      \"id\": {{media_asset_id}},\n      \"type\": \"image\",\n      \"label\": \"Completed site condition\"\n    }\n  ],\n  \"notes\": \"Community feedback indicates high satisfaction with service quality.\",\n  \"confirm_accuracy\": true\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5079,7 +5079,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update a completed report (`project_status=completed`).\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`"
+                "description": "Submit/update a completed report (`project_status=completed`).\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`\n\nCompleted-status question field:\n- Preferred key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` on this `PUT` request."
               },
               "status": "Unprocessable Content",
               "code": 422,
@@ -5091,7 +5091,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n  \"result\": false,\n  \"message\": \"Approximate completion percentage is required.\",\n  \"msg\": \"Approximate completion percentage is required.\",\n  \"data\": {\n    \"errors\": {\n      \"approximate_completion_percentage\": [\n        \"Approximate completion percentage is required.\"\n      ]\n    }\n  },\n  \"errors\": {\n    \"approximate_completion_percentage\": [\n      \"Approximate completion percentage is required.\"\n    ]\n  }\n}"
+              "body": "{\n  \"result\": false,\n  \"message\": \"Please describe the environmental impact observed.\",\n  \"msg\": \"Please describe the environmental impact observed.\",\n  \"data\": {\n    \"errors\": {\n      \"negative_impact_details\": [\n        \"Please describe the environmental impact observed.\"\n      ]\n    }\n  },\n  \"errors\": {\n    \"negative_impact_details\": [\n      \"Please describe the environmental impact observed.\"\n    ]\n  }\n}"
             },
             {
               "name": "422 Cannot Edit Submission",
@@ -5113,7 +5113,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Completed Project Verification\",\n  \"project_status\": \"completed\",\n  \"is_project_being_used\": true,\n  \"user_categories\": [\"all_of_the_above\"],\n  \"is_used_as_intended\": true,\n  \"functional_status\": \"fully_functional\",\n  \"negative_environmental_impact\": true,\n  \"negative_impact_details\": \"Minor construction debris left near the entrance area.\",\n  \"summary_of_observation\": \"Project assets are operational and in daily use.\",\n  \"actual_beneficiaries\": 460,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"manual\",\n  \"notes\": \"Community feedback indicates high satisfaction with service quality.\",\n  \"confirm_accuracy\": true\n}",
+                  "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Completed Project Verification\",\n  \"project_status\": \"completed\",\n  \"is_project_being_used\": true,\n  \"activities_started\": true,\n  \"user_categories\": [\"all_of_the_above\"],\n  \"is_used_as_intended\": true,\n  \"functional_status\": \"fully_functional\",\n  \"negative_environmental_impact\": true,\n  \"negative_impact_details\": \"Minor construction debris left near the entrance area.\",\n  \"summary_of_observation\": \"Project assets are operational and in daily use.\",\n  \"actual_beneficiaries\": 460,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"manual\",\n  \"assets\": [\n    {\n      \"id\": {{media_asset_id}},\n      \"type\": \"image\",\n      \"label\": \"Completed site condition\"\n    }\n  ],\n  \"notes\": \"Community feedback indicates high satisfaction with service quality.\",\n  \"confirm_accuracy\": true\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5131,7 +5131,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update a completed report (`project_status=completed`).\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`"
+                "description": "Submit/update a completed report (`project_status=completed`).\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`\n\nCompleted-status question field:\n- Preferred key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` on this `PUT` request."
               },
               "status": "Unprocessable Content",
               "code": 422,
@@ -5165,7 +5165,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Completed Project Verification\",\n  \"project_status\": \"completed\",\n  \"is_project_being_used\": true,\n  \"user_categories\": [\"all_of_the_above\"],\n  \"is_used_as_intended\": true,\n  \"functional_status\": \"fully_functional\",\n  \"negative_environmental_impact\": true,\n  \"negative_impact_details\": \"Minor construction debris left near the entrance area.\",\n  \"summary_of_observation\": \"Project assets are operational and in daily use.\",\n  \"actual_beneficiaries\": 460,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"manual\",\n  \"notes\": \"Community feedback indicates high satisfaction with service quality.\",\n  \"confirm_accuracy\": true\n}",
+                  "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Completed Project Verification\",\n  \"project_status\": \"completed\",\n  \"is_project_being_used\": true,\n  \"activities_started\": true,\n  \"user_categories\": [\"all_of_the_above\"],\n  \"is_used_as_intended\": true,\n  \"functional_status\": \"fully_functional\",\n  \"negative_environmental_impact\": true,\n  \"negative_impact_details\": \"Minor construction debris left near the entrance area.\",\n  \"summary_of_observation\": \"Project assets are operational and in daily use.\",\n  \"actual_beneficiaries\": 460,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"manual\",\n  \"assets\": [\n    {\n      \"id\": {{media_asset_id}},\n      \"type\": \"image\",\n      \"label\": \"Completed site condition\"\n    }\n  ],\n  \"notes\": \"Community feedback indicates high satisfaction with service quality.\",\n  \"confirm_accuracy\": true\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5183,7 +5183,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update a completed report (`project_status=completed`).\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`"
+                "description": "Submit/update a completed report (`project_status=completed`).\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`\n\nCompleted-status question field:\n- Preferred key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` on this `PUT` request."
               },
               "status": "Forbidden",
               "code": 403,
@@ -5217,7 +5217,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Completed Project Verification\",\n  \"project_status\": \"completed\",\n  \"is_project_being_used\": true,\n  \"user_categories\": [\"all_of_the_above\"],\n  \"is_used_as_intended\": true,\n  \"functional_status\": \"fully_functional\",\n  \"negative_environmental_impact\": true,\n  \"negative_impact_details\": \"Minor construction debris left near the entrance area.\",\n  \"summary_of_observation\": \"Project assets are operational and in daily use.\",\n  \"actual_beneficiaries\": 460,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"manual\",\n  \"notes\": \"Community feedback indicates high satisfaction with service quality.\",\n  \"confirm_accuracy\": true\n}",
+                  "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Completed Project Verification\",\n  \"project_status\": \"completed\",\n  \"is_project_being_used\": true,\n  \"activities_started\": true,\n  \"user_categories\": [\"all_of_the_above\"],\n  \"is_used_as_intended\": true,\n  \"functional_status\": \"fully_functional\",\n  \"negative_environmental_impact\": true,\n  \"negative_impact_details\": \"Minor construction debris left near the entrance area.\",\n  \"summary_of_observation\": \"Project assets are operational and in daily use.\",\n  \"actual_beneficiaries\": 460,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"manual\",\n  \"assets\": [\n    {\n      \"id\": {{media_asset_id}},\n      \"type\": \"image\",\n      \"label\": \"Completed site condition\"\n    }\n  ],\n  \"notes\": \"Community feedback indicates high satisfaction with service quality.\",\n  \"confirm_accuracy\": true\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5235,7 +5235,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update a completed report (`project_status=completed`).\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`"
+                "description": "Submit/update a completed report (`project_status=completed`).\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`\n\nCompleted-status question field:\n- Preferred key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` on this `PUT` request."
               },
               "status": "Not Found",
               "code": 404,
@@ -5269,7 +5269,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Completed Project Verification\",\n  \"project_status\": \"completed\",\n  \"is_project_being_used\": true,\n  \"user_categories\": [\"all_of_the_above\"],\n  \"is_used_as_intended\": true,\n  \"functional_status\": \"fully_functional\",\n  \"negative_environmental_impact\": true,\n  \"negative_impact_details\": \"Minor construction debris left near the entrance area.\",\n  \"summary_of_observation\": \"Project assets are operational and in daily use.\",\n  \"actual_beneficiaries\": 460,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"manual\",\n  \"notes\": \"Community feedback indicates high satisfaction with service quality.\",\n  \"confirm_accuracy\": true\n}",
+                  "raw": "{\n  \"project_id\": {{project_id}},\n  \"mode\": \"submit\",\n  \"title\": \"Completed Project Verification\",\n  \"project_status\": \"completed\",\n  \"is_project_being_used\": true,\n  \"activities_started\": true,\n  \"user_categories\": [\"all_of_the_above\"],\n  \"is_used_as_intended\": true,\n  \"functional_status\": \"fully_functional\",\n  \"negative_environmental_impact\": true,\n  \"negative_impact_details\": \"Minor construction debris left near the entrance area.\",\n  \"summary_of_observation\": \"Project assets are operational and in daily use.\",\n  \"actual_beneficiaries\": 460,\n  \"location_label\": \"Alkufraa Municipality, Southern Libya\",\n  \"location_source\": \"manual\",\n  \"assets\": [\n    {\n      \"id\": {{media_asset_id}},\n      \"type\": \"image\",\n      \"label\": \"Completed site condition\"\n    }\n  ],\n  \"notes\": \"Community feedback indicates high satisfaction with service quality.\",\n  \"confirm_accuracy\": true\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -5287,7 +5287,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Submit/update a completed report (`project_status=completed`).\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`"
+                "description": "Submit/update a completed report (`project_status=completed`).\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`\n\nCompleted-status question field:\n- Preferred key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nMedia attachment:\n- Attach uploaded files with `assets` or `media` on this `PUT` request."
               },
               "status": "Unauthorized",
               "code": 401,
@@ -5328,7 +5328,7 @@
                 "{{submission_id}}"
               ]
             },
-            "description": "Get full submission payload, timeline, labels, and media references."
+            "description": "Get full submission payload, timeline, normalized question answers, answer labels, and media references."
           },
           "response": [
             {
@@ -5356,7 +5356,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Get full submission payload, timeline, labels, and media references."
+                "description": "Get full submission payload, timeline, normalized question answers, answer labels, and media references."
               },
               "status": "OK",
               "code": 200,
@@ -5395,7 +5395,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Get full submission payload, timeline, labels, and media references."
+                "description": "Get full submission payload, timeline, normalized question answers, answer labels, and media references."
               },
               "status": "Forbidden",
               "code": 403,
@@ -5434,7 +5434,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Get full submission payload, timeline, labels, and media references."
+                "description": "Get full submission payload, timeline, normalized question answers, answer labels, and media references."
               },
               "status": "Not Found",
               "code": 404,
@@ -5473,7 +5473,7 @@
                     "{{submission_id}}"
                   ]
                 },
-                "description": "Get full submission payload, timeline, labels, and media references."
+                "description": "Get full submission payload, timeline, normalized question answers, answer labels, and media references."
               },
               "status": "Unauthorized",
               "code": 401,
@@ -6206,7 +6206,7 @@
                 "presign-upload"
               ]
             },
-            "description": "Create/reuse presigned upload for image/video evidence.\n\nBody options:\n- `media_type`: `image` | `video`\n- `mime_type`: must be in server allowed list\n- `client_media_id`: enables idempotent reuse\n- `label`, `display_order`: optional metadata"
+            "description": "Create/reuse a presigned upload for image/video evidence.\n\nUse this only after a submission already exists, because `submission_id` is required.\n\nBody options:\n- `submission_id`: existing draft/submission id that will own the media asset\n- `media_type`: `image` | `video`\n- `mime_type`: must be in the server allowed list\n- `client_media_id`: enables idempotent reuse\n- `label`, `display_order`: optional metadata\n\nThis call does not attach the file to the submission yet. It only creates the media asset row and returns the upload URL."
           },
           "response": [
             {
@@ -6247,7 +6247,7 @@
                     "presign-upload"
                   ]
                 },
-                "description": "Create/reuse presigned upload for image/video evidence.\n\nBody options:\n- `media_type`: `image` | `video`\n- `mime_type`: must be in server allowed list\n- `client_media_id`: enables idempotent reuse\n- `label`, `display_order`: optional metadata"
+                "description": "Create/reuse a presigned upload for image/video evidence.\n\nUse this only after a submission already exists, because `submission_id` is required.\n\nBody options:\n- `submission_id`: existing draft/submission id that will own the media asset\n- `media_type`: `image` | `video`\n- `mime_type`: must be in the server allowed list\n- `client_media_id`: enables idempotent reuse\n- `label`, `display_order`: optional metadata\n\nThis call does not attach the file to the submission yet. It only creates the media asset row and returns the upload URL."
               },
               "status": "Created",
               "code": 201,
@@ -6299,7 +6299,7 @@
                     "presign-upload"
                   ]
                 },
-                "description": "Create/reuse presigned upload for image/video evidence.\n\nBody options:\n- `media_type`: `image` | `video`\n- `mime_type`: must be in server allowed list\n- `client_media_id`: enables idempotent reuse\n- `label`, `display_order`: optional metadata"
+                "description": "Create/reuse a presigned upload for image/video evidence.\n\nUse this only after a submission already exists, because `submission_id` is required.\n\nBody options:\n- `submission_id`: existing draft/submission id that will own the media asset\n- `media_type`: `image` | `video`\n- `mime_type`: must be in the server allowed list\n- `client_media_id`: enables idempotent reuse\n- `label`, `display_order`: optional metadata\n\nThis call does not attach the file to the submission yet. It only creates the media asset row and returns the upload URL."
               },
               "status": "OK",
               "code": 200,
@@ -6351,7 +6351,7 @@
                     "presign-upload"
                   ]
                 },
-                "description": "Create/reuse presigned upload for image/video evidence.\n\nBody options:\n- `media_type`: `image` | `video`\n- `mime_type`: must be in server allowed list\n- `client_media_id`: enables idempotent reuse\n- `label`, `display_order`: optional metadata"
+                "description": "Create/reuse a presigned upload for image/video evidence.\n\nUse this only after a submission already exists, because `submission_id` is required.\n\nBody options:\n- `submission_id`: existing draft/submission id that will own the media asset\n- `media_type`: `image` | `video`\n- `mime_type`: must be in the server allowed list\n- `client_media_id`: enables idempotent reuse\n- `label`, `display_order`: optional metadata\n\nThis call does not attach the file to the submission yet. It only creates the media asset row and returns the upload URL."
               },
               "status": "Unprocessable Content",
               "code": 422,
@@ -6403,7 +6403,7 @@
                     "presign-upload"
                   ]
                 },
-                "description": "Create/reuse presigned upload for image/video evidence.\n\nBody options:\n- `media_type`: `image` | `video`\n- `mime_type`: must be in server allowed list\n- `client_media_id`: enables idempotent reuse\n- `label`, `display_order`: optional metadata"
+                "description": "Create/reuse a presigned upload for image/video evidence.\n\nUse this only after a submission already exists, because `submission_id` is required.\n\nBody options:\n- `submission_id`: existing draft/submission id that will own the media asset\n- `media_type`: `image` | `video`\n- `mime_type`: must be in the server allowed list\n- `client_media_id`: enables idempotent reuse\n- `label`, `display_order`: optional metadata\n\nThis call does not attach the file to the submission yet. It only creates the media asset row and returns the upload URL."
               },
               "status": "Unprocessable Content",
               "code": 422,
@@ -6455,7 +6455,7 @@
                     "presign-upload"
                   ]
                 },
-                "description": "Create/reuse presigned upload for image/video evidence.\n\nBody options:\n- `media_type`: `image` | `video`\n- `mime_type`: must be in server allowed list\n- `client_media_id`: enables idempotent reuse\n- `label`, `display_order`: optional metadata"
+                "description": "Create/reuse a presigned upload for image/video evidence.\n\nUse this only after a submission already exists, because `submission_id` is required.\n\nBody options:\n- `submission_id`: existing draft/submission id that will own the media asset\n- `media_type`: `image` | `video`\n- `mime_type`: must be in the server allowed list\n- `client_media_id`: enables idempotent reuse\n- `label`, `display_order`: optional metadata\n\nThis call does not attach the file to the submission yet. It only creates the media asset row and returns the upload URL."
               },
               "status": "Forbidden",
               "code": 403,
@@ -6507,7 +6507,7 @@
                     "presign-upload"
                   ]
                 },
-                "description": "Create/reuse presigned upload for image/video evidence.\n\nBody options:\n- `media_type`: `image` | `video`\n- `mime_type`: must be in server allowed list\n- `client_media_id`: enables idempotent reuse\n- `label`, `display_order`: optional metadata"
+                "description": "Create/reuse a presigned upload for image/video evidence.\n\nUse this only after a submission already exists, because `submission_id` is required.\n\nBody options:\n- `submission_id`: existing draft/submission id that will own the media asset\n- `media_type`: `image` | `video`\n- `mime_type`: must be in the server allowed list\n- `client_media_id`: enables idempotent reuse\n- `label`, `display_order`: optional metadata\n\nThis call does not attach the file to the submission yet. It only creates the media asset row and returns the upload URL."
               },
               "status": "Not Found",
               "code": 404,
@@ -6559,7 +6559,7 @@
                     "presign-upload"
                   ]
                 },
-                "description": "Create/reuse presigned upload for image/video evidence.\n\nBody options:\n- `media_type`: `image` | `video`\n- `mime_type`: must be in server allowed list\n- `client_media_id`: enables idempotent reuse\n- `label`, `display_order`: optional metadata"
+                "description": "Create/reuse a presigned upload for image/video evidence.\n\nUse this only after a submission already exists, because `submission_id` is required.\n\nBody options:\n- `submission_id`: existing draft/submission id that will own the media asset\n- `media_type`: `image` | `video`\n- `mime_type`: must be in the server allowed list\n- `client_media_id`: enables idempotent reuse\n- `label`, `display_order`: optional metadata\n\nThis call does not attach the file to the submission yet. It only creates the media asset row and returns the upload URL."
               },
               "status": "Unauthorized",
               "code": 401,
@@ -6614,7 +6614,7 @@
                 "complete"
               ]
             },
-            "description": "Mark upload as completed and queue media processing job."
+            "description": "Mark upload as completed and queue media processing.\n\nAfter this succeeds, attach the uploaded media asset to the submission with `PUT /mobile/submissions/{submission_id}` using `assets` or `media`."
           },
           "response": [
             {
@@ -6656,7 +6656,7 @@
                     "complete"
                   ]
                 },
-                "description": "Mark upload as completed and queue media processing job."
+                "description": "Mark upload as completed and queue media processing.\n\nAfter this succeeds, attach the uploaded media asset to the submission with `PUT /mobile/submissions/{submission_id}` using `assets` or `media`."
               },
               "status": "OK",
               "code": 200,
@@ -6709,7 +6709,7 @@
                     "complete"
                   ]
                 },
-                "description": "Mark upload as completed and queue media processing job."
+                "description": "Mark upload as completed and queue media processing.\n\nAfter this succeeds, attach the uploaded media asset to the submission with `PUT /mobile/submissions/{submission_id}` using `assets` or `media`."
               },
               "status": "Unprocessable Content",
               "code": 422,
@@ -6762,7 +6762,7 @@
                     "complete"
                   ]
                 },
-                "description": "Mark upload as completed and queue media processing job."
+                "description": "Mark upload as completed and queue media processing.\n\nAfter this succeeds, attach the uploaded media asset to the submission with `PUT /mobile/submissions/{submission_id}` using `assets` or `media`."
               },
               "status": "Forbidden",
               "code": 403,
@@ -6815,7 +6815,7 @@
                     "complete"
                   ]
                 },
-                "description": "Mark upload as completed and queue media processing job."
+                "description": "Mark upload as completed and queue media processing.\n\nAfter this succeeds, attach the uploaded media asset to the submission with `PUT /mobile/submissions/{submission_id}` using `assets` or `media`."
               },
               "status": "Not Found",
               "code": 404,
@@ -6868,7 +6868,7 @@
                     "complete"
                   ]
                 },
-                "description": "Mark upload as completed and queue media processing job."
+                "description": "Mark upload as completed and queue media processing.\n\nAfter this succeeds, attach the uploaded media asset to the submission with `PUT /mobile/submissions/{submission_id}` using `assets` or `media`."
               },
               "status": "Unauthorized",
               "code": 401,
@@ -7683,7 +7683,7 @@
                 "profile"
               ]
             },
-            "description": "Get mobile profile and available gender options."
+            "description": "Get mobile profile, available gender options, and `avatar_url` for the direct image URL."
           },
           "response": [
             {
@@ -7710,7 +7710,7 @@
                     "profile"
                   ]
                 },
-                "description": "Get mobile profile and available gender options."
+                "description": "Get mobile profile, available gender options, and `avatar_url` for the direct image URL."
               },
               "status": "OK",
               "code": 200,
@@ -7748,7 +7748,7 @@
                     "profile"
                   ]
                 },
-                "description": "Get mobile profile and available gender options."
+                "description": "Get mobile profile, available gender options, and `avatar_url` for the direct image URL."
               },
               "status": "Unauthorized",
               "code": 401,
@@ -7786,7 +7786,7 @@
                     "profile"
                   ]
                 },
-                "description": "Get mobile profile and available gender options."
+                "description": "Get mobile profile, available gender options, and `avatar_url` for the direct image URL."
               },
               "status": "Forbidden",
               "code": 403,
@@ -8083,7 +8083,7 @@
                 "avatar"
               ]
             },
-            "description": "Upload profile image using `form-data` key `avatar` (image, max 5MB)."
+            "description": "Upload profile image using `form-data` key `avatar` (image, max 5MB). The response returns `avatar_url`, which should open directly in the browser/app image viewer."
           },
           "response": [
             {
@@ -8121,7 +8121,7 @@
                     "avatar"
                   ]
                 },
-                "description": "Upload profile image using `form-data` key `avatar` (image, max 5MB)."
+                "description": "Upload profile image using `form-data` key `avatar` (image, max 5MB). The response returns `avatar_url`, which should open directly in the browser/app image viewer."
               },
               "status": "OK",
               "code": 200,
@@ -8170,7 +8170,7 @@
                     "avatar"
                   ]
                 },
-                "description": "Upload profile image using `form-data` key `avatar` (image, max 5MB)."
+                "description": "Upload profile image using `form-data` key `avatar` (image, max 5MB). The response returns `avatar_url`, which should open directly in the browser/app image viewer."
               },
               "status": "Unprocessable Content",
               "code": 422,
@@ -8219,7 +8219,7 @@
                     "avatar"
                   ]
                 },
-                "description": "Upload profile image using `form-data` key `avatar` (image, max 5MB)."
+                "description": "Upload profile image using `form-data` key `avatar` (image, max 5MB). The response returns `avatar_url`, which should open directly in the browser/app image viewer."
               },
               "status": "Unauthorized",
               "code": 401,
@@ -8268,7 +8268,7 @@
                     "avatar"
                   ]
                 },
-                "description": "Upload profile image using `form-data` key `avatar` (image, max 5MB)."
+                "description": "Upload profile image using `form-data` key `avatar` (image, max 5MB). The response returns `avatar_url`, which should open directly in the browser/app image viewer."
               },
               "status": "Forbidden",
               "code": 403,

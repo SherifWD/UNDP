@@ -14,7 +14,6 @@ use App\Support\PhoneNumber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Laravel\Sanctum\PersonalAccessToken;
 use Throwable;
@@ -441,8 +440,8 @@ class AuthController extends Controller
             'role' => $user->role,
             'status' => $user->status,
             'preferred_locale' => $user->preferred_locale,
-            'avatar_url' => $user->avatar_path ? Storage::disk('public')->url($user->avatar_path) : null,
-            'image_url' => $user->avatar_path ? Storage::disk('public')->url($user->avatar_path) : null,
+            'avatar_url' => $user->publicAvatarUrl(),
+            'image_url' => $user->publicAvatarUrl(),
             'municipality' => $user->municipality ? [
                 'id' => $user->municipality->id,
                 'name_en' => $user->municipality->name_en,

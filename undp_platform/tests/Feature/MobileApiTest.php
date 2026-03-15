@@ -11,7 +11,9 @@ use App\Models\Submission;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -748,8 +750,13 @@ class MobileApiTest extends TestCase
             ->assertJsonPath('data.flow.steps.1.status_sections.0.status', 'planned')
             ->assertJsonPath('data.flow.steps.1.status_sections.2.status', 'completed')
             ->assertJsonPath('data.flow.steps.1.status_sections.2.fields.1.key', 'activities_started')
+            ->assertJsonPath('data.flow.steps.1.status_sections.2.fields.1.aliases.0', 'activities_workshops_or_training_started')
             ->assertJsonPath('data.available_options.functional_statuses.1.label', 'Operational but needs maintenance')
             ->assertJsonPath('data.available_options.functional_statuses.1.label_ar', 'تشغيلي لكنه يحتاج صيانة')
+            ->assertJsonPath('data.submission_contract.create.path', '/api/mobile/submissions')
+            ->assertJsonPath('data.submission_contract.update.accepted_media_reference_keys.0', 'assets')
+            ->assertJsonPath('data.submission_contract.field_aliases.activities_started.0', 'activities_workshops_or_training_started')
+            ->assertJsonPath('data.submission_contract.media_upload_flow.4.endpoint', 'PUT /api/mobile/submissions/{submission_id}')
             ->assertJsonPath('data.media_limits.images.max_count', 10);
     }
 
@@ -822,7 +829,7 @@ class MobileApiTest extends TestCase
             'mode' => 'submit',
             'project_status' => 'completed',
             'is_project_being_used' => true,
-            'activities_started' => true,
+            'activities_workshops_or_training_started' => true,
             'user_categories' => ['all_of_the_above'],
             'is_used_as_intended' => true,
             'functional_status' => 'fully_functional',
@@ -839,6 +846,42 @@ class MobileApiTest extends TestCase
             ->assertJsonPath('data.submission.data.activities_started', true)
             ->assertJsonPath('data.submission.data.functional_status', 'fully_functional')
             ->assertJsonPath('data.submission.data.user_categories.0', 'all_of_the_above');
+    }
+
+    public function test_mobile_profile_avatar_urls_are_directly_accessible(): void
+    {
+        Storage::fake('public');
+
+        UploadedFile::fake()
+            ->image('avatar-test.jpg')
+            ->storeAs('mobile/avatars', 'avatar-test.jpg', 'public');
+
+        $municipality = Municipality::query()->create([
+            'name_en' => 'Alkufraa',
+            'name_ar' => 'الكفرة',
+            'code' => 'ALK',
+        ]);
+
+        $reporter = User::factory()->create([
+            'role' => UserRole::REPORTER->value,
+            'municipality_id' => $municipality->id,
+            'status' => 'active',
+            'avatar_path' => 'mobile/avatars/avatar-test.jpg',
+        ]);
+
+        Sanctum::actingAs($reporter);
+
+        $profileResponse = $this->getJson('/api/mobile/profile');
+
+        $profileResponse
+            ->assertOk()
+            ->assertJsonPath('data.profile.avatar_url', url('/storage/mobile/avatars/avatar-test.jpg'));
+
+        $imageResponse = $this->get('/storage/mobile/avatars/avatar-test.jpg');
+
+        $imageResponse
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/jpeg');
     }
 
     public function test_reporter_can_list_and_remove_submission_media(): void

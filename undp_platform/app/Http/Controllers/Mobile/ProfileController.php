@@ -99,7 +99,7 @@ class ProfileController extends MobileController
                 default => null,
             },
             'preferred_locale' => $user->preferred_locale,
-            'avatar_url' => $user->avatar_path ? Storage::disk('public')->url($user->avatar_path) : null,
+            'avatar_url' => $user->publicAvatarUrl(),
             'municipality' => $user->municipality ? [
                 'id' => $user->municipality->id,
                 'name' => $user->municipality->name,
