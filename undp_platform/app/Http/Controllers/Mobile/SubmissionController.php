@@ -19,10 +19,6 @@ use Illuminate\Validation\Rule;
 
 class SubmissionController extends MobileController
 {
-    private const ACTIVITIES_STARTED_ALIASES = [
-        'activities_workshops_or_training_started',
-    ];
-
     public function index(Request $request): JsonResponse
     {
         $statusFilterOptions = array_merge(SubmissionStatus::values(), ['rework']);
@@ -40,7 +36,7 @@ class SubmissionController extends MobileController
             return $this->returnValidationError($validator);
         }
 
-        $validated = $this->normalizeSubmissionPayload($validator->validated());
+        $validated = $validator->validated();
         $query = Submission::query()
             ->with(['project.municipality', 'reporter'])
             ->latest('updated_at');
@@ -120,7 +116,7 @@ class SubmissionController extends MobileController
             return $this->returnValidationError($validator);
         }
 
-        $validated = $this->normalizeSubmissionPayload($validator->validated());
+        $validated = $validator->validated();
 
         if (! empty($validated['client_uuid'])) {
             $existing = Submission::query()
@@ -164,7 +160,7 @@ class SubmissionController extends MobileController
             return $this->returnValidationError($validator);
         }
 
-        return $this->persistSubmission($request, $this->normalizeSubmissionPayload($validator->validated()), $submission);
+        return $this->persistSubmission($request, $validator->validated(), $submission);
     }
 
     public function show(Request $request, Submission $submission): JsonResponse
@@ -311,7 +307,6 @@ class SubmissionController extends MobileController
             'additional_observations' => ['nullable', 'string', 'max:5000'],
             'is_project_being_used' => ['nullable', 'boolean'],
             'activities_started' => ['nullable', 'boolean'],
-            'activities_workshops_or_training_started' => ['nullable', 'boolean'],
             'user_categories' => ['nullable', 'array'],
             'user_categories.*' => ['string', Rule::in(array_keys(config('mobile.reporting.user_categories', [])))],
             'is_used_as_intended' => ['nullable', 'boolean'],
@@ -347,7 +342,7 @@ class SubmissionController extends MobileController
         $validator = Validator::make($request->all(), $rules);
 
         $validator->after(function ($validator) use ($request, $creating): void {
-            $input = $this->normalizeSubmissionPayload($validator->safe()->all());
+            $input = $validator->safe()->all();
             $routeSubmission = $request->route('submission');
             $mode = $this->resolveSubmissionMode(
                 is_string($input['mode'] ?? null) ? $input['mode'] : null,
@@ -613,20 +608,6 @@ class SubmissionController extends MobileController
         ];
 
         return $this->pruneStatusSpecificData($data);
-    }
-
-    private function normalizeSubmissionPayload(array $payload): array
-    {
-        if (! array_key_exists('activities_started', $payload)) {
-            foreach (self::ACTIVITIES_STARTED_ALIASES as $alias) {
-                if (array_key_exists($alias, $payload)) {
-                    $payload['activities_started'] = $payload[$alias];
-                    break;
-                }
-            }
-        }
-
-        return $payload;
     }
 
     private function valueFromPayload(array $validated, array $existing, string $key, mixed $fallback = null): mixed
