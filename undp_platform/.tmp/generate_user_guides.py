@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import date
 from pathlib import Path
 from html import escape
 from shutil import copy2
@@ -16,6 +17,7 @@ PUBLIC_SHOTS = PUBLIC / 'screenshots'
 DOCX_OUT = DOCS / 'UNDP_Platform_User_Guide.docx'
 HTML_DOCS_OUT = DOCS / 'UNDP_Platform_User_Guide.html'
 HTML_PUBLIC_OUT = PUBLIC / 'UNDP_Platform_User_Guide.html'
+GENERATED_ON = date.today().strftime('%d %B %Y')
 
 PUBLIC_SHOTS.mkdir(parents=True, exist_ok=True)
 for img in SHOTS.glob('*.png'):
@@ -25,10 +27,10 @@ roles_table = {
     'headers': ['Role', 'Main Responsibility', 'Primary Screens'],
     'rows': [
         ['Reporter', 'Creates and tracks field submissions.', 'Dashboard, Projects, Project Submissions (scoped), own submission detail'],
-        ['Municipal Focal Point', 'Validates municipality evidence and monitors scoped KPIs.', 'Dashboard, Validation Worklist, Reports & Map, Project Submissions'],
-        ['UNDP Admin', 'Full platform administration and oversight.', 'All pages except partner-only dashboard'],
+        ['Municipal Focal Point', 'Validates municipality evidence, reviews scoped submissions, and monitors municipality KPIs.', 'Dashboard, Validation Worklist, Submission Detail, Project Submissions, Municipal Overview, KPI & Geo Reports'],
+        ['UNDP Admin', 'Full platform administration, donor funding review, and system oversight.', 'Dashboard, Projects, Project Detail, Users, Audit Log, Settings, KPI & Geo Reports, Municipal Overview'],
         ['Auditor', 'Reviews immutable activity history.', 'Audit Log, exports, reporting'],
-        ['Partner / Donor Viewer', 'Reads approved aggregated information only.', 'Partner dashboard and approved reporting views'],
+        ['Partner / Donor Viewer', 'Reads approved aggregated information and submits project funding requests.', 'Partner dashboard, Projects, Project Detail, Funding Request modal, approved reporting views'],
     ],
 }
 
@@ -36,8 +38,9 @@ crud_table = {
     'headers': ['Module', 'Create', 'Read', 'Update', 'Delete / Archive'],
     'rows': [
         ['Municipalities', 'Web UI supports create via Projects page modal.', 'Visible in filters, tabs, dashboard selectors, and overview screens.', 'API supports update; dedicated web edit screen is not currently exposed.', 'Delete is not implemented in the current web UI/API surface.'],
-        ['Projects', 'Web UI supports create.', 'Web UI supports list and detail modal.', 'Web UI supports edit.', 'Delete is not implemented in the current web UI/API surface.'],
+        ['Projects', 'Web UI supports create.', 'Web UI supports list and detail modal.', 'Web UI supports edit.', 'Web UI supports delete from the project detail modal for authorized admins.'],
         ['Submissions', 'Creation is handled by the mobile app / API flow, not by the current admin web UI.', 'Web UI supports list, project list, worklist, and detail view.', 'Status transitions (approve / rework / reject) are supported; direct content editing is not exposed in the web UI.', 'Delete is not implemented in the current web UI/API surface.'],
+        ['Funding Requests', 'Donor users can create requests from the Projects table and project detail modal.', 'Donors can read their project request history; admins can review all requests in Projects and KPI & Geo Reports.', 'Admins can approve or decline with a mandatory review reason.', 'Delete is not exposed; keep the audited decision history instead.'],
         ['Users', 'Web UI supports create.', 'Web UI supports list and audit lookups.', 'Web UI supports role / municipality / profile updates and status toggling.', 'Hard delete is not implemented; use disable / enable instead.'],
         ['Audit Logs', 'System-generated only.', 'Web UI supports list and entry detail.', 'Immutable by design.', 'Not allowed.'],
         ['Settings', 'System settings record is created automatically on first access.', 'Web UI supports full read.', 'Web UI supports save / reset by tab.', 'Not allowed.'],
@@ -49,10 +52,10 @@ entries = [
         'anchor': 'section-1',
         'title': '1. Guide Scope and Navigation',
         'paragraphs': [
-            'This guide covers the currently implemented web dashboard, validation screens, reporting screens, user administration, settings, and the API surface used by the mobile application. It is written against the live codebase and the current seeded dataset.',
+            'This guide covers the currently implemented web dashboard, donor funding flow, focal-point validation flow, reporting screens, user administration, settings, and the API surface used by the mobile application. It is written against the live codebase and the current seeded dataset.',
             'The cover page works as a clickable table of contents. In the HTML guide, each link jumps directly to the relevant section. In the Word guide, the same numbering and internal bookmarks are preserved.',
         ],
-        'callouts': [('notice', 'All walkthroughs below reflect the current implementation. Where a full CRUD action is not exposed in the web UI, the guide states that explicitly instead of implying functionality that does not exist.')],
+        'callouts': [('notice', 'All walkthroughs below reflect the current implementation. Admin, Donor, and Municipal Focal Point journeys are documented with refreshed screenshots from the live dashboard instead of older generic placeholders.')],
     },
     {
         'anchor': 'section-2',
@@ -63,7 +66,7 @@ entries = [
     {
         'anchor': 'section-3',
         'title': '3. Workflow and Status Lifecycle',
-        'paragraphs': ['Every evidence item moves through a defined lifecycle. Review actions are audited and cannot be silently altered.'],
+        'paragraphs': ['Every evidence item and donor funding request moves through a defined lifecycle. Review actions are audited and cannot be silently altered.'],
         'subsections': [
             {
                 'anchor': 'section-3-1',
@@ -75,12 +78,17 @@ entries = [
                 'title': '3.2 Operational Stages',
                 'numbered': ['Authenticate', 'Navigate to the target project or work queue', 'Open the target record', 'Perform review or administration action', 'Verify result in audit / reporting surfaces'],
             },
+            {
+                'anchor': 'section-3-3',
+                'title': '3.3 Funding Request Statuses',
+                'numbered': ['Pending Review', 'Approved', 'Declined'],
+            },
         ],
     },
     {
         'anchor': 'section-4',
         'title': '4. CRUD Availability Matrix',
-        'paragraphs': ['The platform does not expose hard delete for most core records. Use this matrix as the authoritative reference when training users.'],
+        'paragraphs': ['The platform still restricts hard delete for most core records, but projects and funding requests now have clearer operational paths in the web dashboard. Use this matrix as the authoritative reference when training users.'],
         'table': crud_table,
     },
     {
@@ -131,8 +139,8 @@ entries = [
     },
     {
         'anchor': 'section-6',
-        'title': '6. Dashboard Module',
-        'paragraphs': ['The dashboard combines KPIs with a municipality and project workspace. This is the main landing page for most authenticated users.'],
+        'title': '6. Admin Dashboard Module',
+        'paragraphs': ['The Home dashboard combines KPIs with a municipality and project workspace. This is the main landing page for internal dashboard users such as UNDP Admin and other non-partner staff.', 'Partner / Donor users are redirected to the read-only partner dashboard after login, while Municipal Focal Point users rely on Validation Worklist and Municipal Overview for their main operational journey.'],
         'subsections': [
             {
                 'anchor': 'section-6-1',
@@ -156,7 +164,7 @@ entries = [
                     'Use the Municipality dropdown to scope the map and project list. Leaving it on All Municipalities keeps the full scoped dataset visible.',
                     'Use Search projects to filter the visible project rail by name or reference.',
                     'Review the map markers and the live project count in the right rail.',
-                    'Select a project card to drill into the detail pane.',
+                    'Select a project card to drill into the detail pane and inspect project-specific counts before leaving the dashboard.',
                 ],
                 'images': [
                     ('03-dashboard.png', 'Dashboard workspace in its default wide state'),
@@ -173,7 +181,7 @@ entries = [
                     'Choose priority, area, and status as needed.',
                     'Click Apply to update the project rail and map focus.',
                     'Click Reset to clear only the dashboard-side project filters.',
-                    'After opening a project, use Go to Submission to move directly into the project-specific submission page.',
+                    'After opening a project, use Go to Submission to move directly into the project-specific submission page for deeper review.',
                 ],
                 'images': [
                     ('12-dashboard-filter-panel.png', 'Dashboard filter panel open'),
@@ -220,18 +228,19 @@ entries = [
     {
         'anchor': 'section-8',
         'title': '8. Project Management',
-        'paragraphs': ['Projects are the core container for reporting. The web UI supports create, list, detail, and edit flows.'],
+        'paragraphs': ['Projects are the core container for reporting and donor funding activity. The web UI now supports create, list, detail, edit, delete, and donor funding-request entry points depending on role.'],
         'subsections': [
             {
                 'anchor': 'section-8-1',
                 'title': '8.1 Browse the Project Registry',
                 'purpose': 'Read project rows and key metrics.',
-                'buttons': ['Search', 'Status filter', 'Municipality tabs', 'View Submission', 'Edit'],
+                'buttons': ['Search', 'Status filter', 'Municipality tabs', 'Request to Fund', 'View Submissions', 'Edit'],
                 'steps': [
                     'Open Projects from the sidebar.',
                     'Use search and status filter to narrow the rows.',
                     'Use municipality tabs to limit the table to one municipality.',
-                    'Review approved submissions, pending submissions, progress, and current status directly in the table.',
+                    'Review approved submissions, pending submissions, progress, current execution status, and funding request summary directly in the table.',
+                    'If you are logged in as a donor, use the Request to Fund button directly in the row to start a funding request without opening the project first.',
                 ],
                 'images': [('04-projects.png', 'Projects registry table')],
             },
@@ -251,11 +260,12 @@ entries = [
             {
                 'anchor': 'section-8-3',
                 'title': '8.3 View Project Details',
-                'purpose': 'Open the project detail modal for a full read-only summary.',
+                'purpose': 'Open the project detail modal for the full operational summary.',
                 'steps': [
                     'Click any project row in the Projects table.',
-                    'Review the project status, municipality, last update, location, description, progress, and submission stats.',
+                    'Review the project status, municipality, last update, location, description, progress, funding information, and submission stats.',
                     'Use Go to Submissions to jump to the project-specific submission page.',
+                    'If you are a donor, scroll to the Project Funding Requests section to inspect request history and use the in-detail request button.',
                 ],
                 'images': [('14-project-detail-modal.png', 'Project detail modal opened from the project registry')],
             },
@@ -273,12 +283,42 @@ entries = [
             },
             {
                 'anchor': 'section-8-5',
-                'title': '8.5 Project Deletion and Archiving Note',
-                'purpose': 'Clarify current limitations.',
+                'title': '8.5 Donor Request to Fund from the Projects Table',
+                'purpose': 'Submit a funding request from the fastest entry point in the donor journey.',
                 'steps': [
-                    'The current implementation does not expose a project delete action.',
-                    'Use the status field to switch between active and archived where appropriate.',
-                    'If a true deletion policy is needed, it must be added deliberately with audit controls first.',
+                    'Log in as a Partner / Donor Viewer and open Projects.',
+                    'Locate the target project row and review the funding summary column.',
+                    'Click Request to Fund in that row.',
+                    'Enter the requested amount and optional donor note, then submit the modal.',
+                    'The new request appears in project-level history and becomes available to admin review.',
+                ],
+                'images': [('30-donor-projects-request-button.png', 'Donor project table showing the row-level Request to Fund action')],
+            },
+            {
+                'anchor': 'section-8-6',
+                'title': '8.6 Donor Request to Fund from Project Detail',
+                'purpose': 'Submit or review funding requests inside the project detail modal.',
+                'steps': [
+                    'Open the target project row to load the detail modal.',
+                    'Scroll to the Project Funding Requests section.',
+                    'Review total requested amount, pending count, approved / declined count, and prior donor request reasons.',
+                    'Click Request to Fund This Project to open the funding modal from inside the detail view.',
+                ],
+                'images': [
+                    ('31-donor-project-detail-funding.png', 'Donor project detail showing the Project Funding Requests section'),
+                    ('32-donor-funding-request-modal.png', 'Donor funding request modal opened from project detail'),
+                ],
+            },
+            {
+                'anchor': 'section-8-7',
+                'title': '8.7 Delete a Project',
+                'purpose': 'Remove a project and its dependent assignments when you have admin permission.',
+                'steps': [
+                    'Open the project detail modal as a UNDP Admin.',
+                    'Click Delete in the modal header.',
+                    'Read the confirmation warning carefully because related submissions and assignments are removed with the project.',
+                    'Confirm the browser dialog to complete the deletion.',
+                    'Verify the project row disappears from the registry after reload.',
                 ],
             },
         ],
@@ -342,29 +382,51 @@ entries = [
     {
         'anchor': 'section-10',
         'title': '10. Validation Worklist',
-        'paragraphs': ['The validation worklist is the queue used by validators and municipal focal points to process pending items efficiently.'],
-        'buttons': ['Search', 'Sort', 'Project filter', 'Status filter', 'Date filters', 'Apply', 'Reset'],
+        'paragraphs': ['The validation worklist is the main Municipal Focal Point queue. It is scoped to the assigned municipality and keeps pending review work visible without exposing unrelated submissions.'],
+        'buttons': ['Newest', 'Oldest', 'By Project', 'Search', 'Status filter', 'Project filter', 'Date filters', 'Apply', 'Reset', 'Review'],
         'steps': [
-            'Open Submissions from the sidebar (the route maps to the validation worklist).',
-            'Filter the queue by project, status, or date as needed.',
-            'Open the target item to move into the Submission Detail page.',
-            'Complete the review action there, then return to the queue for the next item.',
+            'Open Validation Worklist from the sidebar.',
+            'Confirm the municipality scope banner at the top of the page.',
+            'Use sorting, project, status, and date filters to isolate the queue you need.',
+            'Click Review on the target row to open Submission Detail.',
+            'Approve, request rework, or reject the submission, then return to the queue for the next item.',
         ],
-        'images': [('06-validation.png', 'Validation worklist used to process pending submissions')],
+        'images': [('06-validation.png', 'Municipal Focal Point validation worklist with scoped pending submissions')],
     },
     {
         'anchor': 'section-11',
-        'title': '11. Reports & Map',
-        'paragraphs': ['Reports & Map is the system-level analysis surface. It combines charts, trend blocks, and a spatial data view with export actions.'],
-        'buttons': ['Date From', 'Date To', 'Municipality filter', 'Project filter', 'Status filter', 'Apply', 'Reset Filters', 'Export CSV', 'Export PDF', 'Full Screen Map'],
-        'steps': [
-            'Open Reports & Map from the sidebar.',
-            'Set the date range and optional municipality/project/status filters.',
-            'Click Apply to refresh the chart cards and map.',
-            'Use chart segments and map markers for drill-down analysis.',
-            'Use Export CSV or Export PDF to generate the current filtered output.',
+        'title': '11. KPI & Geo Reports',
+        'paragraphs': ['KPI & Geo Reports is the main analytics surface for dashboard roles that can access reporting. It combines richer KPI cards, municipality and project breakdowns, trend charts, backlog aging, funding charts, export actions, and the interactive map.'],
+        'subsections': [
+            {
+                'anchor': 'section-11-1',
+                'title': '11.1 Analytics, Filters, and Map',
+                'purpose': 'Review system-wide or scoped analytics before exporting or drilling into details.',
+                'buttons': ['Date From', 'Date To', 'Municipality filter', 'Project filter', 'Status filter', 'Report type', 'Apply', 'Reset Filters', 'Export CSV', 'Export PDF', 'Download', 'Full Screen Map'],
+                'steps': [
+                    'Open KPI & Geo Reports from the sidebar.',
+                    'Set the date range and optional municipality, project, status, and report-type filters.',
+                    'Click Apply to refresh KPI cards, status analytics, backlog aging, municipality and project breakdowns, trend charts, funding overview, and the map.',
+                    'Use chart segments or the interactive map to explain system performance during review meetings or exports.',
+                    'Use Export CSV or Export PDF to generate the current filtered output when your role has export permission.',
+                ],
+                'images': [('10-reports-map.png', 'KPI & Geo Reports analytics page with charts, filters, and map')],
+            },
+            {
+                'anchor': 'section-11-2',
+                'title': '11.2 Admin Funding Request Review',
+                'purpose': 'Approve or decline donor funding requests with a mandatory review reason.',
+                'buttons': ['Pending Review filter', 'Approved filter', 'Declined filter', 'Refresh Requests', 'Approve', 'Decline'],
+                'steps': [
+                    'Scroll to Funding Requests Review (Admin) in the reports page.',
+                    'Keep the filter on Pending Review to work the active donor queue first.',
+                    'Read the project, municipality, donor, amount, request reason, and requested timestamp.',
+                    'Enter the review reason in the text area.',
+                    'Click Approve or Decline. The request status, review timestamp, and funding charts refresh after the decision.',
+                ],
+                'images': [('33-admin-reports-funding-review.png', 'Admin funding request review section inside KPI & Geo Reports')],
+            },
         ],
-        'images': [('10-reports-map.png', 'Reports & Map analytics page')],
     },
     {
         'anchor': 'section-12',
@@ -520,22 +582,35 @@ entries = [
     },
     {
         'anchor': 'section-15',
-        'title': '15. Municipal Overview and Access Control',
-        'paragraphs': ['These screens are not used by every role, but they are part of the current implementation and should be included in training.'],
+        'title': '15. Role-Specific Dashboards and Access Control',
+        'paragraphs': ['These screens complete the main Admin, Donor, and Municipal Focal Point dashboard journeys. Include them in training because they explain where each role lands and what they can access.'],
         'subsections': [
             {
                 'anchor': 'section-15-1',
                 'title': '15.1 Municipal Overview (/municipal-overview)',
                 'purpose': 'Inspect scoped municipal analytics and operational summaries.',
                 'steps': [
-                    'Open the route directly or through internal navigation where applicable.',
-                    'Use it as a scoped overview for municipality-level performance checks.',
+                    'Open Municipal Overview as a Municipal Focal Point or an admin with municipality dashboard access.',
+                    'Use the municipality selector, search field, and status legend to scope the view.',
+                    'Review KPI cards, the municipal status donut, and the project list with direct links to project details.',
                 ],
-                'images': [('27-municipal-overview.png', 'Municipal Overview page')],
+                'images': [('27-municipal-overview.png', 'Municipal Overview page for municipality-scoped dashboard users')],
             },
             {
                 'anchor': 'section-15-2',
-                'title': '15.2 Access Denied (/access-denied)',
+                'title': '15.2 Partner / Donor Read-Only Dashboard (/partner-dashboard)',
+                'purpose': 'Explain the donor landing page and its approved-data-only analytics.',
+                'steps': [
+                    'After login, partner-only users are redirected here instead of the internal home dashboard.',
+                    'Use date, municipality, project, and search filters to review approved aggregated data.',
+                    'Review the My Funding Requests chart, approved submission breakdowns, municipality bars, project bars, and approved trend.',
+                    'Export approved data if CSV or PDF access is enabled for that donor role.',
+                ],
+                'images': [('29-partner-dashboard.png', 'Partner / Donor read-only dashboard with approved-data KPIs and funding request summary')],
+            },
+            {
+                'anchor': 'section-15-3',
+                'title': '15.3 Access Denied (/access-denied)',
                 'purpose': 'Explain what users see when a route is blocked by RBAC.',
                 'steps': [
                     'If a user attempts to open a route without the required permission, the router redirects to Access Denied.',
@@ -554,7 +629,7 @@ entries = [
             'Recommended first mobile flow: request OTP, verify OTP, call /auth/me, load municipalities, load scoped projects, create submissions via the API, upload media via presign/complete, then poll the user submission list for status changes.',
         ],
         'bullets': [
-            'Collection: docs/postman/UNDP_Mobile_API.postman_collection.json',
+            'Collection: docs/postman/UNDP Mobile API.postman_collection.json',
             'Environment: docs/postman/UNDP_Mobile_API_Local.postman_environment.json',
             'Base URL (local): http://127.0.0.1:8000/api',
         ],
@@ -568,7 +643,7 @@ entries = [
             'Word guide: docs/UNDP_Platform_User_Guide.docx',
             'Screenshots (docs): docs/screenshots/*.png',
             'Screenshots (public): public/screenshots/*.png',
-            'Postman collection: docs/postman/UNDP_Mobile_API.postman_collection.json',
+            'Postman collection: docs/postman/UNDP Mobile API.postman_collection.json',
         ],
     },
 ]
@@ -691,8 +766,8 @@ html_parts = [
     '<div class="cover" id="top">',
     '<h1>UNDP Platform User Guide and User Manual</h1>',
     '<p><strong>Platform:</strong> UNDP Monitoring / Validation Platform (Web Dashboard, APIs, and Mobile Integration Surface)</p>',
-    '<p><strong>Generated from current codebase:</strong> 27 February 2026</p>',
-    '<p>This edition adds expanded CRUD walkthroughs, implementation notes, real screenshots captured from the running local application, and explicit notes wherever a capability is API-only or intentionally not exposed in the current web UI.</p>',
+    f'<p><strong>Generated from current codebase:</strong> {escape(GENERATED_ON)}</p>',
+    '<p>This edition refreshes the Admin, Donor, and Municipal Focal Point journeys with current screenshots, updated donor funding-request walkthroughs, and explicit notes wherever a capability is API-only or intentionally not exposed in the current web UI.</p>',
     '<h2>Guide Contents</h2>',
     toc_html,
     '</div>',
@@ -839,7 +914,7 @@ rt = title.add_run('UNDP Platform User Guide and User Manual')
 rt.bold = True
 rt.font.name = 'Arial'
 rt.font.size = Pt(22)
-subtitle = doc.add_paragraph('Expanded operational guide with CRUD walkthroughs, module notes, and live screenshots.')
+subtitle = doc.add_paragraph('Role-based operational guide with refreshed Admin, Donor, and Municipal Focal Point screenshots.')
 subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
 cover_toc_heading = add_heading(1, 'Guide Contents', 'top')
 for label, anchor, _level in toc_items:

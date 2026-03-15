@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import AppShell from '../components/AppShell.vue';
 import api from '../api';
 import { useAuthStore } from '../stores/auth';
@@ -10,6 +11,7 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const ui = useUiStore();
+const { t } = useI18n();
 
 const loading = ref(false);
 const exporting = ref(false);
@@ -117,7 +119,7 @@ const loadPage = async (page = pagination.current_page) => {
             loadSubmissions(page),
         ]);
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to load project submissions.';
+        error.value = err.response?.data?.message || t('projectSubmissions.unableToLoad');
         project.value = null;
         submissions.value = [];
     } finally {
@@ -132,7 +134,7 @@ const loadSubmissionPage = async (page = pagination.current_page) => {
     try {
         await loadSubmissions(page);
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to load project submissions.';
+        error.value = err.response?.data?.message || t('projectSubmissions.unableToLoad');
         submissions.value = [];
     } finally {
         loading.value = false;
@@ -191,7 +193,7 @@ const exportCsv = async () => {
 
         downloadBlob(response, `project-${route.params.id}-submissions.csv`);
     } catch (err) {
-        ui.pushToast(err.response?.data?.message || 'Unable to export CSV.', 'error');
+        ui.pushToast(err.response?.data?.message || t('projectSubmissions.unableToExportCsv'), 'error');
     } finally {
         exporting.value = false;
     }
@@ -214,7 +216,7 @@ const exportPdf = async () => {
 
         downloadBlob(response, `project-${route.params.id}-summary.pdf`);
     } catch (err) {
-        ui.pushToast(err.response?.data?.message || 'Unable to export PDF.', 'error');
+        ui.pushToast(err.response?.data?.message || t('projectSubmissions.unableToExportPdf'), 'error');
     } finally {
         exporting.value = false;
     }
@@ -256,12 +258,12 @@ onBeforeUnmount(() => {
                 <div class="tracky-project-flow__title">
                     <button class="tracky-btn tracky-btn--ghost" type="button" @click="goBack">←</button>
                     <div>
-                        <h2>{{ project?.name || 'Project' }}</h2>
-                        <p>{{ project ? `ID:${project.id}` : 'Loading project...' }}</p>
+                        <h2>{{ project?.name || t('projectSubmissions.projectFallback') }}</h2>
+                        <p>{{ project ? `ID:${project.id}` : t('projectSubmissions.loadingProject') }}</p>
                         <p v-if="project" class="tracky-subtle">
-                            Project Status:
+                            {{ t('projectSubmissions.projectStatus') }}:
                             <span class="badge" :class="project.status === 'active' ? 'badge--active' : 'badge--archived'">
-                                {{ project.status === 'active' ? 'Active' : 'Archived' }}
+                                {{ project.status === 'active' ? t('statusLabels.active') : t('statusLabels.archived') }}
                             </span>
                         </p>
                     </div>
@@ -269,16 +271,16 @@ onBeforeUnmount(() => {
 
                 <div class="tracky-project-flow__actions">
                     <select v-model="filters.status">
-                        <option value="">All status</option>
-                        <option value="submitted">Submitted</option>
-                        <option value="under_review">Under Review</option>
-                        <option value="approved">Approved</option>
-                        <option value="rework_requested">Rework Requested</option>
-                        <option value="rejected">Rejected</option>
+                        <option value="">{{ t('projectSubmissions.allStatus') }}</option>
+                        <option value="submitted">{{ t('statusLabels.submitted') }}</option>
+                        <option value="under_review">{{ t('statusLabels.under_review') }}</option>
+                        <option value="approved">{{ t('statusLabels.approved') }}</option>
+                        <option value="rework_requested">{{ t('statusLabels.rework_requested') }}</option>
+                        <option value="rejected">{{ t('statusLabels.rejected') }}</option>
                     </select>
-                    <input v-model="filters.search" type="text" placeholder="Search submissions">
-                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="exporting || !canExportCsv" @click="exportCsv">Export CSV</button>
-                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="exporting || !canExportPdf" @click="exportPdf">Export PDF</button>
+                    <input v-model="filters.search" type="text" :placeholder="t('projectSubmissions.searchPlaceholder')">
+                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="exporting || !canExportCsv" @click="exportCsv">{{ t('projectSubmissions.exportCsv') }}</button>
+                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="exporting || !canExportPdf" @click="exportPdf">{{ t('projectSubmissions.exportPdf') }}</button>
                 </div>
             </header>
 
@@ -286,7 +288,7 @@ onBeforeUnmount(() => {
 
             <section class="tracky-project-kpis" v-if="project">
                 <article class="tracky-card tracky-kpi-panel">
-                    <h3>Submissions Overview</h3>
+                    <h3>{{ t('projectSubmissions.submissionsOverview') }}</h3>
                     <p class="tracky-kpi-panel__value">{{ project.stats?.total_submissions || 0 }}</p>
                     <div class="tracky-kpi-panel__bars">
                         <span :style="{ width: `${statusBreakdown.approvedPercent}%`, background: '#2B8AF0' }"></span>
@@ -294,41 +296,41 @@ onBeforeUnmount(() => {
                         <span :style="{ width: `${statusBreakdown.rejectedPercent}%`, background: '#7F1A8E' }"></span>
                     </div>
                     <div class="tracky-kpi-panel__legend">
-                        <span>Approved {{ project.stats?.approved_submissions || 0 }}</span>
-                        <span>Pending {{ project.stats?.pending_submissions || 0 }}</span>
-                        <span>Rejected {{ project.stats?.rejected_submissions || 0 }}</span>
+                        <span>{{ t('projectSubmissions.submissionsOverviewLegendApproved', { count: project.stats?.approved_submissions || 0 }) }}</span>
+                        <span>{{ t('projectSubmissions.submissionsOverviewLegendPending', { count: project.stats?.pending_submissions || 0 }) }}</span>
+                        <span>{{ t('projectSubmissions.submissionsOverviewLegendRejected', { count: project.stats?.rejected_submissions || 0 }) }}</span>
                     </div>
-                    <span class="badge badge--active">{{ project.stats?.active_reporters || 0 }} Active Reporters</span>
+                    <span class="badge badge--active">{{ t('projectSubmissions.activeReporters', { count: project.stats?.active_reporters || 0 }) }}</span>
                 </article>
 
                 <article class="tracky-card tracky-kpi-panel">
-                    <h3>Pending Actions</h3>
+                    <h3>{{ t('projectSubmissions.pendingActions') }}</h3>
                     <p class="tracky-kpi-panel__value">{{ project.stats?.pending_submissions || 0 }}</p>
                     <div class="tracky-progress">
                         <div class="tracky-progress__bar" :style="{ width: `${Math.min(100, (project.stats?.pending_submissions || 0) * 8)}%` }"></div>
                     </div>
-                    <p class="tracky-subtle">Requires review before the next reporting cycle.</p>
+                    <p class="tracky-subtle">{{ t('projectSubmissions.pendingActionsHint') }}</p>
                 </article>
 
                 <article class="tracky-card tracky-kpi-panel">
-                    <h3>Evidence Coverage</h3>
+                    <h3>{{ t('projectSubmissions.evidenceCoverage') }}</h3>
                     <p class="tracky-kpi-panel__value">{{ coveragePercent }}%</p>
-                    <p class="tracky-subtle">{{ project.stats?.media_attachments || 0 }} attachments linked to this project's submissions.</p>
+                    <p class="tracky-subtle">{{ t('projectSubmissions.evidenceCoverageHint', { count: project.stats?.media_attachments || 0 }) }}</p>
                 </article>
             </section>
 
             <section class="tracky-card tracky-project-flow__table-wrap">
-                <div class="tracky-projects__empty" v-if="loading">Loading project submissions...</div>
+                <div class="tracky-projects__empty" v-if="loading">{{ t('projectSubmissions.loadingSubmissions') }}</div>
 
                 <table class="tracky-projects-table" v-else-if="submissionRows.length">
                     <thead>
                     <tr>
-                        <th>Project Reference</th>
-                        <th>Report Type</th>
-                        <th>Region</th>
-                        <th>Media Attachments</th>
-                        <th>Status</th>
-                        <th>Actions</th>
+                        <th>{{ t('common.reference') }}</th>
+                        <th>{{ t('projectSubmissions.reportType') }}</th>
+                        <th>{{ t('projectSubmissions.region') }}</th>
+                        <th>{{ t('projectSubmissions.mediaAttachments') }}</th>
+                        <th>{{ t('common.status') }}</th>
+                        <th>{{ t('common.actions') }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -343,7 +345,7 @@ onBeforeUnmount(() => {
                         <td>{{ submission.reporter?.name || `#${submission.id}` }}</td>
                         <td>{{ submission.title }}</td>
                         <td>{{ submission.municipality?.name || '-' }}</td>
-                        <td>{{ mediaCount(submission) }} Attachments</td>
+                        <td>{{ t('projectSubmissions.attachmentsCount', { count: mediaCount(submission) }) }}</td>
                         <td>
                             <span class="badge" :class="submission.status === 'approved' ? 'badge--active' : 'badge--archived'">
                                 {{ submission.status_label }}
@@ -351,7 +353,7 @@ onBeforeUnmount(() => {
                         </td>
                         <td>
                             <button class="tracky-btn tracky-btn--ghost" type="button" @click.stop="openSubmission(submission)">
-                                View Details
+                                {{ t('projectSubmissions.viewDetails') }}
                             </button>
                         </td>
                     </tr>
@@ -359,15 +361,15 @@ onBeforeUnmount(() => {
                 </table>
 
                 <div class="tracky-projects__empty" v-else>
-                    <h3>No submissions found.</h3>
-                    <p>This project has no submissions in the current filter scope.</p>
+                    <h3>{{ t('projectSubmissions.noSubmissionsTitle') }}</h3>
+                    <p>{{ t('projectSubmissions.noSubmissionsBody') }}</p>
                 </div>
             </section>
 
             <footer class="tracky-projects__pagination" v-if="!loading && pagination.last_page > 1">
-                <p>Page {{ pagination.current_page }} of {{ pagination.last_page }}</p>
+                <p>{{ t('common.page', { page: pagination.current_page, total: pagination.last_page }) }}</p>
                 <div class="tracky-page-buttons">
-                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.current_page <= 1" @click="goToPage(pagination.current_page - 1)">Prev</button>
+                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.current_page <= 1" @click="goToPage(pagination.current_page - 1)">{{ t('common.previous') }}</button>
                     <button
                         v-for="page in visiblePages"
                         :key="page"
@@ -377,7 +379,7 @@ onBeforeUnmount(() => {
                     >
                         {{ page }}
                     </button>
-                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.current_page >= pagination.last_page" @click="goToPage(pagination.current_page + 1)">Next</button>
+                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.current_page >= pagination.last_page" @click="goToPage(pagination.current_page + 1)">{{ t('common.next') }}</button>
                 </div>
             </footer>
         </section>

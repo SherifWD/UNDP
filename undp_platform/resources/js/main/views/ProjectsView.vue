@@ -157,6 +157,32 @@ const fallbackOptionSets = {
     ],
 };
 
+const staticProjectOptionKeyMap = {
+    'Not Started': 'not_started',
+    Planned: 'planned',
+    'In Progress': 'in_progress',
+    Completed: 'completed',
+    'Infrastructure - Public Safety': 'infrastructure_public_safety',
+    'Water / Sanitation': 'water_sanitation',
+    'Health Services': 'health_services',
+    'Education Rehabilitation': 'education_rehabilitation',
+    'Governance / Capacity Building': 'governance_capacity_building',
+    'Economic Recovery': 'economic_recovery',
+    'Government-led implementation with donor support': 'government_led_donor_support',
+    'Direct implementation by municipal contractor': 'direct_municipal_contractor',
+    'NGO-led delivery partner model': 'ngo_delivery_partner',
+    'Mixed implementation model': 'mixed_model',
+    'Public Safety': 'public_safety',
+    'Primary Healthcare': 'primary_healthcare',
+    'Education Access': 'education_access',
+    'Water Access': 'water_access',
+    'Community Resilience': 'community_resilience',
+    'Local Governance': 'local_governance',
+    'Internal - Admin & Authorized Stakeholders': 'internal_authorized',
+    'Municipality-only internal': 'municipality_internal',
+    'Shared with donors (summary only)': 'donor_summary_only',
+};
+
 const canManageMunicipalities = computed(() => auth.hasPermission('municipalities.manage'));
 const canManageProjects = computed(() => auth.hasPermission('projects.manage'));
 const canRequestFunding = computed(() => auth.hasPermission('funding_requests.create'));
@@ -171,7 +197,7 @@ const canViewProjectSubmissions = computed(() => (
 ));
 
 const projectModalTitle = computed(() => (
-    editingProjectId.value ? 'Edit Project' : 'Create Project'
+    editingProjectId.value ? t('projectsPage.editProject') : t('projectsPage.createProject')
 ));
 
 const reporterDirectory = computed(() => {
@@ -191,7 +217,7 @@ const reporterDirectory = computed(() => {
 const assignedReporterRecords = computed(() => projectForm.assigned_reporter_ids
     .map((id) => reporterDirectory.value.get(Number(id)) || {
         id,
-        name: `Reporter #${id}`,
+        name: `${t('roles.reporter')} #${id}`,
         email: '-',
     }));
 
@@ -271,6 +297,19 @@ const projectReference = (project) => project?.code || `PRJ-${String(project?.id
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : '-');
 const formatDateTime = (value) => (value ? new Date(value).toLocaleString() : '-');
 const formatCurrency = (value) => `USD ${Number(value || 0).toLocaleString()}`;
+const projectOptionLabel = (value) => {
+    const normalized = String(value || '').trim();
+    if (!normalized) {
+        return '-';
+    }
+
+    if (['active', 'archived', 'approved', 'declined', 'pending', 'planned', 'completed', 'not_started', 'in_progress'].includes(normalized)) {
+        return t(`statusLabels.${normalized}`, normalized.replaceAll('_', ' '));
+    }
+
+    const staticKey = staticProjectOptionKeyMap[normalized];
+    return staticKey ? t(`projectsPage.optionValues.${staticKey}`) : normalized;
+};
 const linesToArray = (value) => String(value || '')
     .split('\n')
     .map((row) => row.trim())
@@ -354,7 +393,7 @@ const loadProjectFundingRequests = async (projectId) => {
         projectFundingRequests.value = data.data || [];
     } catch (err) {
         projectFundingRequests.value = [];
-        projectFundingRequestsError.value = err.response?.data?.message || 'Unable to load funding requests.';
+        projectFundingRequestsError.value = err.response?.data?.message || t('projectsPage.unableToLoadFundingRequests');
     } finally {
         projectFundingRequestsLoading.value = false;
     }
@@ -369,7 +408,7 @@ const submitFundingRequest = async () => {
     const amount = Number(fundingRequestForm.amount);
 
     if (! Number.isFinite(amount) || amount <= 0) {
-        fundingRequestError.value = 'Funding amount must be greater than zero.';
+        fundingRequestError.value = t('projectsPage.fundingAmountRequired');
         return;
     }
 
@@ -382,7 +421,7 @@ const submitFundingRequest = async () => {
             reason: fundingRequestForm.reason || null,
         });
 
-        ui.pushToast('Funding request submitted successfully.');
+        ui.pushToast(t('projectsPage.fundingRequestSubmitted'));
         const currentProjectId = projectDetails.value?.id;
         closeFundingRequestModal();
 
@@ -395,7 +434,7 @@ const submitFundingRequest = async () => {
             ]);
         }
     } catch (err) {
-        fundingRequestError.value = err.response?.data?.message || 'Unable to submit funding request.';
+        fundingRequestError.value = err.response?.data?.message || t('projectsPage.unableToSubmitFundingRequest');
     } finally {
         fundingRequestSubmitting.value = false;
     }
@@ -409,7 +448,7 @@ const reviewFundingRequest = async (fundingRequest, decision) => {
     const note = String(fundingReviewNotes[fundingRequest.id] || '').trim();
 
     if (! note) {
-        projectFundingRequestsError.value = 'Review reason is required for approve/decline.';
+        projectFundingRequestsError.value = t('projectsPage.fundingReviewReasonRequired');
         return;
     }
 
@@ -420,12 +459,12 @@ const reviewFundingRequest = async (fundingRequest, decision) => {
             await api.post(`/funding-requests/${fundingRequest.id}/approve`, {
                 review_comment: note,
             });
-            ui.pushToast('Funding request approved.');
+            ui.pushToast(t('projectsPage.fundingApproved'));
         } else {
             await api.post(`/funding-requests/${fundingRequest.id}/decline`, {
                 review_comment: note,
             });
-            ui.pushToast('Funding request declined.');
+            ui.pushToast(t('projectsPage.fundingDeclined'));
         }
 
         fundingReviewNotes[fundingRequest.id] = '';
@@ -439,7 +478,7 @@ const reviewFundingRequest = async (fundingRequest, decision) => {
             ]);
         }
     } catch (err) {
-        projectFundingRequestsError.value = err.response?.data?.message || 'Unable to review funding request.';
+        projectFundingRequestsError.value = err.response?.data?.message || t('projectsPage.unableToReviewFundingRequest');
     }
 };
 
@@ -513,7 +552,7 @@ const loadProjects = async (page = pagination.current_page) => {
         pagination.total = data.total || projects.value.length;
         tabCounts.value = data.tab_counts || { all: projects.value.length, by_municipality: {} };
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to load projects.';
+        error.value = err.response?.data?.message || t('projectsPage.unableToLoadProjects');
         projects.value = [];
         tabCounts.value = { all: 0, by_municipality: {} };
         pagination.current_page = 1;
@@ -534,7 +573,7 @@ const fetchProjectDetails = async (projectId) => {
         projectReporters.value = data.reporters || [];
         projectMediaAttachments.value = data.media_attachments || [];
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to load project details.';
+        error.value = err.response?.data?.message || t('projectsPage.unableToLoadProjectDetails');
         projectDetails.value = null;
         projectReporters.value = [];
         projectMediaAttachments.value = [];
@@ -698,11 +737,11 @@ const saveMunicipality = async () => {
         });
 
         municipalityModalOpen.value = false;
-        ui.pushToast('Municipality saved successfully.');
+        ui.pushToast(t('projectsPage.municipalitySaved'));
         await loadMunicipalities();
         await loadProjects(1);
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to save municipality.';
+        error.value = err.response?.data?.message || t('projectsPage.unableToSaveMunicipality');
     } finally {
         saving.value = false;
     }
@@ -767,7 +806,7 @@ const saveProject = async () => {
             ? await api.put(`/projects/${editingProjectId.value}`, payload)
             : await api.post('/projects', payload);
 
-        ui.pushToast(editingProjectId.value ? 'Project updated successfully.' : 'Project created successfully.');
+        ui.pushToast(editingProjectId.value ? t('projectsPage.projectUpdated') : t('projectsPage.projectCreated'));
 
         const savedProject = response.data.project || null;
         projectDetails.value = savedProject;
@@ -784,7 +823,7 @@ const saveProject = async () => {
             await ensureDetailMap();
         }
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to save project.';
+        error.value = err.response?.data?.message || t('projectsPage.unableToSaveProject');
     } finally {
         saving.value = false;
     }
@@ -795,7 +834,7 @@ const deleteProject = async () => {
         return;
     }
 
-    const confirmed = window.confirm(`Delete ${projectDetails.value.name}? This will remove related submissions and assignments.`);
+    const confirmed = window.confirm(t('projectsPage.deleteProjectConfirm', { name: projectDetails.value.name }));
 
     if (! confirmed) {
         return;
@@ -806,14 +845,14 @@ const deleteProject = async () => {
 
     try {
         await api.delete(`/projects/${projectDetails.value.id}`);
-        ui.pushToast('Project deleted successfully.');
+        ui.pushToast(t('projectsPage.projectDeleted'));
         projectDetailsModalOpen.value = false;
         projectDetails.value = null;
         projectReporters.value = [];
         projectMediaAttachments.value = [];
         await loadProjects(1);
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to delete project.';
+        error.value = err.response?.data?.message || t('projectsPage.unableToDeleteProject');
     } finally {
         deleting.value = false;
     }
@@ -1123,13 +1162,13 @@ onBeforeUnmount(() => {
                     <table class="tracky-projects-table tracky-projects-table--rich">
                         <thead>
                         <tr>
-                            <th>Project</th>
-                            <th>Reference</th>
+                            <th>{{ t('common.project') }}</th>
+                            <th>{{ t('common.reference') }}</th>
                             <th>{{ t('projectsPage.municipality') }}</th>
                             <th>{{ t('projectsPage.progress') }}</th>
-                            <th>Assigned Reporters</th>
-                            <th>Execution</th>
-                            <th v-if="canViewFundingRequests">Funding Requests</th>
+                            <th>{{ t('projectsPage.assignedReporters') }}</th>
+                            <th>{{ t('projectsPage.execution') }}</th>
+                            <th v-if="canViewFundingRequests">{{ t('projectsPage.fundingRequests') }}</th>
                             <th>{{ t('projectsPage.tableColumns.actions') }}</th>
                         </tr>
                         </thead>
@@ -1150,7 +1189,7 @@ onBeforeUnmount(() => {
                             <td>
                                 <div class="tracky-project-progress-row">
                                     <small>{{ project.progress_percent || 0 }}%</small>
-                                    <small>{{ project.stats?.approved_submissions || 0 }} approved</small>
+                                    <small>{{ t('projectsPage.approvedCount', { count: project.stats?.approved_submissions || 0 }) }}</small>
                                 </div>
                                 <div class="tracky-project-inline-progress">
                                     <span :style="{ width: `${project.progress_percent || 0}%` }" />
@@ -1158,11 +1197,11 @@ onBeforeUnmount(() => {
                             </td>
                             <td>
                                 <strong>{{ project.assigned_reporters_count || 0 }}</strong>
-                                <p>{{ project.stats?.active_reporters || project.assigned_reporters_count || 0 }} active</p>
+                                <p>{{ t('projectsPage.activeCount', { count: project.stats?.active_reporters || project.assigned_reporters_count || 0 }) }}</p>
                             </td>
                             <td>
                                 <span class="tracky-status-chip" :class="executionStatusClass(project.execution_status)">
-                                    {{ project.execution_status_label }}
+                                    {{ projectOptionLabel(project.execution_status) }}
                                 </span>
                                 <p>
                                     <span class="badge" :class="lifecycleBadgeClass(project.status)">
@@ -1174,16 +1213,16 @@ onBeforeUnmount(() => {
                                 <template v-if="project.funding_requests_summary">
                                     <strong>{{ formatCurrency(project.funding_requests_summary.total_requested_amount) }}</strong>
                                     <p>
-                                        {{ project.funding_requests_summary.total_requests || 0 }} requests
+                                        {{ t('projectsPage.requestsSummary', { count: project.funding_requests_summary.total_requests || 0 }) }}
                                         <span v-if="project.funding_requests_summary.pending_requests">
-                                            | {{ project.funding_requests_summary.pending_requests }} pending
+                                            | {{ t('projectsPage.pendingCount', { count: project.funding_requests_summary.pending_requests }) }}
                                         </span>
                                     </p>
                                     <p v-if="project.funding_requests_summary.latest_requested_at">
-                                        Last: {{ formatDate(project.funding_requests_summary.latest_requested_at) }}
+                                        {{ t('projectsPage.lastRequest', { date: formatDate(project.funding_requests_summary.latest_requested_at) }) }}
                                     </p>
                                 </template>
-                                <p v-else>No requests yet.</p>
+                                <p v-else>{{ t('projectsPage.noRequestsYet') }}</p>
                                 <button
                                     v-if="canRequestFundingForProject(project)"
                                     class="tracky-btn"
@@ -1191,7 +1230,7 @@ onBeforeUnmount(() => {
                                     type="button"
                                     @click.stop="openFundingRequestModal(project)"
                                 >
-                                    Request to Fund
+                                    {{ t('projectsPage.requestToFund') }}
                                 </button>
                             </td>
                             <td>
@@ -1202,7 +1241,7 @@ onBeforeUnmount(() => {
                                         v-if="canViewProjectSubmissions"
                                         @click="openProjectSubmissions(project)"
                                     >
-                                        View Submissions
+                                        {{ t('projectsPage.viewSubmission') }}
                                     </button>
                                     <button
                                         class="tracky-btn tracky-btn--ghost"
@@ -1221,15 +1260,15 @@ onBeforeUnmount(() => {
 
                 <div class="tracky-projects__empty" v-else>
                     <h3>{{ t('projectsPage.noProjects') }}</h3>
-                    <p>Create a project to start monitoring activities.</p>
+                    <p>{{ t('projectsPage.noProjectsHint') }}</p>
                 </div>
             </section>
 
             <footer class="tracky-projects__pagination" v-if="!loading && pagination.last_page > 1">
-                <p>Page {{ pagination.current_page }} of {{ pagination.last_page }}</p>
+                <p>{{ t('common.page', { page: pagination.current_page, total: pagination.last_page }) }}</p>
                 <div class="tracky-page-buttons">
                     <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.current_page <= 1" @click="goToPage(pagination.current_page - 1)">
-                        Prev
+                        {{ t('common.previous') }}
                     </button>
                     <button
                         v-for="page in visiblePages"
@@ -1242,7 +1281,7 @@ onBeforeUnmount(() => {
                         {{ typeof page === 'number' ? page : '...' }}
                     </button>
                     <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.current_page >= pagination.last_page" @click="goToPage(pagination.current_page + 1)">
-                        Next
+                        {{ t('common.next') }}
                     </button>
                 </div>
             </footer>
@@ -1251,7 +1290,7 @@ onBeforeUnmount(() => {
                 <article class="tracky-project-modal">
                     <header class="tracky-project-modal__head">
                         <div>
-                            <h3>{{ detailLoading ? 'Loading project...' : projectDetails?.name || 'Project Details' }}</h3>
+                            <h3>{{ detailLoading ? t('projectsPage.loadingProject') : projectDetails?.name || t('projectsPage.projectDetails') }}</h3>
                             <p v-if="projectDetails">{{ projectReference(projectDetails) }}</p>
                         </div>
                         <div class="tracky-project-modal__head-actions">
@@ -1261,7 +1300,7 @@ onBeforeUnmount(() => {
                                 v-if="projectDetails && canViewProjectSubmissions"
                                 @click="openProjectSubmissions(projectDetails)"
                             >
-                                Go to Submissions
+                                {{ t('projectsPage.goToSubmissions') }}
                             </button>
                             <button
                                 class="tracky-btn"
@@ -1270,7 +1309,7 @@ onBeforeUnmount(() => {
                                 v-if="projectDetails && canRequestFundingForProject(projectDetails)"
                                 @click="openFundingRequestModal(projectDetails)"
                             >
-                                Request to Fund
+                                {{ t('projectsPage.requestToFund') }}
                             </button>
                             <button
                                 class="tracky-btn tracky-btn--ghost"
@@ -1287,9 +1326,9 @@ onBeforeUnmount(() => {
                                 :disabled="deleting"
                                 @click="deleteProject"
                             >
-                                Delete
+                                {{ t('projectsPage.deleteProject') }}
                             </button>
-                            <button class="tracky-btn tracky-btn--ghost" type="button" @click="closeProjectDetails">Close</button>
+                            <button class="tracky-btn tracky-btn--ghost" type="button" @click="closeProjectDetails">{{ t('common.close') }}</button>
                         </div>
                     </header>
 
@@ -1297,23 +1336,23 @@ onBeforeUnmount(() => {
                         <section class="tracky-project-modal__column">
                             <div class="tracky-project-view-grid">
                                 <div>
-                                    <span>Project Status</span>
+                                    <span>{{ t('projectsPage.projectStatus') }}</span>
                                     <strong>
                                         <span class="tracky-status-chip" :class="executionStatusClass(projectDetails.execution_status)">
-                                            {{ projectDetails.execution_status_label }}
+                                            {{ projectOptionLabel(projectDetails.execution_status) }}
                                         </span>
                                     </strong>
                                 </div>
                                 <div>
-                                    <span>Project Category</span>
-                                    <strong>{{ projectDetails.project_category }}</strong>
+                                    <span>{{ t('projectsPage.projectCategory') }}</span>
+                                    <strong>{{ projectOptionLabel(projectDetails.project_category) }}</strong>
                                 </div>
                                 <div>
-                                    <span>Region / Municipality</span>
+                                    <span>{{ t('projectsPage.regionMunicipality') }}</span>
                                     <strong>{{ projectDetails.region_label }}</strong>
                                 </div>
                                 <div>
-                                    <span>Project Location</span>
+                                    <span>{{ t('projectsPage.projectLocation') }}</span>
                                     <strong>{{ projectDetails.location_label }}</strong>
                                 </div>
                             </div>
@@ -1323,15 +1362,15 @@ onBeforeUnmount(() => {
                             </div>
 
                             <div class="tracky-project-section">
-                                <h4>Project Description</h4>
+                                <h4>{{ t('projectsPage.projectDescription') }}</h4>
                                 <p>{{ projectDetails.description || t('dashboard.noDescription') }}</p>
                             </div>
 
                             <div class="tracky-project-section">
-                                <h4>Project Objectives</h4>
+                                <h4>{{ t('projectsPage.projectObjectives') }}</h4>
                                 <ul class="tracky-detail-bullet-list">
                                     <li v-for="(objective, index) in projectDetails.objectives" :key="`objective-${index}`">{{ objective }}</li>
-                                    <li v-if="!projectDetails.objectives?.length">No objectives provided.</li>
+                                    <li v-if="!projectDetails.objectives?.length">{{ t('projectsPage.noObjectives') }}</li>
                                 </ul>
                             </div>
 
@@ -1346,20 +1385,20 @@ onBeforeUnmount(() => {
                             </div>
 
                             <div class="tracky-project-section">
-                                <h4>Project Components</h4>
+                                <h4>{{ t('projectsPage.projectComponents') }}</h4>
                                 <div class="tracky-project-split-card">
                                     <div>
-                                        <strong>Hard Components</strong>
+                                        <strong>{{ t('projectsPage.hardComponents') }}</strong>
                                         <ul class="tracky-detail-bullet-list">
                                             <li v-for="(item, index) in projectDetails.hard_components" :key="`hard-${index}`">{{ item }}</li>
-                                            <li v-if="!projectDetails.hard_components?.length">No hard components provided.</li>
+                                            <li v-if="!projectDetails.hard_components?.length">{{ t('projectsPage.noHardComponents') }}</li>
                                         </ul>
                                     </div>
                                     <div>
-                                        <strong>Soft Components</strong>
+                                        <strong>{{ t('projectsPage.softComponents') }}</strong>
                                         <ul class="tracky-detail-bullet-list">
                                             <li v-for="(item, index) in projectDetails.soft_components" :key="`soft-${index}`">{{ item }}</li>
-                                            <li v-if="!projectDetails.soft_components?.length">No soft components provided.</li>
+                                            <li v-if="!projectDetails.soft_components?.length">{{ t('projectsPage.noSoftComponents') }}</li>
                                         </ul>
                                     </div>
                                 </div>
@@ -1368,60 +1407,60 @@ onBeforeUnmount(() => {
 
                         <section class="tracky-project-modal__column">
                             <div class="tracky-project-section tracky-project-section--no-divider">
-                                <h4>Implementing Partner</h4>
+                                <h4>{{ t('projectsPage.implementingPartnerTitle') }}</h4>
                                 <ul class="tracky-project-stats-list">
-                                    <li><span>Implementing Partner</span><strong>{{ projectDetails.implementing_partner || '-' }}</strong></li>
-                                    <li><span>Program Lead</span><strong>{{ projectDetails.program_lead || '-' }}</strong></li>
-                                    <li><span>Development Goal Area</span><strong>{{ projectDetails.development_goal_area || '-' }}</strong></li>
-                                    <li><span>Execution Model</span><strong>{{ projectDetails.execution_model || '-' }}</strong></li>
-                                    <li><span>Start / End</span><strong>{{ projectDetails.date_range_label || '-' }}</strong></li>
-                                    <li><span>Duration</span><strong>{{ projectDetails.duration_label || '-' }}</strong></li>
+                                    <li><span>{{ t('projectsPage.implementingPartner') }}</span><strong>{{ projectDetails.implementing_partner || '-' }}</strong></li>
+                                    <li><span>{{ t('projectsPage.programLead') }}</span><strong>{{ projectDetails.program_lead || '-' }}</strong></li>
+                                    <li><span>{{ t('projectsPage.developmentGoalArea') }}</span><strong>{{ projectOptionLabel(projectDetails.development_goal_area) }}</strong></li>
+                                    <li><span>{{ t('projectsPage.executionModel') }}</span><strong>{{ projectOptionLabel(projectDetails.execution_model) }}</strong></li>
+                                    <li><span>{{ t('projectsPage.startEnd') }}</span><strong>{{ projectDetails.date_range_label || '-' }}</strong></li>
+                                    <li><span>{{ t('projectsPage.duration') }}</span><strong>{{ projectDetails.duration_label || '-' }}</strong></li>
                                 </ul>
                             </div>
 
                             <div class="tracky-project-section">
-                                <h4>Media Attachments</h4>
+                                <h4>{{ t('projectsPage.mediaAttachments') }}</h4>
                                 <div class="tracky-project-media-grid">
                                     <div class="tracky-project-media-tile" v-for="asset in projectMediaAttachments" :key="asset.id">
-                                        <strong>{{ asset.media_type === 'video' ? 'Video' : 'Image' }}</strong>
+                                        <strong>{{ asset.media_type === 'video' ? t('common.video') : t('common.image') }}</strong>
                                         <small>#{{ asset.id }}</small>
-                                        <span>{{ asset.status }}</span>
+                                        <span>{{ t(`statusLabels.${asset.status}`, asset.status) }}</span>
                                     </div>
                                     <div class="tracky-project-media-empty" v-if="!projectMediaAttachments.length">
-                                        No uploaded media yet.
+                                        {{ t('projectsPage.noUploadedMediaYet') }}
                                     </div>
                                 </div>
                             </div>
 
                             <div class="tracky-project-section">
-                                <h4>Funding Information</h4>
+                                <h4>{{ t('projectsPage.fundingInformation') }}</h4>
                                 <div class="tracky-project-funding-card">
                                     <div>
-                                        <span>Total Approved Budget</span>
+                                        <span>{{ t('projectsPage.totalApprovedBudget') }}</span>
                                         <strong>{{ projectDetails.funding_budget_label || formatCurrency(projectDetails.funding_budget) }}</strong>
                                     </div>
                                     <div>
-                                        <span>Funding Sources</span>
+                                        <span>{{ t('projectsPage.fundingSources') }}</span>
                                         <ul class="tracky-detail-bullet-list">
                                             <li v-for="(item, index) in projectDetails.funding_sources" :key="`source-${index}`">{{ item }}</li>
-                                            <li v-if="!projectDetails.funding_sources?.length">No funding sources provided.</li>
+                                            <li v-if="!projectDetails.funding_sources?.length">{{ t('projectsPage.noFundingSources') }}</li>
                                         </ul>
                                     </div>
                                     <div>
-                                        <span>Funding Type</span>
+                                        <span>{{ t('projectsPage.fundingType') }}</span>
                                         <ul class="tracky-detail-bullet-list">
                                             <li v-for="(item, index) in projectDetails.funding_types" :key="`type-${index}`">{{ item }}</li>
-                                            <li v-if="!projectDetails.funding_types?.length">No funding types provided.</li>
+                                            <li v-if="!projectDetails.funding_types?.length">{{ t('projectsPage.noFundingTypes') }}</li>
                                         </ul>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="tracky-project-section" v-if="canViewFundingRequests">
-                                <h4>Project Funding Requests</h4>
+                                <h4>{{ t('projectsPage.projectFundingRequests') }}</h4>
                                 <p class="field-error" v-if="projectFundingRequestsError">{{ projectFundingRequestsError }}</p>
                                 <p class="panel__hint" v-if="canRequestFunding">
-                                    Submit a donor funding request for this project. UNDP Admin reviews every request and approves or declines it with a reason.
+                                    {{ t('projectsPage.donorFundingHint') }}
                                 </p>
 
                                 <div
@@ -1429,19 +1468,19 @@ onBeforeUnmount(() => {
                                     class="tracky-project-funding-summary"
                                 >
                                     <article class="tracky-project-funding-summary__card">
-                                        <span>Total Requested</span>
+                                        <span>{{ t('projectsPage.totalRequested') }}</span>
                                         <strong>{{ formatCurrency(projectDetails.funding_requests_summary.total_requested_amount) }}</strong>
                                     </article>
                                     <article class="tracky-project-funding-summary__card">
-                                        <span>Total Requests</span>
+                                        <span>{{ t('projectsPage.totalRequests') }}</span>
                                         <strong>{{ projectDetails.funding_requests_summary.total_requests || 0 }}</strong>
                                     </article>
                                     <article class="tracky-project-funding-summary__card">
-                                        <span>Pending Review</span>
+                                        <span>{{ t('projectsPage.pendingReview') }}</span>
                                         <strong>{{ projectDetails.funding_requests_summary.pending_requests || 0 }}</strong>
                                     </article>
                                     <article class="tracky-project-funding-summary__card">
-                                        <span>Approved / Declined</span>
+                                        <span>{{ t('projectsPage.approvedDeclined') }}</span>
                                         <strong>
                                             {{ projectDetails.funding_requests_summary.approved_requests || 0 }}
                                             /
@@ -1452,7 +1491,7 @@ onBeforeUnmount(() => {
 
                                 <div class="inline-group" v-if="projectDetails && canRequestFundingForProject(projectDetails)">
                                     <button class="btn btn--primary" type="button" @click="openFundingRequestModal(projectDetails)">
-                                        Request to Fund This Project
+                                        {{ t('projectsPage.requestToFundThisProject') }}
                                     </button>
                                 </div>
 
@@ -1460,14 +1499,14 @@ onBeforeUnmount(() => {
                                     <table class="table" v-if="!projectFundingRequestsLoading && projectFundingRequests.length">
                                         <thead>
                                         <tr>
-                                            <th>ID</th>
-                                            <th>Donor</th>
-                                            <th>Amount</th>
-                                            <th>Status</th>
-                                            <th>Request Reason</th>
-                                            <th>Review Reason</th>
-                                            <th>Requested At</th>
-                                            <th v-if="canReviewFundingRequests">Actions</th>
+                                            <th>{{ t('common.id') }}</th>
+                                            <th>{{ t('dashboard.donors') }}</th>
+                                            <th>{{ t('common.amount') }}</th>
+                                            <th>{{ t('common.status') }}</th>
+                                            <th>{{ t('reportsPage.requestReason') }}</th>
+                                            <th>{{ t('reportsPage.reviewReason') }}</th>
+                                            <th>{{ t('reportsPage.requested') }}</th>
+                                            <th v-if="canReviewFundingRequests">{{ t('common.actions') }}</th>
                                         </tr>
                                         </thead>
                                         <tbody>
@@ -1480,7 +1519,7 @@ onBeforeUnmount(() => {
                                                     class="status-pill"
                                                     :class="fundingBadgeClass(requestRow.status)"
                                                 >
-                                                    {{ requestRow.status_label }}
+                                                    {{ t(`statusLabels.${requestRow.status}`, requestRow.status_label) }}
                                                 </span>
                                             </td>
                                             <td>{{ requestRow.reason || '-' }}</td>
@@ -1491,53 +1530,53 @@ onBeforeUnmount(() => {
                                                     <input
                                                         v-model="fundingReviewNotes[requestRow.id]"
                                                         type="text"
-                                                        placeholder="Review reason"
+                                                        :placeholder="t('reportsPage.reviewReason')"
                                                     >
                                                     <button class="btn btn--primary" type="button" @click="reviewFundingRequest(requestRow, 'approve')">
-                                                        Approve
+                                                        {{ t('submissionDetail.approve') }}
                                                     </button>
                                                     <button class="btn btn--danger" type="button" @click="reviewFundingRequest(requestRow, 'decline')">
-                                                        Decline
+                                                        {{ t('submissionDetail.reject') }}
                                                     </button>
                                                 </div>
-                                                <span v-else>Reviewed</span>
+                                                <span v-else>{{ t('common.reviewed') }}</span>
                                             </td>
                                         </tr>
                                         </tbody>
                                     </table>
-                                    <p class="panel__hint" v-else-if="projectFundingRequestsLoading">Loading funding requests...</p>
-                                    <p class="panel__hint" v-else>No funding requests found for this project.</p>
+                                    <p class="panel__hint" v-else-if="projectFundingRequestsLoading">{{ t('reportsPage.loadingFundingRequests') }}</p>
+                                    <p class="panel__hint" v-else>{{ t('projectsPage.noFundingRequests') }}</p>
                                 </div>
                             </div>
 
                             <div class="tracky-project-section">
-                                <h4>Share {{ projectDetails.name }}</h4>
+                                <h4>{{ t('projectsPage.shareProject', { name: projectDetails.name }) }}</h4>
                                 <div class="tracky-share-list">
                                     <div class="tracky-share-row" v-for="reporter in projectReporters" :key="reporter.id">
                                         <div>
                                             <strong>{{ reporter.name }}</strong>
                                             <p>{{ reporter.email || '-' }}</p>
                                         </div>
-                                        <span class="tracky-share-badge">Assigned</span>
+                                        <span class="tracky-share-badge">{{ t('projectsPage.assigned') }}</span>
                                     </div>
                                     <div class="tracky-project-media-empty" v-if="!projectReporters.length">
-                                        No reporters assigned.
+                                        {{ t('projectsPage.noReportersAssigned') }}
                                     </div>
                                 </div>
                             </div>
 
                             <div class="tracky-project-section">
-                                <h4>Administrative Metadata</h4>
+                                <h4>{{ t('projectsPage.administrativeMetadata') }}</h4>
                                 <ul class="tracky-project-stats-list">
-                                    <li><span>Created By</span><strong>{{ projectDetails.created_by_label || '-' }}</strong></li>
-                                    <li><span>Last Updated</span><strong>{{ formatDate(projectDetails.updated_at || projectDetails.last_update_at) }}</strong></li>
-                                    <li><span>Visibility</span><strong>{{ projectDetails.visibility || '-' }}</strong></li>
+                                    <li><span>{{ t('projectsPage.createdBy') }}</span><strong>{{ projectDetails.created_by_label || '-' }}</strong></li>
+                                    <li><span>{{ t('projectsPage.lastUpdated') }}</span><strong>{{ formatDate(projectDetails.updated_at || projectDetails.last_update_at) }}</strong></li>
+                                    <li><span>{{ t('projectsPage.visibility') }}</span><strong>{{ projectOptionLabel(projectDetails.visibility) }}</strong></li>
                                 </ul>
                             </div>
                         </section>
                     </div>
 
-                    <div class="tracky-projects__empty" v-else-if="detailLoading">Loading project details...</div>
+                    <div class="tracky-projects__empty" v-else-if="detailLoading">{{ t('projectsPage.loadingProjectDetails') }}</div>
                 </article>
             </div>
 
@@ -1546,11 +1585,11 @@ onBeforeUnmount(() => {
                     <header class="tracky-project-modal__head">
                         <div>
                             <h3>{{ projectModalTitle }}</h3>
-                            <p>{{ editingProjectId ? 'Update the project details, location, and reporter access.' : 'Create a complete project profile and assign the reporter scope.' }}</p>
+                            <p>{{ editingProjectId ? t('projectsPage.formEditHint') : t('projectsPage.formCreateHint') }}</p>
                         </div>
                         <div class="tracky-project-modal__head-actions">
                             <button class="tracky-btn tracky-btn--primary" type="button" :disabled="saving" @click="saveProject">
-                                Save
+                                {{ t('common.save') }}
                             </button>
                             <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="saving" @click="closeProjectFormModal">
                                 {{ t('common.cancel') }}
@@ -1562,38 +1601,38 @@ onBeforeUnmount(() => {
                         <section class="tracky-project-modal__column">
                             <div class="tracky-editor-grid">
                                 <label class="field">
-                                    Project Name (English)
+                                    {{ t('projectsPage.projectNameEn') }}
                                     <input v-model="projectForm.name_en" type="text">
                                 </label>
                                 <label class="field">
-                                    Project Name (Arabic)
+                                    {{ t('projectsPage.projectNameAr') }}
                                     <input v-model="projectForm.name_ar" type="text">
                                 </label>
                                 <label class="field">
-                                    Project Reference
+                                    {{ t('projectsPage.projectReference') }}
                                     <input v-model="projectForm.project_code" type="text" placeholder="PRJ-ALK-001">
                                 </label>
                                 <label class="field">
-                                    Record Status
+                                    {{ t('projectsPage.recordStatus') }}
                                     <select v-model="projectForm.status">
                                         <option v-for="option in projectOptionSets.lifecycle_statuses" :key="option.value" :value="option.value">
-                                            {{ option.label }}
+                                            {{ projectOptionLabel(option.value || option.label) }}
                                         </option>
                                     </select>
                                 </label>
                                 <label class="field">
-                                    Project Status
+                                    {{ t('projectsPage.projectStatus') }}
                                     <select v-model="projectForm.execution_status">
                                         <option v-for="option in projectOptionSets.execution_statuses" :key="option.value" :value="option.value">
-                                            {{ option.label }}
+                                            {{ projectOptionLabel(option.value || option.label) }}
                                         </option>
                                     </select>
                                 </label>
                                 <label class="field">
-                                    Project Category
+                                    {{ t('projectsPage.projectCategory') }}
                                     <select v-model="projectForm.project_category">
                                         <option v-for="option in projectOptionSets.project_categories" :key="option.value" :value="option.value">
-                                            {{ option.label }}
+                                            {{ projectOptionLabel(option.value || option.label) }}
                                         </option>
                                     </select>
                                 </label>
@@ -1607,15 +1646,15 @@ onBeforeUnmount(() => {
                                     </select>
                                 </label>
                                 <label class="field">
-                                    Region / Municipality
-                                    <input v-model="projectForm.region_label" type="text" placeholder="South Region - Alkufraa">
+                                    {{ t('projectsPage.regionMunicipality') }}
+                                    <input v-model="projectForm.region_label" type="text" :placeholder="t('projectsPage.regionMunicipalityPlaceholder')">
                                 </label>
                                 <label class="field field--span-2">
-                                    Project Location Label
+                                    {{ t('projectsPage.projectLocationLabel') }}
                                     <input
                                         :value="projectForm.location_label"
                                         type="text"
-                                        placeholder="Choose the project spot from the map"
+                                        :placeholder="t('projectsPage.projectLocationPlaceholder')"
                                         readonly
                                     >
                                 </label>
@@ -1624,29 +1663,29 @@ onBeforeUnmount(() => {
                             <div class="tracky-project-map-card tracky-project-map-card--editable">
                                 <div ref="formMapEl" class="tracky-project-map-canvas tracky-project-map-canvas--editor" />
                                 <div class="tracky-project-coordinates">
-                                    <span>Latitude: <strong>{{ projectForm.latitude === '' ? '-' : projectForm.latitude }}</strong></span>
-                                    <span>Longitude: <strong>{{ projectForm.longitude === '' ? '-' : projectForm.longitude }}</strong></span>
+                                    <span>{{ t('projectsPage.latitude') }}: <strong>{{ projectForm.latitude === '' ? '-' : projectForm.latitude }}</strong></span>
+                                    <span>{{ t('projectsPage.longitude') }}: <strong>{{ projectForm.longitude === '' ? '-' : projectForm.longitude }}</strong></span>
                                 </div>
                             </div>
 
                             <label class="field">
-                                Project Description
+                                {{ t('projectsPage.projectDescription') }}
                                 <textarea v-model="projectForm.description" rows="4"></textarea>
                             </label>
 
                             <label class="field">
-                                Project Objectives
-                                <textarea v-model="projectForm.objectives_text" rows="4" placeholder="One objective per line"></textarea>
+                                {{ t('projectsPage.projectObjectives') }}
+                                <textarea v-model="projectForm.objectives_text" rows="4" :placeholder="t('projectsPage.objectivesPlaceholder')"></textarea>
                             </label>
 
                             <div class="tracky-editor-grid">
                                 <label class="field">
-                                    Hard Components
-                                    <textarea v-model="projectForm.hard_components_text" rows="5" placeholder="One item per line"></textarea>
+                                    {{ t('projectsPage.hardComponents') }}
+                                    <textarea v-model="projectForm.hard_components_text" rows="5" :placeholder="t('projectsPage.hardComponentsPlaceholder')"></textarea>
                                 </label>
                                 <label class="field">
-                                    Soft Components
-                                    <textarea v-model="projectForm.soft_components_text" rows="5" placeholder="One item per line"></textarea>
+                                    {{ t('projectsPage.softComponents') }}
+                                    <textarea v-model="projectForm.soft_components_text" rows="5" :placeholder="t('projectsPage.softComponentsPlaceholder')"></textarea>
                                 </label>
                             </div>
 
@@ -1662,80 +1701,80 @@ onBeforeUnmount(() => {
                         <section class="tracky-project-modal__column">
                             <div class="tracky-editor-grid">
                                 <label class="field">
-                                    Implementing Partner
+                                    {{ t('projectsPage.implementingPartner') }}
                                     <input v-model="projectForm.implementing_partner" type="text">
                                 </label>
                                 <label class="field">
-                                    Program Lead
+                                    {{ t('projectsPage.programLead') }}
                                     <input v-model="projectForm.program_lead" type="text">
                                 </label>
                                 <label class="field">
-                                    Development Goal Area
+                                    {{ t('projectsPage.developmentGoalArea') }}
                                     <select v-model="projectForm.development_goal_area">
                                         <option v-for="option in projectOptionSets.development_goal_areas" :key="option.value" :value="option.value">
-                                            {{ option.label }}
+                                            {{ projectOptionLabel(option.value || option.label) }}
                                         </option>
                                     </select>
                                 </label>
                                 <label class="field">
-                                    Execution Model
+                                    {{ t('projectsPage.executionModel') }}
                                     <select v-model="projectForm.execution_model">
                                         <option v-for="option in projectOptionSets.execution_models" :key="option.value" :value="option.value">
-                                            {{ option.label }}
+                                            {{ projectOptionLabel(option.value || option.label) }}
                                         </option>
                                     </select>
                                 </label>
                                 <label class="field">
-                                    Start Date
+                                    {{ t('projectsPage.startDate') }}
                                     <input v-model="projectForm.start_date" type="date">
                                 </label>
                                 <label class="field">
-                                    End Date
+                                    {{ t('projectsPage.endDate') }}
                                     <input v-model="projectForm.end_date" type="date">
                                 </label>
                             </div>
 
                             <label class="field">
-                                Total Approved Budget
+                                {{ t('projectsPage.totalApprovedBudget') }}
                                 <input v-model="projectForm.funding_budget" type="number" min="0" step="1">
                             </label>
 
                             <div class="tracky-editor-grid">
                                 <label class="field">
-                                    Funding Sources
-                                    <textarea v-model="projectForm.funding_sources_text" rows="4" placeholder="One source per line"></textarea>
+                                    {{ t('projectsPage.fundingSources') }}
+                                    <textarea v-model="projectForm.funding_sources_text" rows="4" :placeholder="t('projectsPage.fundingSourcesPlaceholder')"></textarea>
                                 </label>
                                 <label class="field">
-                                    Funding Types
-                                    <textarea v-model="projectForm.funding_types_text" rows="4" placeholder="One funding type per line"></textarea>
+                                    {{ t('projectsPage.fundingType') }}
+                                    <textarea v-model="projectForm.funding_types_text" rows="4" :placeholder="t('projectsPage.fundingTypesPlaceholder')"></textarea>
                                 </label>
                             </div>
 
                             <label class="field">
-                                Contact Numbers
-                                <textarea v-model="projectForm.contacts_text" rows="3" placeholder="One contact per line"></textarea>
+                                {{ t('projectsPage.contactNumbers') }}
+                                <textarea v-model="projectForm.contacts_text" rows="3" :placeholder="t('projectsPage.contactsPlaceholder')"></textarea>
                             </label>
 
                             <label class="field">
-                                Visibility
+                                {{ t('projectsPage.visibility') }}
                                 <select v-model="projectForm.visibility">
                                     <option v-for="option in projectOptionSets.visibility_options" :key="option.value" :value="option.value">
-                                        {{ option.label }}
+                                        {{ projectOptionLabel(option.value || option.label) }}
                                     </option>
                                 </select>
                             </label>
 
                             <section class="tracky-project-section">
-                                <h4>Share {{ projectForm.name_en || 'this project' }}</h4>
+                                <h4>{{ t('projectsPage.shareThisProject', { name: projectForm.name_en || t('projectsPage.projectLabel') }) }}</h4>
                                 <div class="tracky-assign-row">
                                     <select v-model="selectedReporterId" :disabled="optionsLoading || !availableReporterChoices.length">
-                                        <option value="">Add users...</option>
+                                        <option value="">{{ t('projectsPage.addUsers') }}</option>
                                         <option v-for="reporter in availableReporterChoices" :key="reporter.id" :value="reporter.id">
                                             {{ reporter.name }}{{ reporter.email ? ` (${reporter.email})` : '' }}
                                         </option>
                                     </select>
                                     <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="!selectedReporterId" @click="addAssignedReporter">
-                                        Invite
+                                        {{ t('projectsPage.invite') }}
                                     </button>
                                 </div>
                                 <div class="tracky-share-list">
@@ -1745,11 +1784,11 @@ onBeforeUnmount(() => {
                                             <p>{{ reporter.email || '-' }}</p>
                                         </div>
                                         <button class="tracky-icon-btn" type="button" @click="removeAssignedReporter(reporter.id)">
-                                            Remove
+                                            {{ t('projectsPage.remove') }}
                                         </button>
                                     </div>
                                     <div class="tracky-project-media-empty" v-if="!assignedReporterRecords.length">
-                                        No reporters assigned yet.
+                                        {{ t('projectsPage.noReportersAssignedYet') }}
                                     </div>
                                 </div>
                             </section>
@@ -1760,25 +1799,25 @@ onBeforeUnmount(() => {
 
             <div class="modal-backdrop" v-if="fundingRequestModalOpen" @click.self="closeFundingRequestModal">
                 <article class="modal-card tracky-form-modal">
-                    <h3>Request Project Funding</h3>
+                    <h3>{{ t('projectsPage.requestProjectFunding') }}</h3>
                     <p class="panel__hint">
-                        Project: <strong>{{ fundingRequestTargetProject?.name || '-' }}</strong>
+                        {{ t('projectsPage.projectLabel') }}: <strong>{{ fundingRequestTargetProject?.name || '-' }}</strong>
                     </p>
                     <p class="field-error" v-if="fundingRequestError">{{ fundingRequestError }}</p>
 
                     <label class="field">
-                        Funding Amount (USD)
-                        <input v-model="fundingRequestForm.amount" type="number" min="1" step="0.01" placeholder="e.g. 15000">
+                        {{ t('projectsPage.fundingAmountUsd') }}
+                        <input v-model="fundingRequestForm.amount" type="number" min="1" step="0.01" :placeholder="t('projectsPage.fundingAmountPlaceholder')">
                     </label>
 
                     <label class="field">
-                        Reason (Optional)
-                        <textarea v-model="fundingRequestForm.reason" rows="4" placeholder="Optional context for the requested fund"></textarea>
+                        {{ t('projectsPage.reasonOptional') }}
+                        <textarea v-model="fundingRequestForm.reason" rows="4" :placeholder="t('projectsPage.fundingReasonPlaceholder')"></textarea>
                     </label>
 
                     <div class="inline-group">
                         <button class="btn btn--primary" type="button" :disabled="fundingRequestSubmitting" @click="submitFundingRequest">
-                            Submit Funding Request
+                            {{ t('projectsPage.submitFundingRequest') }}
                         </button>
                         <button class="btn btn--ghost" type="button" :disabled="fundingRequestSubmitting" @click="closeFundingRequestModal">
                             {{ t('common.cancel') }}

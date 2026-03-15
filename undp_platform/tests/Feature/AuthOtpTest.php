@@ -244,6 +244,35 @@ class AuthOtpTest extends TestCase
         $this->assertSame(1, User::query()->where('phone_e164', '+218910000001')->count());
     }
 
+    public function test_verify_otp_bypass_code_allows_seeded_user_login_without_existing_otp_row(): void
+    {
+        $this->seed(RbacSeeder::class);
+
+        $focalPoint = User::factory()->create([
+            'name' => 'Municipal Focal Point - Tripoli',
+            'country_code' => '+218',
+            'phone' => '910000003',
+            'phone_e164' => '+218910000003',
+            'role' => UserRole::MUNICIPAL_FOCAL_POINT->value,
+            'status' => UserStatus::ACTIVE->value,
+        ]);
+
+        $this->assertNull(OtpCode::query()->where('phone_e164', $focalPoint->phone_e164)->first());
+
+        $response = $this->postJson('/api/auth/verify-otp', [
+            'country_code' => '+218',
+            'phone' => '910000003',
+            'code' => '111111',
+            'preferred_locale' => 'en',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('user.id', $focalPoint->id)
+            ->assertJsonPath('user.role', UserRole::MUNICIPAL_FOCAL_POINT->value)
+            ->assertJsonPath('result', true);
+    }
+
     public function test_validation_errors_are_wrapped_in_the_standard_api_envelope(): void
     {
         $response = $this->postJson('/api/auth/request-otp', []);

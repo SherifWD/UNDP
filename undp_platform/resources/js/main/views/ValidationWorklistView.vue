@@ -1,11 +1,13 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import AppShell from '../components/AppShell.vue';
 import api from '../api';
 
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 const loading = ref(false);
 const error = ref('');
 const submissions = ref([]);
@@ -38,14 +40,14 @@ const activeFilterCount = computed(() => [filters.search, filters.status, filter
 const activeFilterChips = computed(() => {
     const chips = [];
 
-    if (filters.search) chips.push(`Search: ${filters.search}`);
-    if (filters.status) chips.push(`Status: ${filters.status}`);
+    if (filters.search) chips.push(`${t('common.search')}: ${filters.search}`);
+    if (filters.status) chips.push(`${t('common.status')}: ${filters.status}`);
     if (filters.project_id) {
         const project = projects.value.find((item) => Number(item.id) === Number(filters.project_id));
-        chips.push(`Project: ${project?.name || `#${filters.project_id}`}`);
+        chips.push(`${t('common.project')}: ${project?.name || `#${filters.project_id}`}`);
     }
-    if (filters.date_from) chips.push(`From: ${filters.date_from}`);
-    if (filters.date_to) chips.push(`To: ${filters.date_to}`);
+    if (filters.date_from) chips.push(`${t('common.dateFrom')}: ${filters.date_from}`);
+    if (filters.date_to) chips.push(`${t('common.dateTo')}: ${filters.date_to}`);
 
     return chips;
 });
@@ -90,7 +92,7 @@ const loadPending = async (page = pagination.current_page) => {
         pagination.total = data.total || submissions.value.length;
         scope.value = data.scope || null;
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to load pending submissions.';
+        error.value = err.response?.data?.message || t('validation.unableToLoad');
         submissions.value = [];
         pagination.current_page = 1;
         pagination.last_page = 1;
@@ -216,15 +218,15 @@ onBeforeUnmount(() => {
             <header class="tracky-project-flow__head">
                 <div class="tracky-project-flow__title">
                     <div>
-                        <h2>Submission Review</h2>
-                        <p v-if="scope?.municipality_name">Scoped to {{ scope.municipality_name }}</p>
+                        <h2>{{ t('validation.title') }}</h2>
+                        <p v-if="scope?.municipality_name">{{ t('validation.scopedTo', { name: scope.municipality_name }) }}</p>
                     </div>
                 </div>
 
                 <div class="tracky-project-flow__actions">
-                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="setSort('created_at', 'desc')">Newest</button>
-                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="setSort('created_at', 'asc')">Oldest</button>
-                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="setSort('project_id', 'asc')">By Project</button>
+                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="setSort('created_at', 'desc')">{{ t('validation.newest') }}</button>
+                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="setSort('created_at', 'asc')">{{ t('validation.oldest') }}</button>
+                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="setSort('project_id', 'asc')">{{ t('validation.byProject') }}</button>
                 </div>
             </header>
 
@@ -232,17 +234,17 @@ onBeforeUnmount(() => {
 
             <section class="tracky-project-kpis">
                 <article class="tracky-card tracky-kpi-panel">
-                    <h3>Pending Queue</h3>
+                    <h3>{{ t('validation.pendingQueue') }}</h3>
                     <p class="tracky-kpi-panel__value">{{ pendingCount }}</p>
                 </article>
 
                 <article class="tracky-card tracky-kpi-panel">
-                    <h3>Active Filters</h3>
+                    <h3>{{ t('validation.activeFilters') }}</h3>
                     <p class="tracky-kpi-panel__value">{{ activeFilterCount }}</p>
                 </article>
 
                 <article class="tracky-card tracky-kpi-panel">
-                    <h3>Project Filter</h3>
+                    <h3>{{ t('validation.projectFilter') }}</h3>
                     <p class="tracky-kpi-panel__value">{{ filters.project_id ? '1' : '0' }}</p>
                 </article>
             </section>
@@ -250,18 +252,18 @@ onBeforeUnmount(() => {
             <section class="tracky-card tracky-projects__toolbar">
                 <div class="tracky-projects__filters">
                     <div class="tracky-projects__search-wrap">
-                        <input v-model="filters.search" placeholder="Search submission title or ID">
+                        <input v-model="filters.search" :placeholder="t('validation.searchPlaceholder')">
                     </div>
 
                     <select v-model="filters.status" @change="applyFilters">
-                        <option value="">All pending statuses</option>
-                        <option value="under_review">Under Review</option>
-                        <option value="rework_requested">Rework Requested</option>
-                        <option value="submitted">Submitted</option>
+                        <option value="">{{ t('validation.allPendingStatuses') }}</option>
+                        <option value="under_review">{{ t('statusLabels.under_review') }}</option>
+                        <option value="rework_requested">{{ t('statusLabels.rework_requested') }}</option>
+                        <option value="submitted">{{ t('statusLabels.submitted') }}</option>
                     </select>
 
                     <select v-model="filters.project_id" @focus="ensureProjectsLoaded" @change="applyFilters">
-                        <option value="">{{ projectsLoading ? 'Loading projects...' : 'All projects' }}</option>
+                        <option value="">{{ projectsLoading ? t('common.loadingProjects') : t('validation.allProjects') }}</option>
                         <option v-for="project in projects" :key="project.id" :value="project.id">{{ project.name }}</option>
                     </select>
 
@@ -270,8 +272,8 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div class="tracky-projects__head-actions">
-                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="resetFilters">Reset</button>
-                    <button class="tracky-btn tracky-btn--primary" type="button" @click="applyFilters">Apply</button>
+                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="resetFilters">{{ t('common.reset') }}</button>
+                    <button class="tracky-btn tracky-btn--primary" type="button" @click="applyFilters">{{ t('common.apply') }}</button>
                 </div>
             </section>
 
@@ -280,18 +282,18 @@ onBeforeUnmount(() => {
                     <span class="filter-chip" v-for="chip in activeFilterChips" :key="chip">{{ chip }}</span>
                 </div>
 
-                <div class="tracky-projects__empty" v-if="loading">Loading pending submissions...</div>
+                <div class="tracky-projects__empty" v-if="loading">{{ t('validation.loadingPending') }}</div>
 
                 <table class="tracky-projects-table" v-else-if="submissions.length">
                     <thead>
                     <tr>
                         <th>ID</th>
-                        <th>Title</th>
-                        <th>Reporter</th>
-                        <th>Project</th>
-                        <th>Status</th>
-                        <th>Created</th>
-                        <th>Actions</th>
+                        <th>{{ t('common.title') }}</th>
+                        <th>{{ t('validation.reporter') }}</th>
+                        <th>{{ t('common.project') }}</th>
+                        <th>{{ t('common.status') }}</th>
+                        <th>{{ t('validation.created') }}</th>
+                        <th>{{ t('common.actions') }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -316,7 +318,7 @@ onBeforeUnmount(() => {
                         <td>{{ submission.created_at ? new Date(submission.created_at).toLocaleString() : '-' }}</td>
                         <td>
                             <router-link class="tracky-btn tracky-btn--ghost" :to="{ name: 'submission-detail', params: { id: submission.id } }" @click.stop>
-                                Review
+                                {{ t('validation.review') }}
                             </router-link>
                         </td>
                     </tr>
@@ -324,15 +326,15 @@ onBeforeUnmount(() => {
                 </table>
 
                 <div class="tracky-projects__empty" v-else>
-                    <h3>No pending submissions.</h3>
-                    <p>There are no submissions matching the current validation scope.</p>
+                    <h3>{{ t('validation.noPendingTitle') }}</h3>
+                    <p>{{ t('validation.noPendingBody') }}</p>
                 </div>
             </section>
 
             <footer class="tracky-projects__pagination" v-if="!loading && pagination.last_page > 1">
-                <p>Page {{ pagination.current_page }} of {{ pagination.last_page }}</p>
+                <p>{{ t('common.page', { page: pagination.current_page, total: pagination.last_page }) }}</p>
                 <div class="tracky-page-buttons">
-                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.current_page <= 1" @click="goToPage(pagination.current_page - 1)">Prev</button>
+                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.current_page <= 1" @click="goToPage(pagination.current_page - 1)">{{ t('common.previous') }}</button>
                     <button
                         v-for="page in visiblePages"
                         :key="page"
@@ -342,7 +344,7 @@ onBeforeUnmount(() => {
                     >
                         {{ page }}
                     </button>
-                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.current_page >= pagination.last_page" @click="goToPage(pagination.current_page + 1)">Next</button>
+                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.current_page >= pagination.last_page" @click="goToPage(pagination.current_page + 1)">{{ t('common.next') }}</button>
                 </div>
             </footer>
         </section>

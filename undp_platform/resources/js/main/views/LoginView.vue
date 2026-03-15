@@ -62,7 +62,7 @@ const submit = async () => {
             },
         });
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to send OTP right now.';
+        error.value = err.response?.data?.message || t('login.unableToSendOtp');
     } finally {
         loading.value = false;
     }

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import L from 'leaflet';
+import { useI18n } from 'vue-i18n';
 import AppShell from '../components/AppShell.vue';
 import KpiCards from '../components/KpiCards.vue';
 import api from '../api';
@@ -8,6 +9,7 @@ import { useAsyncExport } from '../composables/useAsyncExport';
 import { useAuthStore } from '../stores/auth';
 
 const FILTER_STORAGE_KEY = 'undp_reports_filters_v1';
+const { t } = useI18n();
 const asyncExport = useAsyncExport();
 const auth = useAuthStore();
 
@@ -81,6 +83,24 @@ const FUNDING_STATUS_COLORS = {
     approved: '#16a34a',
     declined: '#dc2626',
 };
+
+const reportTypeLabels = {
+    submissions: 'reportsPage.submissionsReport',
+    audit_logs: 'reportsPage.auditLogReport',
+    users: 'reportsPage.usersReport',
+};
+
+const statusLabel = (value) => {
+    const key = String(value || '').trim();
+    return key ? t(`statusLabels.${key}`, key.replaceAll('_', ' ')) : '-';
+};
+
+const roleLabel = (value) => {
+    const key = String(value || '').trim();
+    return key ? t(`roles.${key}`, key.replaceAll('_', ' ')) : '-';
+};
+
+const reportTypeLabelText = (value) => t(reportTypeLabels[value] || reportTypeLabels.submissions);
 
 const statusSlices = computed(() => {
     const entries = Object.entries(statusBreakdown.value || {})
@@ -182,47 +202,47 @@ const activeFilterChips = computed(() => {
     const chips = [];
 
     if (filters.status) {
-        chips.push(`Status: ${filters.status}`);
+        chips.push(`${t('common.status')}: ${statusLabel(filters.status)}`);
     }
     if (filters.date_from) {
-        chips.push(`From: ${filters.date_from}`);
+        chips.push(`${t('common.dateFrom')}: ${filters.date_from}`);
     }
     if (filters.date_to) {
-        chips.push(`To: ${filters.date_to}`);
+        chips.push(`${t('common.dateTo')}: ${filters.date_to}`);
     }
     if (filters.municipality_id) {
         const municipality = municipalities.value.find((item) => Number(item.id) === Number(filters.municipality_id));
-        chips.push(`Municipality: ${municipality?.name || filters.municipality_id}`);
+        chips.push(`${t('common.municipality')}: ${municipality?.name || filters.municipality_id}`);
     }
     if (filters.project_id) {
         const project = projects.value.find((item) => Number(item.id) === Number(filters.project_id));
-        chips.push(`Project: ${project?.name || filters.project_id}`);
+        chips.push(`${t('common.project')}: ${project?.name || filters.project_id}`);
     }
 
     return chips;
 });
 
 const detailFilterChips = computed(() => {
-    const chips = [`Report: ${reportTypeLabel.value}`];
+    const chips = [`${t('projectSubmissions.reportType')}: ${reportTypeLabel.value}`];
 
     if (detailFilters.search) {
-        chips.push(`Search: ${detailFilters.search}`);
+        chips.push(`${t('common.search')}: ${detailFilters.search}`);
     }
 
     if (reportType.value === 'audit_logs' && detailFilters.action) {
-        chips.push(`Action: ${detailFilters.action}`);
+        chips.push(`${t('audit.action')}: ${detailFilters.action}`);
     }
 
     if (reportType.value === 'users' && detailFilters.role) {
-        chips.push(`Role: ${detailFilters.role}`);
+        chips.push(`${t('common.role')}: ${roleLabel(detailFilters.role)}`);
     }
 
     if (detailFilters.status) {
-        chips.push(`Status: ${detailFilters.status}`);
+        chips.push(`${t('common.status')}: ${statusLabel(detailFilters.status)}`);
     }
 
     if (detailFilters.user_id) {
-        chips.push(`User ID: ${detailFilters.user_id}`);
+        chips.push(`${t('audit.userId')}: ${detailFilters.user_id}`);
     }
 
     return chips;
@@ -236,41 +256,41 @@ const canReviewFundingRequests = computed(() => auth.hasPermission('funding_requ
 
 const availableReportTypes = computed(() => {
     const options = [
-        { value: 'submissions', label: 'Submissions Report' },
+        { value: 'submissions', label: reportTypeLabelText('submissions') },
     ];
 
     if (canViewAudit.value) {
-        options.push({ value: 'audit_logs', label: 'Audit Log Report' });
+        options.push({ value: 'audit_logs', label: reportTypeLabelText('audit_logs') });
     }
 
     if (canViewUsers.value) {
-        options.push({ value: 'users', label: 'Users Report' });
+        options.push({ value: 'users', label: reportTypeLabelText('users') });
     }
 
     return options;
 });
 
 const reportTypeLabel = computed(() => {
-    return availableReportTypes.value.find((option) => option.value === reportType.value)?.label || 'Submissions Report';
+    return availableReportTypes.value.find((option) => option.value === reportType.value)?.label || reportTypeLabelText('submissions');
 });
 
 const detailSortOptions = computed(() => {
     if (reportType.value === 'users') {
         return [
-            { value: 'created_at', label: 'Created At' },
-            { value: 'last_login_at', label: 'Last Login' },
-            { value: 'name', label: 'Name' },
-            { value: 'role', label: 'Role' },
-            { value: 'status', label: 'Status' },
+            { value: 'created_at', label: t('reportsPage.createdAt') },
+            { value: 'last_login_at', label: t('reportsPage.lastLogin') },
+            { value: 'name', label: t('common.name') },
+            { value: 'role', label: t('common.role') },
+            { value: 'status', label: t('common.status') },
         ];
     }
 
     if (reportType.value === 'submissions') {
         return [
-            { value: 'created_at', label: 'Created At' },
-            { value: 'submitted_at', label: 'Submitted At' },
-            { value: 'updated_at', label: 'Updated At' },
-            { value: 'status', label: 'Status' },
+            { value: 'created_at', label: t('reportsPage.createdAt') },
+            { value: 'submitted_at', label: t('reportsPage.submittedAt') },
+            { value: 'updated_at', label: t('reportsPage.updatedAt') },
+            { value: 'status', label: t('common.status') },
         ];
     }
 
@@ -283,7 +303,7 @@ const exportStatusLabel = computed(() => {
     }
 
     const task = asyncExport.task.value;
-    return `Export ${task.status} (${task.progress}%)`;
+    return t('reportsPage.exportStatus', { status: task.status, progress: task.progress });
 });
 
 const persistedFilters = () => {
@@ -386,10 +406,10 @@ const renderMarkers = () => {
 
             const marker = L.marker([cluster.lat, cluster.lng], { icon });
             marker.bindPopup(`
-                <strong>Cluster</strong><br/>
-                Total: ${cluster.count}<br/>
-                Projects: ${cluster.projects}<br/>
-                Submissions: ${cluster.submissions}
+                <strong>${t('reportsPage.cluster')}</strong><br/>
+                ${t('reportsPage.total')}: ${cluster.count}<br/>
+                ${t('reportsPage.projects')}: ${cluster.projects}<br/>
+                ${t('reportsPage.submissions')}: ${cluster.submissions}
             `);
             markerLayer.addLayer(marker);
         });
@@ -406,15 +426,15 @@ const renderMarkers = () => {
         });
 
         const detailLink = item.type === 'submission'
-            ? `<a href="/submissions/${item.id}" target="_blank" rel="noopener">View details</a>`
+            ? `<a href="/submissions/${item.id}" target="_blank" rel="noopener">${t('reportsPage.viewDetails')}</a>`
             : '-';
 
         marker.bindPopup(`
             <strong>${item.name}</strong><br/>
-            Type: ${item.type}<br/>
-            Status: ${item.status}<br/>
-            Municipality: ${item.municipality || '-'}<br/>
-            ${item.overlap_count > 1 ? `Overlap group: ${item.overlap_index}/${item.overlap_count}<br/>` : ''}
+            ${t('reportsPage.type')}: ${item.type === 'project' ? t('common.project') : t('reportsPage.submissions')}<br/>
+            ${t('common.status')}: ${statusLabel(item.status)}<br/>
+            ${t('common.municipality')}: ${item.municipality || '-'}<br/>
+            ${item.overlap_count > 1 ? `${t('reportsPage.overlapGroup')}: ${item.overlap_index}/${item.overlap_count}<br/>` : ''}
             ${detailLink}
         `);
 
@@ -478,7 +498,7 @@ const loadMapData = async (silent = false) => {
         clusters.value = data.clusters || [];
         renderMarkers();
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to load map data.';
+        error.value = err.response?.data?.message || t('reportsPage.unableToLoadMapData');
     } finally {
         if (!silent) {
             loading.value = false;
@@ -565,7 +585,7 @@ const loadDetailedReport = async (page = 1) => {
         const { data } = await api.get(request.endpoint, { params: request.params });
         normalizeDetailPagination(data);
     } catch (err) {
-        detailError.value = err.response?.data?.message || 'Unable to load detailed report data.';
+        detailError.value = err.response?.data?.message || t('reportsPage.unableToLoadDetailedReport');
         detailRows.value = [];
         reportPagination.current_page = 1;
         reportPagination.last_page = 1;
@@ -599,7 +619,7 @@ const loadFundingRequests = async () => {
         fundingRequests.value = data.data || [];
     } catch (err) {
         fundingRequests.value = [];
-        fundingError.value = err.response?.data?.message || 'Unable to load funding requests.';
+        fundingError.value = err.response?.data?.message || t('reportsPage.unableToLoadFundingRequests');
     } finally {
         fundingLoading.value = false;
     }
@@ -618,7 +638,7 @@ const loadReports = async () => {
         await loadDetailedReport(1);
         await loadFundingRequests();
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to load report data.';
+        error.value = err.response?.data?.message || t('reportsPage.unableToLoadReportData');
     } finally {
         loading.value = false;
     }
@@ -744,7 +764,10 @@ const startSummaryPdfExport = async () => {
     });
 };
 
-const rowStatusLabel = (value) => String(value || '-').replaceAll('_', ' ');
+const rowStatusLabel = (value) => {
+    const key = String(value || '').trim();
+    return key ? t(`statusLabels.${key}`, t(`roles.${key}`, key.replaceAll('_', ' '))) : '-';
+};
 
 const formatDateTime = (value) => {
     if (!value) {
@@ -761,7 +784,7 @@ const reviewFundingRequest = async (row, decision) => {
 
     const reviewComment = String(fundingReviewNotes[row.id] || '').trim();
     if (!reviewComment) {
-        fundingError.value = 'Review reason is required to approve or decline.';
+        fundingError.value = t('reportsPage.reviewReasonRequired');
         return;
     }
 
@@ -784,7 +807,7 @@ const reviewFundingRequest = async (row, decision) => {
             loadKpis(),
         ]);
     } catch (err) {
-        fundingError.value = err.response?.data?.message || 'Unable to review funding request.';
+        fundingError.value = err.response?.data?.message || t('reportsPage.unableToReviewFundingRequest');
     }
 };
 
@@ -856,7 +879,7 @@ onBeforeUnmount(() => {
     <AppShell>
         <section class="panel">
             <header class="panel__header">
-                <h2>KPI & Geo Reports</h2>
+                <h2>{{ t('reportsPage.title') }}</h2>
             </header>
 
             <p class="field-error" v-if="error">{{ error }}</p>
@@ -865,38 +888,38 @@ onBeforeUnmount(() => {
                 <input v-model="filters.date_from" type="date">
                 <input v-model="filters.date_to" type="date">
                 <select v-model="filters.municipality_id" @change="onMunicipalityChange">
-                    <option value="">All municipalities</option>
+                    <option value="">{{ t('reportsPage.allMunicipalities') }}</option>
                     <option v-for="municipality in municipalities" :key="municipality.id" :value="municipality.id">
                         {{ municipality.name }}
                     </option>
                 </select>
                 <select v-model="filters.project_id" @focus="loadProjectOptions()">
-                    <option value="">All projects</option>
+                    <option value="">{{ t('reportsPage.allProjects') }}</option>
                     <option v-for="project in projects" :key="project.id" :value="project.id">
                         {{ project.name }}
                     </option>
                 </select>
                 <select v-model="filters.status">
-                    <option value="">All statuses</option>
-                    <option value="under_review">Under Review</option>
-                    <option value="approved">Approved</option>
-                    <option value="rework_requested">Rework Requested</option>
-                    <option value="rejected">Rejected</option>
+                    <option value="">{{ t('reportsPage.allStatuses') }}</option>
+                    <option value="under_review">{{ t('statusLabels.under_review') }}</option>
+                    <option value="approved">{{ t('statusLabels.approved') }}</option>
+                    <option value="rework_requested">{{ t('statusLabels.rework_requested') }}</option>
+                    <option value="rejected">{{ t('statusLabels.rejected') }}</option>
                 </select>
                 <select v-model="reportType">
                     <option v-for="option in availableReportTypes" :key="option.value" :value="option.value">
                         {{ option.label }}
                     </option>
                 </select>
-                <button class="btn btn--primary" @click="applyFilters">Apply</button>
-                <button class="btn btn--ghost" @click="resetFilters">Reset Filters</button>
+                <button class="btn btn--primary" @click="applyFilters">{{ t('common.apply') }}</button>
+                <button class="btn btn--ghost" @click="resetFilters">{{ t('reportsPage.resetFilters') }}</button>
                 <button
                     v-if="canExportCsv"
                     class="btn btn--ghost"
                     :disabled="asyncExport.loading.value"
                     @click="startCsvExport"
                 >
-                    Export CSV
+                    {{ t('common.exportCsv') }}
                 </button>
                 <button
                     v-if="canExportPdf && reportType === 'submissions'"
@@ -904,14 +927,14 @@ onBeforeUnmount(() => {
                     :disabled="asyncExport.loading.value"
                     @click="startSummaryPdfExport"
                 >
-                    Export PDF
+                    {{ t('common.exportPdf') }}
                 </button>
                 <button
                     v-if="asyncExport.task.value?.status === 'ready'"
                     class="btn btn--primary"
                     @click="asyncExport.download"
                 >
-                    Download
+                    {{ t('common.download') }}
                 </button>
             </div>
             <p class="panel__hint" v-if="exportStatusLabel">{{ exportStatusLabel }}</p>
@@ -924,9 +947,9 @@ onBeforeUnmount(() => {
 
             <div class="split-grid">
                 <div class="detail-block">
-                    <h3>Status Analytics</h3>
+                    <h3>{{ t('reportsPage.statusAnalytics') }}</h3>
                     <div class="status-chart-wrap">
-                        <svg viewBox="0 0 42 42" class="status-donut" role="img" aria-label="Status breakdown chart">
+                        <svg viewBox="0 0 42 42" class="status-donut" role="img" :aria-label="t('reportsPage.statusBreakdownChart')">
                             <circle cx="21" cy="21" r="15.9155" fill="transparent" stroke="#e2e8f0" stroke-width="6" />
                             <circle
                                 v-for="slice in statusSlices"
@@ -947,7 +970,7 @@ onBeforeUnmount(() => {
                             <li v-for="slice in statusSlices" :key="slice.status">
                                 <button class="status-legend__btn" type="button" @click="drillStatus(slice.status)">
                                     <span class="status-legend__dot" :style="{ backgroundColor: slice.color }" />
-                                    <span>{{ slice.status.replaceAll('_', ' ') }}</span>
+                                    <span>{{ statusLabel(slice.status) }}</span>
                                     <strong>{{ slice.count }}</strong>
                                 </button>
                             </li>
@@ -955,19 +978,19 @@ onBeforeUnmount(() => {
                     </div>
                     <ul class="stat-list stat-list--dense" v-if="statusSummary.length">
                         <li v-for="row in statusSummary" :key="`status-summary-${row.status}`">
-                            <span>{{ row.label }}</span>
+                            <span>{{ statusLabel(row.status || row.label) }}</span>
                             <strong>{{ row.count }} / {{ row.percentage }}%</strong>
                         </li>
                     </ul>
                 </div>
 
                 <div class="detail-block">
-                    <h3>Municipality Breakdown</h3>
+                    <h3>{{ t('reportsPage.municipalityBreakdown') }}</h3>
                     <ul class="bar-list">
                         <li v-for="row in municipalityBreakdown" :key="row.municipality_id">
                             <div>
                                 <span>{{ row.municipality_name }}</span>
-                                <small>{{ row.approval_rate_percent || 0 }}% approved</small>
+                                <small>{{ row.approval_rate_percent || 0 }}% {{ t('statusLabels.approved') }}</small>
                             </div>
                             <div class="bar-list__track">
                                 <div
@@ -983,12 +1006,12 @@ onBeforeUnmount(() => {
 
             <div class="split-grid">
                 <div class="detail-block">
-                    <h3>Project Breakdown</h3>
+                    <h3>{{ t('reportsPage.projectBreakdown') }}</h3>
                     <ul class="bar-list">
                         <li v-for="row in projectBreakdown" :key="row.project_id">
                             <div>
                                 <span>{{ row.project_name }}</span>
-                                <small>{{ row.municipality_name || '-' }} | {{ row.approval_rate_percent || 0 }}% approved</small>
+                                <small>{{ row.municipality_name || '-' }} | {{ row.approval_rate_percent || 0 }}% {{ t('statusLabels.approved') }}</small>
                             </div>
                             <div class="bar-list__track">
                                 <div
@@ -1002,19 +1025,19 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div class="detail-block">
-                    <h3>Trend</h3>
+                    <h3>{{ t('reportsPage.trend') }}</h3>
                     <div class="trend-chart" v-if="trendPath">
-                        <svg viewBox="0 0 360 150" role="img" aria-label="Submission trend chart">
+                        <svg viewBox="0 0 360 150" role="img" :aria-label="t('reportsPage.submissionTrendChart')">
                             <path v-if="trendAreaPath" :d="trendAreaPath" class="trend-area" />
                             <polyline :points="trendPath" class="trend-line" />
                         </svg>
                     </div>
-                    <p class="panel__hint" v-if="!trendPath && !loading">No trend data available.</p>
+                    <p class="panel__hint" v-if="!trendPath && !loading">{{ t('reportsPage.noTrend') }}</p>
                     <ul class="trend-labels" v-if="trend.length">
                         <li v-for="item in trend" :key="item.day">
                             <small>{{ item.day }}</small>
                             <strong>{{ item.count }}</strong>
-                            <span>Approved {{ item.approved || 0 }}</span>
+                            <span>{{ t('reportsPage.approvedShort', { count: item.approved || 0 }) }}</span>
                         </li>
                     </ul>
                 </div>
@@ -1022,7 +1045,7 @@ onBeforeUnmount(() => {
 
             <div class="split-grid">
                 <div class="detail-block">
-                    <h3>Review Backlog Aging</h3>
+                    <h3>{{ t('reportsPage.reviewBacklogAging') }}</h3>
                     <ul class="bar-list">
                         <li v-for="bucket in reviewBacklog" :key="bucket.key">
                             <span>{{ bucket.label }}</span>
@@ -1038,9 +1061,9 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div class="detail-block" v-if="fundingOverview">
-                    <h3>Funding Request Overview</h3>
+                    <h3>{{ t('reportsPage.fundingOverview') }}</h3>
                     <div class="status-chart-wrap">
-                        <svg viewBox="0 0 42 42" class="status-donut" role="img" aria-label="Funding status breakdown chart">
+                        <svg viewBox="0 0 42 42" class="status-donut" role="img" :aria-label="t('reportsPage.fundingStatusBreakdownChart')">
                             <circle cx="21" cy="21" r="15.9155" fill="transparent" stroke="#e2e8f0" stroke-width="6" />
                             <circle
                                 v-for="slice in fundingSlices"
@@ -1060,7 +1083,7 @@ onBeforeUnmount(() => {
                             <li v-for="slice in fundingSlices" :key="`funding-${slice.status}`">
                                 <div class="status-legend__btn status-legend__btn--static">
                                     <span class="status-legend__dot" :style="{ backgroundColor: slice.color }" />
-                                    <span>{{ slice.status.replaceAll('_', ' ') }}</span>
+                                    <span>{{ statusLabel(slice.status) }}</span>
                                     <strong>{{ slice.count }}</strong>
                                 </div>
                             </li>
@@ -1068,19 +1091,19 @@ onBeforeUnmount(() => {
                     </div>
                     <ul class="stat-list stat-list--dense">
                         <li>
-                            <span>Total Requested</span>
+                            <span>{{ t('reportsPage.totalRequested') }}</span>
                             <strong>{{ Number(fundingOverview.total_requested_amount || 0).toLocaleString() }}</strong>
                         </li>
                         <li>
-                            <span>Pending Amount</span>
+                            <span>{{ t('reportsPage.pendingAmount') }}</span>
                             <strong>{{ Number(fundingOverview.pending_requested_amount || 0).toLocaleString() }}</strong>
                         </li>
                         <li>
-                            <span>Approved Amount</span>
+                            <span>{{ t('reportsPage.approvedAmount') }}</span>
                             <strong>{{ Number(fundingOverview.approved_requested_amount || 0).toLocaleString() }}</strong>
                         </li>
                         <li>
-                            <span>Approval Rate</span>
+                            <span>{{ t('reportsPage.approvalRate') }}</span>
                             <strong>{{ fundingOverview.approval_rate_percent || 0 }}%</strong>
                         </li>
                     </ul>
@@ -1090,52 +1113,52 @@ onBeforeUnmount(() => {
             <div class="detail-block">
                 <div class="map-shell__head">
                     <h3>{{ reportTypeLabel }}</h3>
-                    <p class="panel__hint">All filters and exports respect current role permissions and scoped data.</p>
+                    <p class="panel__hint">{{ t('reportsPage.allFiltersHint') }}</p>
                 </div>
 
                 <div class="toolbar">
-                    <input v-model="detailFilters.search" placeholder="Search records">
+                    <input v-model="detailFilters.search" :placeholder="t('reportsPage.searchRecords')">
                     <input
                         v-if="reportType === 'audit_logs'"
                         v-model="detailFilters.action"
-                        placeholder="Action contains"
+                        :placeholder="t('reportsPage.actionContains')"
                     >
                     <input
                         v-if="reportType === 'audit_logs'"
                         v-model="detailFilters.user_id"
                         type="number"
                         min="1"
-                        placeholder="Actor user ID"
+                        :placeholder="t('reportsPage.actorUserId')"
                     >
                     <select v-if="reportType !== 'audit_logs'" v-model="detailFilters.status">
-                        <option value="">All statuses</option>
-                        <option v-if="reportType === 'submissions'" value="under_review">Under Review</option>
-                        <option v-if="reportType === 'submissions'" value="approved">Approved</option>
-                        <option v-if="reportType === 'submissions'" value="rework_requested">Rework Requested</option>
-                        <option v-if="reportType === 'submissions'" value="rejected">Rejected</option>
-                        <option v-if="reportType === 'users'" value="active">Active</option>
-                        <option v-if="reportType === 'users'" value="disabled">Disabled</option>
+                        <option value="">{{ t('reportsPage.allStatuses') }}</option>
+                        <option v-if="reportType === 'submissions'" value="under_review">{{ t('statusLabels.under_review') }}</option>
+                        <option v-if="reportType === 'submissions'" value="approved">{{ t('statusLabels.approved') }}</option>
+                        <option v-if="reportType === 'submissions'" value="rework_requested">{{ t('statusLabels.rework_requested') }}</option>
+                        <option v-if="reportType === 'submissions'" value="rejected">{{ t('statusLabels.rejected') }}</option>
+                        <option v-if="reportType === 'users'" value="active">{{ t('common.active') }}</option>
+                        <option v-if="reportType === 'users'" value="disabled">{{ t('common.disabled') }}</option>
                     </select>
                     <select v-if="reportType !== 'submissions'" v-model="detailFilters.role">
-                        <option value="">All roles</option>
-                        <option value="reporter">Reporter</option>
-                        <option value="municipal_focal_point">Municipal Focal Point</option>
-                        <option value="undp_admin">UNDP Admin</option>
-                        <option value="partner_donor_viewer">Partner / Donor Viewer</option>
-                        <option value="auditor">Auditor</option>
+                        <option value="">{{ t('reportsPage.allRoles') }}</option>
+                        <option value="reporter">{{ t('roles.reporter') }}</option>
+                        <option value="municipal_focal_point">{{ t('roles.municipal_focal_point') }}</option>
+                        <option value="undp_admin">{{ t('roles.undp_admin') }}</option>
+                        <option value="partner_donor_viewer">{{ t('roles.partner_donor_viewer') }}</option>
+                        <option value="auditor">{{ t('roles.auditor') }}</option>
                     </select>
                     <select v-if="detailSortOptions.length" v-model="detailFilters.sort_by">
-                        <option value="">Default sort</option>
+                        <option value="">{{ t('reportsPage.defaultSort') }}</option>
                         <option v-for="option in detailSortOptions" :key="option.value" :value="option.value">
                             {{ option.label }}
                         </option>
                     </select>
                     <select v-if="detailSortOptions.length" v-model="detailFilters.sort_dir">
-                        <option value="desc">Descending</option>
-                        <option value="asc">Ascending</option>
+                        <option value="desc">{{ t('reportsPage.descending') }}</option>
+                        <option value="asc">{{ t('reportsPage.ascending') }}</option>
                     </select>
-                    <button class="btn btn--primary" @click="applyDetailedFilters">Apply Table Filters</button>
-                    <button class="btn btn--ghost" @click="resetDetailedFilters">Reset Table Filters</button>
+                    <button class="btn btn--primary" @click="applyDetailedFilters">{{ t('reportsPage.applyTableFilters') }}</button>
+                    <button class="btn btn--ghost" @click="resetDetailedFilters">{{ t('reportsPage.resetTableFilters') }}</button>
                 </div>
 
                 <div class="chips-row" v-if="detailFilterChips.length">
@@ -1148,35 +1171,35 @@ onBeforeUnmount(() => {
                     <table class="table" v-if="!detailLoading && detailRows.length">
                         <thead v-if="reportType === 'submissions'">
                             <tr>
-                                <th>ID</th>
-                                <th>Title</th>
-                                <th>Status</th>
-                                <th>Reporter</th>
-                                <th>Project</th>
-                                <th>Municipality</th>
-                                <th>Submitted</th>
-                                <th>Actions</th>
+                                <th>{{ t('common.id') }}</th>
+                                <th>{{ t('common.title') }}</th>
+                                <th>{{ t('common.status') }}</th>
+                                <th>{{ t('validation.reporter') }}</th>
+                                <th>{{ t('common.project') }}</th>
+                                <th>{{ t('common.municipality') }}</th>
+                                <th>{{ t('reportsPage.submittedAt') }}</th>
+                                <th>{{ t('common.actions') }}</th>
                             </tr>
                         </thead>
                         <thead v-else-if="reportType === 'audit_logs'">
                             <tr>
-                                <th>ID</th>
-                                <th>Timestamp</th>
-                                <th>Action</th>
-                                <th>Actor</th>
-                                <th>Role</th>
-                                <th>Entity</th>
+                                <th>{{ t('common.id') }}</th>
+                                <th>{{ t('audit.timestamp') }}</th>
+                                <th>{{ t('audit.action') }}</th>
+                                <th>{{ t('common.actor') }}</th>
+                                <th>{{ t('common.role') }}</th>
+                                <th>{{ t('reportsPage.entity') }}</th>
                             </tr>
                         </thead>
                         <thead v-else>
                             <tr>
-                                <th>ID</th>
-                                <th>Name</th>
-                                <th>Email / Phone</th>
-                                <th>Role</th>
-                                <th>Status</th>
-                                <th>Municipality</th>
-                                <th>Last Login</th>
+                                <th>{{ t('common.id') }}</th>
+                                <th>{{ t('common.name') }}</th>
+                                <th>{{ t('reportsPage.emailPhone') }}</th>
+                                <th>{{ t('common.role') }}</th>
+                                <th>{{ t('common.status') }}</th>
+                                <th>{{ t('common.municipality') }}</th>
+                                <th>{{ t('reportsPage.lastLogin') }}</th>
                             </tr>
                         </thead>
                         <tbody v-if="reportType === 'submissions'">
@@ -1191,7 +1214,7 @@ onBeforeUnmount(() => {
                                 <td>{{ row.municipality?.name || '-' }}</td>
                                 <td>{{ formatDateTime(row.submitted_at || row.created_at) }}</td>
                                 <td>
-                                    <a :href="`/submissions/${row.id}`" target="_blank" rel="noopener">View</a>
+                                    <a :href="`/submissions/${row.id}`" target="_blank" rel="noopener">{{ t('common.view') }}</a>
                                 </td>
                             </tr>
                         </tbody>
@@ -1221,8 +1244,8 @@ onBeforeUnmount(() => {
                             </tr>
                         </tbody>
                     </table>
-                    <p class="panel__hint" v-else-if="detailLoading">Loading report records...</p>
-                    <p class="panel__hint" v-else>No records found for current filters.</p>
+                    <p class="panel__hint" v-else-if="detailLoading">{{ t('reportsPage.reportRecordsLoading') }}</p>
+                    <p class="panel__hint" v-else>{{ t('reportsPage.noRecords') }}</p>
                 </div>
 
                 <div class="pagination-bar" v-if="!detailLoading && reportPagination.last_page > 1">
@@ -1232,7 +1255,7 @@ onBeforeUnmount(() => {
                         :disabled="reportPagination.current_page <= 1"
                         @click="goToDetailPage(reportPagination.current_page - 1)"
                     >
-                        Previous
+                        {{ t('common.previous') }}
                     </button>
                     <button
                         class="btn btn--ghost"
@@ -1240,47 +1263,46 @@ onBeforeUnmount(() => {
                         :disabled="reportPagination.current_page >= reportPagination.last_page"
                         @click="goToDetailPage(reportPagination.current_page + 1)"
                     >
-                        Next
+                        {{ t('common.next') }}
                     </button>
                     <span class="pagination-meta">
-                        Page {{ reportPagination.current_page }} of {{ reportPagination.last_page }}
-                        ({{ reportPagination.total }} records)
+                        {{ t('reportsPage.pageMeta', { page: reportPagination.current_page, total: reportPagination.last_page, records: reportPagination.total }) }}
                     </span>
                 </div>
             </div>
 
             <div class="detail-block" v-if="canReviewFundingRequests">
                 <div class="map-shell__head">
-                    <h3>Funding Requests Review (Admin)</h3>
-                    <p class="panel__hint">Review donor funding requests and approve or decline with a required reason.</p>
+                    <h3>{{ t('reportsPage.fundingReviewTitle') }}</h3>
+                    <p class="panel__hint">{{ t('reportsPage.fundingReviewHint') }}</p>
                 </div>
 
                 <p class="field-error" v-if="fundingError">{{ fundingError }}</p>
 
                 <div class="toolbar">
                     <select v-model="fundingStatusFilter" @change="loadFundingRequests">
-                        <option value="pending">Pending Review</option>
-                        <option value="approved">Approved</option>
-                        <option value="declined">Declined</option>
+                        <option value="pending">{{ t('reportsPage.pendingReview') }}</option>
+                        <option value="approved">{{ t('statusLabels.approved') }}</option>
+                        <option value="declined">{{ t('statusLabels.declined') }}</option>
                     </select>
-                    <button class="btn btn--ghost" type="button" @click="loadFundingRequests">Refresh Requests</button>
+                    <button class="btn btn--ghost" type="button" @click="loadFundingRequests">{{ t('reportsPage.refreshRequests') }}</button>
                 </div>
 
                 <div class="table-wrap">
                     <table class="table" v-if="!fundingLoading && fundingRequests.length">
                         <thead>
                             <tr>
-                                <th>ID</th>
-                                <th>Project</th>
-                                <th>Municipality</th>
-                                <th>Donor</th>
-                                <th>Amount</th>
-                                <th>Status</th>
-                                <th>Request Reason</th>
-                                <th>Review Reason</th>
-                                <th>Requested</th>
-                                <th>Reviewed</th>
-                                <th>Actions</th>
+                                <th>{{ t('common.id') }}</th>
+                                <th>{{ t('common.project') }}</th>
+                                <th>{{ t('common.municipality') }}</th>
+                                <th>{{ t('dashboard.donors') }}</th>
+                                <th>{{ t('common.amount') }}</th>
+                                <th>{{ t('common.status') }}</th>
+                                <th>{{ t('reportsPage.requestReason') }}</th>
+                                <th>{{ t('reportsPage.reviewReason') }}</th>
+                                <th>{{ t('reportsPage.requested') }}</th>
+                                <th>{{ t('reportsPage.reviewed') }}</th>
+                                <th>{{ t('common.actions') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1292,7 +1314,7 @@ onBeforeUnmount(() => {
                                 <td>{{ row.currency }} {{ Number(row.amount || 0).toLocaleString() }}</td>
                                 <td>
                                     <span class="status-pill" :class="row.status === 'approved' ? 'status-pill--active' : row.status === 'declined' ? 'status-pill--disabled' : ''">
-                                        {{ row.status_label }}
+                                        {{ statusLabel(row.status) }}
                                     </span>
                                 </td>
                                 <td>{{ row.reason || '-' }}</td>
@@ -1304,30 +1326,30 @@ onBeforeUnmount(() => {
                                         <textarea
                                             v-model="fundingReviewNotes[row.id]"
                                             rows="2"
-                                            placeholder="Review reason (required)"
+                                            :placeholder="t('reportsPage.reviewReasonRequired')"
                                         />
                                         <div class="inline-group">
-                                            <button class="btn btn--primary" type="button" @click="reviewFundingRequest(row, 'approve')">Approve</button>
-                                            <button class="btn btn--danger" type="button" @click="reviewFundingRequest(row, 'decline')">Decline</button>
+                                            <button class="btn btn--primary" type="button" @click="reviewFundingRequest(row, 'approve')">{{ t('submissionDetail.approve') }}</button>
+                                            <button class="btn btn--danger" type="button" @click="reviewFundingRequest(row, 'decline')">{{ t('submissionDetail.reject') }}</button>
                                         </div>
                                     </div>
-                                    <span v-else>Reviewed</span>
+                                    <span v-else>{{ t('common.reviewed') }}</span>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
-                    <p class="panel__hint" v-else-if="fundingLoading">Loading funding requests...</p>
-                    <p class="panel__hint" v-else>No pending funding requests for the current scope.</p>
+                    <p class="panel__hint" v-else-if="fundingLoading">{{ t('reportsPage.loadingFundingRequests') }}</p>
+                    <p class="panel__hint" v-else>{{ t('reportsPage.noFundingRequests') }}</p>
                 </div>
             </div>
 
             <div class="detail-block map-shell" ref="mapShellRef">
                 <div class="map-shell__head">
                     <div>
-                        <h3>Interactive Map</h3>
+                        <h3>{{ t('reportsPage.interactiveMap') }}</h3>
                     </div>
                     <button class="btn btn--ghost" type="button" @click="toggleMapFullscreen">
-                        {{ isMapFullscreen ? 'Exit Full Screen' : 'Full Screen Map' }}
+                        {{ isMapFullscreen ? t('reportsPage.exitFullScreen') : t('reportsPage.fullScreenMap') }}
                     </button>
                 </div>
                 <div ref="mapRef" class="map-canvas"></div>

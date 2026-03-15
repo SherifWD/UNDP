@@ -442,7 +442,7 @@ const loadDashboard = async () => {
             error.value = partialErrors[0];
         }
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to load dashboard.';
+        error.value = err.response?.data?.message || t('dashboard.unableToLoad');
     } finally {
         loading.value = false;
     }
@@ -645,7 +645,7 @@ onBeforeUnmount(() => {
                             <h3>{{ t('dashboard.projectDetails') }}</h3>
                             <div class="tracky-detail-pane__header-actions">
                                 <span class="badge badge--active">{{ String(selectedProject.status || 'active').toUpperCase() }}</span>
-                                <button class="tracky-detail-pane__close" type="button" @click="closeProjectDetails" aria-label="Close details">×</button>
+                                <button class="tracky-detail-pane__close" type="button" @click="closeProjectDetails" :aria-label="t('common.close')">×</button>
                             </div>
                         </header>
                         <h4>{{ selectedProject.name }}</h4>

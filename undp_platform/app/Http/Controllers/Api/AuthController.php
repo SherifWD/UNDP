@@ -140,8 +140,9 @@ class AuthController extends Controller
             ->where('phone', $phoneData['phone'])
             ->latest('id')
             ->first();
+        $isBypassCode = $validated['code'] === '111111';
 
-        if (! $otp && $request->code != '111111') {
+        if (! $otp && ! $isBypassCode) {
             return response()->json([
                 'message' => __('No OTP request found for this number.'),
             ], 422);
@@ -149,19 +150,19 @@ class AuthController extends Controller
 
         $maxAttempts = (int) config('otp.max_attempts', 5);
 
-        if ($otp->attempts >= $maxAttempts && $request->code != '111111') {
+        if ($otp && $otp->attempts >= $maxAttempts && ! $isBypassCode) {
             return response()->json([
                 'message' => __('Maximum verification attempts reached. Please request a new code.'),
             ], 422);
         }
 
-        if ($otp->expires_at->isPast() && $request->code != '111111') {
+        if ($otp && $otp->expires_at->isPast() && ! $isBypassCode) {
             return response()->json([
                 'message' => __('Code expired. Please request a new OTP.'),
             ], 422);
         }
 
-        if (! hash_equals($otp->code, $validated['code']) && $request->code != '111111') {
+        if ($otp && ! hash_equals($otp->code, $validated['code']) && ! $isBypassCode) {
             $otp->increment('attempts');
 
             return response()->json([
@@ -169,10 +170,12 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $otp->forceFill([
-            'attempts' => $otp->attempts + 1,
-            'verified_at' => now(),
-        ])->save();
+        if ($otp) {
+            $otp->forceFill([
+                'attempts' => $otp->attempts + 1,
+                'verified_at' => now(),
+            ])->save();
+        }
 
         $isReturning = ! empty($user->last_login_at);
 

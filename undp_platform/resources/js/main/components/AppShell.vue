@@ -77,7 +77,7 @@ const currentPageLabel = computed(() => {
 });
 
 const firstName = computed(() => {
-    const fullName = auth.user?.name || 'User';
+    const fullName = auth.user?.name || t('common.user');
     return String(fullName).split(' ')[0];
 });
 
@@ -103,7 +103,7 @@ const iconPath = (name) => NAV_ICON_PATHS[name] || NAV_ICON_PATHS.dashboard;
                 <div class="shell__brand-icon">
                 <h1>RASD</h1>
                 </div>
-                <button class="shell__collapse-btn" type="button" aria-label="Toggle sidebar">
+                <button class="shell__collapse-btn" type="button" :aria-label="t('shell.toggleSidebar')">
                     <span class="shell__collapse-icon" aria-hidden="true" />
                 </button>
             </header>
@@ -147,10 +147,10 @@ const iconPath = (name) => NAV_ICON_PATHS[name] || NAV_ICON_PATHS.dashboard;
             <footer class="shell__profile">
                 <div class="shell__profile-avatar">{{ firstName.charAt(0).toUpperCase() }}</div>
                 <div class="shell__profile-meta">
-                    <p class="shell__profile-name" :title="auth.user?.name || 'User'">{{ auth.user?.name || 'User' }}</p>
+                    <p class="shell__profile-name" :title="auth.user?.name || t('common.user')">{{ auth.user?.name || t('common.user') }}</p>
                     <p class="shell__profile-email" :title="auth.user?.email || auth.user?.phone_e164 || ''">{{ auth.user?.email || auth.user?.phone_e164 || '' }}</p>
                 </div>
-                <button class="shell__logout-btn" type="button" @click="logout" aria-label="Logout">
+                <button class="shell__logout-btn" type="button" @click="logout" :aria-label="t('nav.logout')">
                     <span class="shell__logout-icon" aria-hidden="true" />
                 </button>
             </footer>
@@ -165,7 +165,7 @@ const iconPath = (name) => NAV_ICON_PATHS[name] || NAV_ICON_PATHS.dashboard;
 
                 <div class="shell__header-actions">
                     <LanguageSwitch />
-                    <button class="shell__notify-btn" type="button" @click="showNotifications = !showNotifications" aria-label="Notifications">
+                    <button class="shell__notify-btn" type="button" @click="showNotifications = !showNotifications" :aria-label="t('shell.notifications')">
                         <span class="shell__bell-icon" aria-hidden="true" />
                         <span class="shell__notify-dot" aria-hidden="true" />
                     </button>
@@ -180,7 +180,7 @@ const iconPath = (name) => NAV_ICON_PATHS[name] || NAV_ICON_PATHS.dashboard;
                 v-if="showNotifications"
                 class="shell__drawer-backdrop"
                 type="button"
-                aria-label="Close notifications"
+                :aria-label="t('common.close')"
                 @click="closeNotifications"
             />
 
@@ -188,8 +188,8 @@ const iconPath = (name) => NAV_ICON_PATHS[name] || NAV_ICON_PATHS.dashboard;
                 <div class="shell__notification-head">
                     <input v-model="notificationQuery" :placeholder="t('shell.notificationsSearch')">
                     <div class="shell__notification-actions">
-                        <button type="button" class="notif-btn notif-btn--accept">OK</button>
-                        <button type="button" class="notif-btn notif-btn--delete">DEL</button>
+                        <button type="button" class="notif-btn notif-btn--accept">{{ t('common.apply') }}</button>
+                        <button type="button" class="notif-btn notif-btn--delete">{{ t('common.reset') }}</button>
                     </div>
                 </div>
                 <div class="shell__notification-tabs">

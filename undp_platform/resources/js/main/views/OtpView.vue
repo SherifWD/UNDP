@@ -99,7 +99,7 @@ const resend = async () => {
         });
         startCountdown();
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to resend code.';
+        error.value = err.response?.data?.message || t('otp.unableToResend');
     }
 };
 

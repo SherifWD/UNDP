@@ -1,8 +1,10 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import AppShell from '../components/AppShell.vue';
 import api from '../api';
 
+const { t } = useI18n();
 const logs = ref([]);
 const loading = ref(false);
 const error = ref('');
@@ -80,7 +82,7 @@ const loadLogs = async (page = pagination.current_page) => {
         pagination.last_page = data.last_page || 1;
         pagination.total = data.total || logs.value.length;
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to load audit logs.';
+        error.value = err.response?.data?.message || t('audit.unableToLoad');
         logs.value = [];
         pagination.current_page = 1;
         pagination.last_page = 1;
@@ -131,7 +133,7 @@ const goToPage = async (page) => {
 
 const moduleLabel = (log) => {
     const value = String(log.entity_type || '').replace(/_/g, ' ');
-    return value ? value.charAt(0).toUpperCase() + value.slice(1) : 'System';
+    return value ? value.charAt(0).toUpperCase() + value.slice(1) : t('common.system');
 };
 
 const referenceLabel = (log) => {
@@ -149,28 +151,28 @@ const referenceLabel = (log) => {
         return `USR-${String(log.entity_id).padStart(3, '0')}`;
     }
 
-    return `REF-${String(log.id).padStart(3, '0')}`;
+        return `REF-${String(log.id).padStart(3, '0')}`;
 };
 
 const detailLabel = (log) => {
     if (log.metadata?.status) {
-        return `Status ${String(log.metadata.status).replace(/_/g, ' ')}`;
+        return `${t('audit.statusPrefix')} ${String(log.metadata.status).replace(/_/g, ' ')}`;
     }
 
     const afterKeys = Object.keys(log.after || {});
     if (afterKeys.length) {
-        return `Updated ${afterKeys.slice(0, 2).join(', ')}`;
+        return `${t('audit.updatedPrefix')} ${afterKeys.slice(0, 2).join(', ')}`;
     }
 
-    return 'Action captured';
+    return t('audit.actionCaptured');
 };
 
-const userLabel = (log) => log.actor?.name || 'System';
+const userLabel = (log) => log.actor?.name || t('common.system');
 
 const deviceLabel = (log) => {
-    const agent = String(log.user_agent || 'Unknown device');
-    const browser = ['Chrome', 'Firefox', 'Safari', 'Edge', 'Opera', 'Brave'].find((item) => agent.includes(item)) || 'Browser';
-    const platform = ['Windows', 'macOS', 'Linux', 'Android', 'iPhone', 'iPad'].find((item) => agent.includes(item)) || 'Device';
+    const agent = String(log.user_agent || t('audit.unknownDevice'));
+    const browser = ['Chrome', 'Firefox', 'Safari', 'Edge', 'Opera', 'Brave'].find((item) => agent.includes(item)) || t('audit.browser');
+    const platform = ['Windows', 'macOS', 'Linux', 'Android', 'iPhone', 'iPad'].find((item) => agent.includes(item)) || t('audit.device');
     return `${browser} - ${platform}`;
 };
 
@@ -184,7 +186,7 @@ onMounted(async () => {
         <section class="tracky-audit-page">
             <header class="tracky-projects__head">
                 <div>
-                    <h2>Audit Log</h2>
+                    <h2>{{ t('audit.pageTitle') }}</h2>
                 </div>
             </header>
 
@@ -192,50 +194,50 @@ onMounted(async () => {
 
             <section class="tracky-card tracky-audit-summary">
                 <div>
-                    <h3>Total Activities</h3>
+                    <h3>{{ t('audit.totalActivities') }}</h3>
                     <p class="tracky-figure">{{ totalActivities }}</p>
-                    <span class="tracky-subtle">Actions</span>
+                    <span class="tracky-subtle">{{ t('audit.actionsLabel') }}</span>
                 </div>
                 <div>
-                    <h3>Online Users</h3>
+                    <h3>{{ t('audit.onlineUsers') }}</h3>
                     <p class="tracky-figure">{{ onlineUsers }}</p>
-                    <span class="tracky-subtle">Active Users</span>
+                    <span class="tracky-subtle">{{ t('audit.activeUsers') }}</span>
                 </div>
             </section>
 
             <section class="tracky-card tracky-projects__toolbar">
                 <div class="tracky-projects__filters">
                     <div class="tracky-projects__search-wrap">
-                        <input v-model="filters.action" placeholder="Action type">
+                        <input v-model="filters.action" :placeholder="t('audit.actionType')">
                     </div>
-                    <input v-model="filters.user_id" type="text" inputmode="numeric" placeholder="User ID">
+                    <input v-model="filters.user_id" type="text" inputmode="numeric" :placeholder="t('audit.userId')">
                     <input v-model="filters.date_from" type="date">
                     <input v-model="filters.date_to" type="date">
                 </div>
 
                 <div class="tracky-projects__head-actions">
-                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="setQuickFilter('today')">Today</button>
-                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="setQuickFilter('last7')">Last 7 Days</button>
-                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="resetFilters">Reset</button>
-                    <button class="tracky-btn tracky-btn--primary" type="button" @click="applyFilters">Apply</button>
+                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="setQuickFilter('today')">{{ t('audit.today') }}</button>
+                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="setQuickFilter('last7')">{{ t('audit.last7Days') }}</button>
+                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="resetFilters">{{ t('common.reset') }}</button>
+                    <button class="tracky-btn tracky-btn--primary" type="button" @click="applyFilters">{{ t('common.apply') }}</button>
                 </div>
             </section>
 
             <section class="tracky-card tracky-users-table-card">
-                <div class="tracky-projects__empty" v-if="loading">Loading audit log...</div>
+                <div class="tracky-projects__empty" v-if="loading">{{ t('audit.loading') }}</div>
 
                 <div class="tracky-projects-table-wrap" v-else-if="logs.length">
                     <table class="tracky-projects-table">
                         <thead>
                         <tr>
-                            <th>Timestamp</th>
-                            <th>User</th>
-                            <th>Action</th>
-                            <th>Module</th>
-                            <th>Reference</th>
-                            <th>Details</th>
-                            <th>IP Address</th>
-                            <th>Device / Platform</th>
+                            <th>{{ t('audit.timestamp') }}</th>
+                            <th>{{ t('audit.user') }}</th>
+                            <th>{{ t('audit.action') }}</th>
+                            <th>{{ t('audit.module') }}</th>
+                            <th>{{ t('audit.reference') }}</th>
+                            <th>{{ t('audit.details') }}</th>
+                            <th>{{ t('audit.ipAddress') }}</th>
+                            <th>{{ t('audit.devicePlatform') }}</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -258,15 +260,15 @@ onMounted(async () => {
                 </div>
 
                 <div class="tracky-projects__empty" v-else>
-                    <h3>No audit activity found.</h3>
-                    <p>There are no records in the selected filter range.</p>
+                    <h3>{{ t('audit.noLogsTitle') }}</h3>
+                    <p>{{ t('audit.noLogsBody') }}</p>
                 </div>
             </section>
 
             <footer class="tracky-projects__pagination" v-if="!loading && pagination.last_page > 1">
-                <p>Page {{ pagination.current_page }} of {{ pagination.last_page }}</p>
+                <p>{{ t('common.page', { page: pagination.current_page, total: pagination.last_page }) }}</p>
                 <div class="tracky-page-buttons">
-                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.current_page <= 1" @click="goToPage(pagination.current_page - 1)">Prev</button>
+                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.current_page <= 1" @click="goToPage(pagination.current_page - 1)">{{ t('common.previous') }}</button>
                     <button
                         v-for="page in visiblePages"
                         :key="String(page)"
@@ -277,7 +279,7 @@ onMounted(async () => {
                     >
                         {{ typeof page === 'number' ? page : '...' }}
                     </button>
-                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.current_page >= pagination.last_page" @click="goToPage(pagination.current_page + 1)">Next</button>
+                    <button class="tracky-btn tracky-btn--ghost" type="button" :disabled="pagination.current_page >= pagination.last_page" @click="goToPage(pagination.current_page + 1)">{{ t('common.next') }}</button>
                 </div>
             </footer>
 
@@ -285,23 +287,23 @@ onMounted(async () => {
                 <article class="tracky-audit-detail-modal">
                     <header class="tracky-project-modal__head">
                         <div>
-                            <h3>Audit Entry #{{ selected.id }}</h3>
+                            <h3>{{ t('audit.detailTitle') }} #{{ selected.id }}</h3>
                             <p>{{ referenceLabel(selected) }}</p>
                         </div>
-                        <button class="tracky-btn tracky-btn--ghost" type="button" @click="selected = null">Close</button>
+                        <button class="tracky-btn tracky-btn--ghost" type="button" @click="selected = null">{{ t('common.close') }}</button>
                     </header>
 
                     <div class="tracky-audit-detail-grid">
                         <div class="tracky-project-section">
-                            <h4>Before</h4>
+                            <h4>{{ t('audit.before') }}</h4>
                             <pre>{{ JSON.stringify(selected.before || {}, null, 2) }}</pre>
                         </div>
                         <div class="tracky-project-section">
-                            <h4>After</h4>
+                            <h4>{{ t('audit.after') }}</h4>
                             <pre>{{ JSON.stringify(selected.after || {}, null, 2) }}</pre>
                         </div>
                         <div class="tracky-project-section tracky-audit-detail-grid__full">
-                            <h4>Metadata</h4>
+                            <h4>{{ t('audit.metadata') }}</h4>
                             <pre>{{ JSON.stringify(selected.metadata || {}, null, 2) }}</pre>
                         </div>
                     </div>

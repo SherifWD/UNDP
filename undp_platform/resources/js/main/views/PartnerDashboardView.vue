@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import AppShell from '../components/AppShell.vue';
 import KpiCards from '../components/KpiCards.vue';
 import api from '../api';
@@ -21,6 +22,7 @@ const FUNDING_STATUS_COLORS = {
 
 const asyncExport = useAsyncExport();
 const router = useRouter();
+const { t } = useI18n();
 
 const kpis = ref({});
 const trend = ref([]);
@@ -59,32 +61,32 @@ const exportStatusLabel = computed(() => {
     }
 
     const task = asyncExport.task.value;
-    return `Export ${task.status} (${task.progress}%)`;
+    return t('reportsPage.exportStatus', { status: task.status, progress: task.progress });
 });
 
 const activeFilterChips = computed(() => {
-    const chips = [`Status: ${selectedStatus.value || 'approved'}`];
+    const chips = [`${t('partnerDashboard.statusFilter')}: ${rowStatusLabel(selectedStatus.value || 'approved')}`];
 
     if (filters.date_from) {
-        chips.push(`From: ${filters.date_from}`);
+        chips.push(`${t('common.dateFrom')}: ${filters.date_from}`);
     }
 
     if (filters.date_to) {
-        chips.push(`To: ${filters.date_to}`);
+        chips.push(`${t('common.dateTo')}: ${filters.date_to}`);
     }
 
     if (filters.municipality_id) {
         const municipality = municipalities.value.find((item) => Number(item.id) === Number(filters.municipality_id));
-        chips.push(`Municipality: ${municipality?.name || filters.municipality_id}`);
+        chips.push(`${t('common.municipality')}: ${municipality?.name || filters.municipality_id}`);
     }
 
     if (filters.project_id) {
         const project = projects.value.find((item) => Number(item.id) === Number(filters.project_id));
-        chips.push(`Project: ${project?.name || filters.project_id}`);
+        chips.push(`${t('common.project')}: ${project?.name || filters.project_id}`);
     }
 
     if (filters.search) {
-        chips.push(`Search: ${filters.search}`);
+        chips.push(`${t('common.search')}: ${filters.search}`);
     }
 
     return chips;
@@ -191,7 +193,11 @@ const formatDateTime = (value) => {
     return new Date(value).toLocaleString();
 };
 
-const rowStatusLabel = (value) => String(value || '-').replaceAll('_', ' ');
+const rowStatusLabel = (value) => {
+    const key = String(value || '').toLowerCase();
+    const translated = t(`statusLabels.${key}`);
+    return translated !== `statusLabels.${key}` ? translated : String(value || '-').replaceAll('_', ' ');
+};
 
 const filteredProjectCards = computed(() => {
     if (!projectCards.value.length) {
@@ -293,7 +299,7 @@ const loadPartnerDashboard = async () => {
         projectBreakdown.value = data.project_breakdown || [];
         fundingOverview.value = data.funding_overview || null;
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to load partner dashboard.';
+        error.value = err.response?.data?.message || t('partnerDashboard.unableToLoad');
         kpis.value = {};
         trend.value = [];
         statusBreakdown.value = {};
@@ -329,7 +335,7 @@ const loadApprovedSubmissions = async (page = 1) => {
         pagination.last_page = Number(data.last_page || 1);
         pagination.total = Number(data.total || submissions.value.length || 0);
     } catch (err) {
-        error.value = err.response?.data?.message || 'Unable to load approved submissions.';
+        error.value = err.response?.data?.message || t('partnerDashboard.unableToLoadApproved');
         submissions.value = [];
         pagination.current_page = 1;
         pagination.last_page = 1;
@@ -424,12 +430,12 @@ onMounted(async () => {
     <AppShell>
         <section class="panel">
             <header class="panel__header">
-                <h2>Partner / Donor Read-Only Dashboard</h2>
-                <p class="panel__hint">Approved aggregated data only. No edit, validation, or configuration actions are available.</p>
+                <h2>{{ t('partnerDashboard.title') }}</h2>
+                <p class="panel__hint">{{ t('partnerDashboard.hint') }}</p>
             </header>
 
-            <div class="view-only-banner">View-Only</div>
-            <div class="read-only-lock">RBAC enforced: this view is restricted to approved aggregated records and export actions.</div>
+            <div class="view-only-banner">{{ t('common.viewOnly') }}</div>
+            <div class="read-only-lock">{{ t('partnerDashboard.rbacHint') }}</div>
 
             <p class="field-error" v-if="error">{{ error }}</p>
 
@@ -437,28 +443,28 @@ onMounted(async () => {
                 <input v-model="filters.date_from" type="date">
                 <input v-model="filters.date_to" type="date">
                 <select v-model="filters.municipality_id" @change="onMunicipalityChange">
-                    <option value="">All municipalities</option>
+                    <option value="">{{ t('reportsPage.allMunicipalities') }}</option>
                     <option v-for="municipality in municipalities" :key="municipality.id" :value="municipality.id">
                         {{ municipality.name }}
                     </option>
                 </select>
                 <select v-model="filters.project_id">
-                    <option value="">All projects</option>
+                    <option value="">{{ t('reportsPage.allProjects') }}</option>
                     <option v-for="project in projects" :key="project.id" :value="project.id">
                         {{ project.name }}
                     </option>
                 </select>
-                <input v-model="filters.search" placeholder="Search approved submissions">
-                <button class="btn btn--primary" @click="applyFilters">Apply</button>
-                <button class="btn btn--ghost" @click="resetFilters">Reset</button>
-                <button class="btn btn--ghost" :disabled="asyncExport.loading.value" @click="startApprovedCsvExport">Export CSV</button>
-                <button class="btn btn--ghost" :disabled="asyncExport.loading.value" @click="startSummaryPdfExport">Export PDF</button>
+                <input v-model="filters.search" :placeholder="t('partnerDashboard.searchPlaceholder')">
+                <button class="btn btn--primary" @click="applyFilters">{{ t('common.apply') }}</button>
+                <button class="btn btn--ghost" @click="resetFilters">{{ t('common.reset') }}</button>
+                <button class="btn btn--ghost" :disabled="asyncExport.loading.value" @click="startApprovedCsvExport">{{ t('common.exportCsv') }}</button>
+                <button class="btn btn--ghost" :disabled="asyncExport.loading.value" @click="startSummaryPdfExport">{{ t('common.exportPdf') }}</button>
                 <button
                     v-if="asyncExport.task.value?.status === 'ready'"
                     class="btn btn--primary"
                     @click="asyncExport.download"
                 >
-                    Download
+                    {{ t('common.download') }}
                 </button>
             </div>
             <p class="panel__hint" v-if="exportStatusLabel">{{ exportStatusLabel }}</p>
@@ -470,9 +476,9 @@ onMounted(async () => {
             <KpiCards :kpis="kpis" />
 
             <div class="detail-block" v-if="fundingOverview">
-                <h3>My Funding Requests</h3>
+                <h3>{{ t('partnerDashboard.myFundingRequests') }}</h3>
                 <div class="status-chart-wrap">
-                    <svg viewBox="0 0 42 42" class="status-donut" role="img" aria-label="Funding request status chart">
+                    <svg viewBox="0 0 42 42" class="status-donut" role="img" :aria-label="t('reportsPage.fundingStatusBreakdownChart')">
                         <circle cx="21" cy="21" r="15.9155" fill="transparent" stroke="#e2e8f0" stroke-width="6" />
                         <circle
                             v-for="slice in fundingSlices"
@@ -500,19 +506,19 @@ onMounted(async () => {
                 </div>
                 <ul class="stat-list stat-list--dense">
                     <li>
-                        <span>Total Requested Amount</span>
+                        <span>{{ t('partnerDashboard.totalRequestedAmount') }}</span>
                         <strong>{{ Number(fundingOverview.total_requested_amount || 0).toLocaleString() }}</strong>
                     </li>
                     <li>
-                        <span>Pending Amount</span>
+                        <span>{{ t('partnerDashboard.pendingAmount') }}</span>
                         <strong>{{ Number(fundingOverview.pending_requested_amount || 0).toLocaleString() }}</strong>
                     </li>
                     <li>
-                        <span>Approved Amount</span>
+                        <span>{{ t('partnerDashboard.approvedAmount') }}</span>
                         <strong>{{ Number(fundingOverview.approved_requested_amount || 0).toLocaleString() }}</strong>
                     </li>
                     <li>
-                        <span>Approval Rate</span>
+                        <span>{{ t('partnerDashboard.approvalRate') }}</span>
                         <strong>{{ fundingOverview.approval_rate_percent || 0 }}%</strong>
                     </li>
                 </ul>
@@ -520,9 +526,9 @@ onMounted(async () => {
 
             <div class="split-grid">
                 <div class="detail-block">
-                    <h3>Submission Status Breakdown</h3>
+                    <h3>{{ t('partnerDashboard.statusBreakdown') }}</h3>
                     <div class="status-chart-wrap">
-                        <svg viewBox="0 0 42 42" class="status-donut" role="img" aria-label="Donor status breakdown chart">
+                        <svg viewBox="0 0 42 42" class="status-donut" role="img" :aria-label="t('reportsPage.statusBreakdownChart')">
                             <circle cx="21" cy="21" r="15.9155" fill="transparent" stroke="#e2e8f0" stroke-width="6" />
                             <circle
                                 v-for="slice in statusSlices"
@@ -549,14 +555,14 @@ onMounted(async () => {
                             </li>
                         </ul>
                     </div>
-                    <p class="panel__hint">Click a status segment to filter submission rows and project cards.</p>
+                    <p class="panel__hint">{{ t('partnerDashboard.statusHint') }}</p>
                 </div>
 
                 <div class="detail-block">
-                    <h3>Project List</h3>
-                    <p class="panel__hint">Card grid with progress and latest updates.</p>
-                    <div v-if="projectCardsLoading" class="panel__hint">Loading projects...</div>
-                    <div v-else-if="!filteredProjectCards.length" class="panel__hint">No projects match the selected filters.</div>
+                    <h3>{{ t('partnerDashboard.projectList') }}</h3>
+                    <p class="panel__hint">{{ t('partnerDashboard.projectListHint') }}</p>
+                    <div v-if="projectCardsLoading" class="panel__hint">{{ t('partnerDashboard.loadingProjects') }}</div>
+                    <div v-else-if="!filteredProjectCards.length" class="panel__hint">{{ t('partnerDashboard.noProjects') }}</div>
                     <div v-else v-for="project in filteredProjectCards" :key="project.id" class="project-card">
                         <div class="project-card__top">
                             <strong>{{ project.name }}</strong>
@@ -566,13 +572,13 @@ onMounted(async () => {
                             <div class="project-progress__bar" :style="{ width: `${Number(project.stats?.progress_percent || 0)}%` }" />
                         </div>
                         <small>
-                            Total: {{ Number(project.stats?.total_submissions || 0) }} |
-                            Approved: {{ Number(project.stats?.approved_submissions || 0) }} |
-                            Rejected: {{ Number(project.stats?.rejected_submissions || 0) }}
+                            {{ t('partnerDashboard.total') }}: {{ Number(project.stats?.total_submissions || 0) }} |
+                            {{ t('partnerDashboard.approved') }}: {{ Number(project.stats?.approved_submissions || 0) }} |
+                            {{ t('partnerDashboard.rejected') }}: {{ Number(project.stats?.rejected_submissions || 0) }}
                         </small>
-                        <small>Last update: {{ formatDateTime(project.last_update_at) }}</small>
+                        <small>{{ t('partnerDashboard.lastUpdate', { value: formatDateTime(project.last_update_at) }) }}</small>
                         <button class="btn btn--ghost" type="button" @click="openProjectDetails(project)">
-                            View Project Details
+                            {{ t('partnerDashboard.viewProjectDetails') }}
                         </button>
                     </div>
                 </div>
@@ -580,7 +586,7 @@ onMounted(async () => {
 
             <div class="split-grid">
                 <div class="detail-block">
-                    <h3>Municipality Breakdown (Approved)</h3>
+                    <h3>{{ t('partnerDashboard.municipalityBreakdown') }}</h3>
                     <ul class="bar-list">
                         <li v-for="row in municipalityBreakdown" :key="row.municipality_id">
                             <span>{{ row.municipality_name || '-' }}</span>
@@ -596,7 +602,7 @@ onMounted(async () => {
                 </div>
 
                 <div class="detail-block">
-                    <h3>Project Breakdown (Approved)</h3>
+                    <h3>{{ t('partnerDashboard.projectBreakdown') }}</h3>
                     <ul class="bar-list">
                         <li v-for="row in projectBreakdown" :key="row.project_id">
                             <span>{{ row.project_name || '-' }}</span>
@@ -613,14 +619,14 @@ onMounted(async () => {
             </div>
 
             <div class="detail-block">
-                <h3>Approved Trend</h3>
+                <h3>{{ t('partnerDashboard.approvedTrend') }}</h3>
                 <div class="trend-chart" v-if="trendPath">
-                    <svg viewBox="0 0 360 150" role="img" aria-label="Partner approved trend chart">
+                    <svg viewBox="0 0 360 150" role="img" :aria-label="t('reportsPage.submissionTrendChart')">
                         <path v-if="trendAreaPath" :d="trendAreaPath" class="trend-area" />
                         <polyline :points="trendPath" class="trend-line" />
                     </svg>
                 </div>
-                <p class="panel__hint" v-if="!trendPath && !loading">No trend data available.</p>
+                <p class="panel__hint" v-if="!trendPath && !loading">{{ t('partnerDashboard.noTrend') }}</p>
                 <ul class="trend-labels" v-if="trend.length">
                     <li v-for="item in trend" :key="item.day">
                         <small>{{ item.day }}</small>
@@ -630,18 +636,18 @@ onMounted(async () => {
             </div>
 
             <div class="detail-block">
-                <h3>Approved Submission Report</h3>
+                <h3>{{ t('partnerDashboard.approvedSubmissionReport') }}</h3>
                 <div class="table-wrap">
                     <table class="table" v-if="!tableLoading && submissions.length">
                         <thead>
                             <tr>
-                                <th>ID</th>
-                                <th>Title</th>
-                                <th>Project</th>
-                                <th>Municipality</th>
-                                <th>Status</th>
-                                <th>Submitted</th>
-                                <th>Updated</th>
+                                <th>{{ t('common.id') }}</th>
+                                <th>{{ t('common.title') }}</th>
+                                <th>{{ t('common.project') }}</th>
+                                <th>{{ t('common.municipality') }}</th>
+                                <th>{{ t('common.status') }}</th>
+                                <th>{{ t('common.submittedAt') }}</th>
+                                <th>{{ t('common.updated') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -658,8 +664,8 @@ onMounted(async () => {
                             </tr>
                         </tbody>
                     </table>
-                    <p class="panel__hint" v-else-if="tableLoading">Loading approved submissions...</p>
-                    <p class="panel__hint" v-else>No approved submissions found for these filters.</p>
+                    <p class="panel__hint" v-else-if="tableLoading">{{ t('partnerDashboard.loadingApprovedSubmissions') }}</p>
+                    <p class="panel__hint" v-else>{{ t('partnerDashboard.noApprovedSubmissions') }}</p>
                 </div>
 
                 <div class="pagination-bar" v-if="!tableLoading && pagination.last_page > 1">
@@ -669,7 +675,7 @@ onMounted(async () => {
                         :disabled="pagination.current_page <= 1"
                         @click="goToPage(pagination.current_page - 1)"
                     >
-                        Previous
+                        {{ t('common.previous') }}
                     </button>
                     <button
                         class="btn btn--ghost"
@@ -677,11 +683,11 @@ onMounted(async () => {
                         :disabled="pagination.current_page >= pagination.last_page"
                         @click="goToPage(pagination.current_page + 1)"
                     >
-                        Next
+                        {{ t('common.next') }}
                     </button>
                     <span class="pagination-meta">
-                        Page {{ pagination.current_page }} of {{ pagination.last_page }}
-                        ({{ pagination.total }} records)
+                        {{ t('common.page', { page: pagination.current_page, total: pagination.last_page }) }}
+                        ({{ pagination.total }} {{ t('common.records') }})
                     </span>
                 </div>
             </div>
