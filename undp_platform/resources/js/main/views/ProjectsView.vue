@@ -162,6 +162,7 @@ const canManageProjects = computed(() => auth.hasPermission('projects.manage'));
 const canRequestFunding = computed(() => auth.hasPermission('funding_requests.create'));
 const canReviewFundingRequests = computed(() => auth.hasPermission('funding_requests.review'));
 const canViewFundingRequests = computed(() => canRequestFunding.value || canReviewFundingRequests.value);
+const donorFundingMode = computed(() => canRequestFunding.value && !canManageProjects.value && !canReviewFundingRequests.value);
 const canViewProjectSubmissions = computed(() => (
     auth.hasPermission('submissions.view.own')
     || auth.hasPermission('submissions.view.municipality')
@@ -290,6 +291,12 @@ const fundingBadgeClass = (status) => (
         : status === 'declined'
             ? 'status-pill--disabled'
             : ''
+);
+const canRequestFundingForProject = (project) => canRequestFunding.value && project?.status === 'active';
+const fundingRequestButtonClass = (project) => (
+    canRequestFundingForProject(project) && donorFundingMode.value
+        ? 'tracky-btn--primary'
+        : 'tracky-btn--ghost'
 );
 
 const openProjectSubmissions = (project) => {
@@ -1177,6 +1184,15 @@ onBeforeUnmount(() => {
                                     </p>
                                 </template>
                                 <p v-else>No requests yet.</p>
+                                <button
+                                    v-if="canRequestFundingForProject(project)"
+                                    class="tracky-btn"
+                                    :class="fundingRequestButtonClass(project)"
+                                    type="button"
+                                    @click.stop="openFundingRequestModal(project)"
+                                >
+                                    Request to Fund
+                                </button>
                             </td>
                             <td>
                                 <div class="tracky-project-actions" @click.stop>
@@ -1187,14 +1203,6 @@ onBeforeUnmount(() => {
                                         @click="openProjectSubmissions(project)"
                                     >
                                         View Submissions
-                                    </button>
-                                    <button
-                                        class="tracky-btn tracky-btn--ghost"
-                                        type="button"
-                                        v-if="canRequestFunding"
-                                        @click="openFundingRequestModal(project)"
-                                    >
-                                        Request Funding
                                     </button>
                                     <button
                                         class="tracky-btn tracky-btn--ghost"
@@ -1256,12 +1264,13 @@ onBeforeUnmount(() => {
                                 Go to Submissions
                             </button>
                             <button
-                                class="tracky-btn tracky-btn--soft"
+                                class="tracky-btn"
+                                :class="fundingRequestButtonClass(projectDetails)"
                                 type="button"
-                                v-if="projectDetails && canRequestFunding"
+                                v-if="projectDetails && canRequestFundingForProject(projectDetails)"
                                 @click="openFundingRequestModal(projectDetails)"
                             >
-                                Request Funding
+                                Request to Fund
                             </button>
                             <button
                                 class="tracky-btn tracky-btn--ghost"
@@ -1411,6 +1420,9 @@ onBeforeUnmount(() => {
                             <div class="tracky-project-section" v-if="canViewFundingRequests">
                                 <h4>Project Funding Requests</h4>
                                 <p class="field-error" v-if="projectFundingRequestsError">{{ projectFundingRequestsError }}</p>
+                                <p class="panel__hint" v-if="canRequestFunding">
+                                    Submit a donor funding request for this project. UNDP Admin reviews every request and approves or declines it with a reason.
+                                </p>
 
                                 <div
                                     v-if="projectDetails?.funding_requests_summary"
@@ -1438,9 +1450,9 @@ onBeforeUnmount(() => {
                                     </article>
                                 </div>
 
-                                <div class="inline-group" v-if="projectDetails && canRequestFunding">
-                                    <button class="btn btn--ghost" type="button" @click="openFundingRequestModal(projectDetails)">
-                                        Request Funding For This Project
+                                <div class="inline-group" v-if="projectDetails && canRequestFundingForProject(projectDetails)">
+                                    <button class="btn btn--primary" type="button" @click="openFundingRequestModal(projectDetails)">
+                                        Request to Fund This Project
                                     </button>
                                 </div>
 

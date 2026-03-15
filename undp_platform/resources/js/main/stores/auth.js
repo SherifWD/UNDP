@@ -16,6 +16,7 @@ export const useAuthStore = defineStore('auth', {
         user: JSON.parse(localStorage.getItem('undp_user') || 'null'),
         otpContext: null,
         loading: false,
+        hydrated: false,
     }),
 
     getters: {
@@ -44,6 +45,7 @@ export const useAuthStore = defineStore('auth', {
 
             this.token = data.token;
             this.user = data.user;
+            this.hydrated = true;
 
             localStorage.setItem('undp_token', data.token);
             localStorage.setItem('undp_user', JSON.stringify(data.user));
@@ -52,16 +54,23 @@ export const useAuthStore = defineStore('auth', {
         },
 
         async fetchMe() {
-            if (!this.token) return null;
+            if (!this.token) {
+                this.hydrated = true;
+                return null;
+            }
 
+            this.loading = true;
             try {
                 const { data } = await api.get('/auth/me');
                 this.user = data.user;
                 localStorage.setItem('undp_user', JSON.stringify(this.user));
+                this.hydrated = true;
                 return this.user;
             } catch {
                 this.clearSession();
                 return null;
+            } finally {
+                this.loading = false;
             }
         },
 
@@ -77,6 +86,8 @@ export const useAuthStore = defineStore('auth', {
             this.token = null;
             this.user = null;
             this.otpContext = null;
+            this.loading = false;
+            this.hydrated = false;
             localStorage.removeItem('undp_token');
             localStorage.removeItem('undp_user');
         },
