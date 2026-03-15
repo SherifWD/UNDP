@@ -284,6 +284,13 @@ const executionStatusClass = (status) => {
 };
 
 const lifecycleBadgeClass = (status) => (status === 'active' ? 'badge--active' : 'badge--archived');
+const fundingBadgeClass = (status) => (
+    status === 'approved'
+        ? 'status-pill--active'
+        : status === 'declined'
+            ? 'status-pill--disabled'
+            : ''
+);
 
 const openProjectSubmissions = (project) => {
     if (! project || ! canViewProjectSubmissions.value) {
@@ -372,8 +379,13 @@ const submitFundingRequest = async () => {
         const currentProjectId = projectDetails.value?.id;
         closeFundingRequestModal();
 
+        await loadProjects(pagination.current_page);
+
         if (currentProjectId) {
-            await loadProjectFundingRequests(currentProjectId);
+            await Promise.all([
+                loadProjectFundingRequests(currentProjectId),
+                fetchProjectDetails(currentProjectId),
+            ]);
         }
     } catch (err) {
         fundingRequestError.value = err.response?.data?.message || 'Unable to submit funding request.';
@@ -411,8 +423,13 @@ const reviewFundingRequest = async (fundingRequest, decision) => {
 
         fundingReviewNotes[fundingRequest.id] = '';
 
+        await loadProjects(pagination.current_page);
+
         if (projectDetails.value?.id) {
-            await loadProjectFundingRequests(projectDetails.value.id);
+            await Promise.all([
+                loadProjectFundingRequests(projectDetails.value.id),
+                fetchProjectDetails(projectDetails.value.id),
+            ]);
         }
     } catch (err) {
         projectFundingRequestsError.value = err.response?.data?.message || 'Unable to review funding request.';
@@ -1105,6 +1122,7 @@ onBeforeUnmount(() => {
                             <th>{{ t('projectsPage.progress') }}</th>
                             <th>Assigned Reporters</th>
                             <th>Execution</th>
+                            <th v-if="canViewFundingRequests">Funding Requests</th>
                             <th>{{ t('projectsPage.tableColumns.actions') }}</th>
                         </tr>
                         </thead>
@@ -1145,6 +1163,21 @@ onBeforeUnmount(() => {
                                     </span>
                                 </p>
                             </td>
+                            <td v-if="canViewFundingRequests">
+                                <template v-if="project.funding_requests_summary">
+                                    <strong>{{ formatCurrency(project.funding_requests_summary.total_requested_amount) }}</strong>
+                                    <p>
+                                        {{ project.funding_requests_summary.total_requests || 0 }} requests
+                                        <span v-if="project.funding_requests_summary.pending_requests">
+                                            | {{ project.funding_requests_summary.pending_requests }} pending
+                                        </span>
+                                    </p>
+                                    <p v-if="project.funding_requests_summary.latest_requested_at">
+                                        Last: {{ formatDate(project.funding_requests_summary.latest_requested_at) }}
+                                    </p>
+                                </template>
+                                <p v-else>No requests yet.</p>
+                            </td>
                             <td>
                                 <div class="tracky-project-actions" @click.stop>
                                     <button
@@ -1161,7 +1194,7 @@ onBeforeUnmount(() => {
                                         v-if="canRequestFunding"
                                         @click="openFundingRequestModal(project)"
                                     >
-                                        Request Fund
+                                        Request Funding
                                     </button>
                                     <button
                                         class="tracky-btn tracky-btn--ghost"
@@ -1228,7 +1261,7 @@ onBeforeUnmount(() => {
                                 v-if="projectDetails && canRequestFunding"
                                 @click="openFundingRequestModal(projectDetails)"
                             >
-                                Request Fund
+                                Request Funding
                             </button>
                             <button
                                 class="tracky-btn tracky-btn--ghost"
@@ -1379,6 +1412,32 @@ onBeforeUnmount(() => {
                                 <h4>Project Funding Requests</h4>
                                 <p class="field-error" v-if="projectFundingRequestsError">{{ projectFundingRequestsError }}</p>
 
+                                <div
+                                    v-if="projectDetails?.funding_requests_summary"
+                                    class="tracky-project-funding-summary"
+                                >
+                                    <article class="tracky-project-funding-summary__card">
+                                        <span>Total Requested</span>
+                                        <strong>{{ formatCurrency(projectDetails.funding_requests_summary.total_requested_amount) }}</strong>
+                                    </article>
+                                    <article class="tracky-project-funding-summary__card">
+                                        <span>Total Requests</span>
+                                        <strong>{{ projectDetails.funding_requests_summary.total_requests || 0 }}</strong>
+                                    </article>
+                                    <article class="tracky-project-funding-summary__card">
+                                        <span>Pending Review</span>
+                                        <strong>{{ projectDetails.funding_requests_summary.pending_requests || 0 }}</strong>
+                                    </article>
+                                    <article class="tracky-project-funding-summary__card">
+                                        <span>Approved / Declined</span>
+                                        <strong>
+                                            {{ projectDetails.funding_requests_summary.approved_requests || 0 }}
+                                            /
+                                            {{ projectDetails.funding_requests_summary.declined_requests || 0 }}
+                                        </strong>
+                                    </article>
+                                </div>
+
                                 <div class="inline-group" v-if="projectDetails && canRequestFunding">
                                     <button class="btn btn--ghost" type="button" @click="openFundingRequestModal(projectDetails)">
                                         Request Funding For This Project
@@ -1407,7 +1466,7 @@ onBeforeUnmount(() => {
                                             <td>
                                                 <span
                                                     class="status-pill"
-                                                    :class="requestRow.status === 'approved' ? 'status-pill--active' : requestRow.status === 'declined' ? 'status-pill--disabled' : ''"
+                                                    :class="fundingBadgeClass(requestRow.status)"
                                                 >
                                                     {{ requestRow.status_label }}
                                                 </span>

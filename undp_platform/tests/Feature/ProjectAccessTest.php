@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Enums\FundingRequestStatus;
 use App\Enums\UserRole;
+use App\Models\FundingRequest;
 use App\Models\Municipality;
 use App\Models\Project;
 use App\Models\User;
@@ -126,5 +128,64 @@ class ProjectAccessTest extends TestCase
             'reporter_id' => $reporter->id,
             'assigned_by' => $admin->id,
         ]);
+    }
+
+    public function test_partner_project_payload_includes_scoped_funding_request_summary(): void
+    {
+        $municipality = Municipality::query()->create([
+            'name_en' => 'Tripoli',
+            'name_ar' => 'طرابلس',
+            'code' => 'TRI',
+        ]);
+
+        $project = Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Water Rehabilitation',
+            'name_ar' => 'تأهيل المياه',
+            'status' => 'active',
+        ]);
+
+        $partner = User::factory()->create([
+            'role' => UserRole::PARTNER_DONOR_VIEWER->value,
+            'status' => 'active',
+        ]);
+
+        $otherPartner = User::factory()->create([
+            'role' => UserRole::PARTNER_DONOR_VIEWER->value,
+            'status' => 'active',
+        ]);
+
+        FundingRequest::query()->create([
+            'project_id' => $project->id,
+            'donor_user_id' => $partner->id,
+            'amount' => 10000,
+            'currency' => 'USD',
+            'status' => FundingRequestStatus::PENDING->value,
+        ]);
+
+        FundingRequest::query()->create([
+            'project_id' => $project->id,
+            'donor_user_id' => $otherPartner->id,
+            'amount' => 5000,
+            'currency' => 'USD',
+            'status' => FundingRequestStatus::APPROVED->value,
+        ]);
+
+        Sanctum::actingAs($partner);
+
+        $indexResponse = $this->getJson('/api/projects?with_stats=1');
+        $showResponse = $this->getJson("/api/projects/{$project->id}");
+
+        $indexResponse
+            ->assertOk()
+            ->assertJsonPath('data.0.funding_requests_summary.total_requests', 1)
+            ->assertJsonPath('data.0.funding_requests_summary.pending_requests', 1)
+            ->assertJsonPath('data.0.funding_requests_summary.total_requested_amount', 10000);
+
+        $showResponse
+            ->assertOk()
+            ->assertJsonPath('project.funding_requests_summary.total_requests', 1)
+            ->assertJsonPath('project.funding_requests_summary.pending_requests', 1)
+            ->assertJsonPath('project.funding_requests_summary.total_requested_amount', 10000);
     }
 }

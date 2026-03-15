@@ -610,6 +610,10 @@ a {
     cursor: pointer;
 }
 
+.stat-list--dense li {
+    padding: 10px 12px;
+}
+
 .map-canvas {
     width: 100%;
     min-height: 360px;
@@ -657,6 +661,14 @@ a {
     border-color: rgba(11, 125, 118, 0.45);
 }
 
+.status-legend__btn--static {
+    cursor: default;
+}
+
+.status-legend__btn--static:hover {
+    border-color: var(--line);
+}
+
 .status-legend__dot {
     width: 10px;
     height: 10px;
@@ -679,6 +691,16 @@ a {
     grid-template-columns: minmax(90px, 130px) 1fr auto;
     align-items: center;
     gap: 8px;
+}
+
+.bar-list li > div:first-child {
+    display: grid;
+    gap: 3px;
+}
+
+.bar-list li small {
+    color: var(--muted);
+    font-size: 0.75rem;
 }
 
 .bar-list__track {
@@ -732,9 +754,45 @@ a {
     border-radius: 8px;
     background: #fff;
     padding: 6px 8px;
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
     gap: 6px;
+}
+
+.tracky-funding-review-cell {
+    display: grid;
+    gap: 8px;
+    min-width: 240px;
+}
+
+.tracky-funding-review-cell textarea {
+    min-height: 68px;
+    resize: vertical;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font: inherit;
+}
+
+.tracky-project-funding-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+}
+
+.tracky-project-funding-summary__card {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(11, 125, 118, 0.05);
+    padding: 12px;
+    display: grid;
+    gap: 6px;
+}
+
+.tracky-project-funding-summary__card span {
+    color: var(--muted);
+    font-size: 0.8rem;
 }
 
 .map-shell {

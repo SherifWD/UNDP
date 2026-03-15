@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Enums\FundingRequestStatus;
 use App\Enums\SubmissionStatus;
 use App\Enums\UserRole;
+use App\Models\FundingRequest;
 use App\Models\Municipality;
 use App\Models\Project;
 use App\Models\Submission;
@@ -53,6 +55,8 @@ class DashboardApiTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('result', true)
+            ->assertJsonPath('status_summary.0.status', SubmissionStatus::UNDER_REVIEW->value)
+            ->assertJsonPath('review_backlog.0.count', 1)
             ->assertJsonStructure([
                 'data' => [
                     'kpis' => [
@@ -291,6 +295,14 @@ class DashboardApiTest extends TestCase
             'role' => UserRole::PARTNER_DONOR_VIEWER->value,
         ]);
 
+        FundingRequest::query()->create([
+            'project_id' => $projectA->id,
+            'donor_user_id' => $partner->id,
+            'amount' => 15000,
+            'currency' => 'USD',
+            'status' => FundingRequestStatus::PENDING->value,
+        ]);
+
         Sanctum::actingAs($partner);
 
         $response = $this->getJson('/api/dashboard/partner');
@@ -302,7 +314,10 @@ class DashboardApiTest extends TestCase
             ->assertJsonPath('kpis.municipalities_covered', 1)
             ->assertJsonPath('kpis.total_actual_beneficiaries', 200)
             ->assertJsonPath('kpis.average_completion_percentage', 85)
-            ->assertJsonPath('status_breakdown.approved', 2);
+            ->assertJsonPath('status_breakdown.approved', 2)
+            ->assertJsonPath('funding_overview.total_requests', 1)
+            ->assertJsonPath('funding_overview.pending_requests', 1)
+            ->assertJsonPath('funding_overview.total_requested_amount', 15000);
 
         $municipalityCounts = collect($response->json('municipality_breakdown'));
         $projectCounts = collect($response->json('project_breakdown'));
@@ -389,16 +404,123 @@ class DashboardApiTest extends TestCase
             ->assertJsonPath('projects.0.rejected_submissions', 1);
     }
 
-    public function test_admin_cannot_access_municipal_overview_endpoint(): void
+    public function test_admin_can_access_municipal_overview_for_selected_municipality(): void
     {
+        $tripoli = Municipality::query()->create([
+            'name_en' => 'Tripoli',
+            'name_ar' => 'طرابلس',
+            'code' => 'TRI',
+        ]);
+
+        $benghazi = Municipality::query()->create([
+            'name_en' => 'Benghazi',
+            'name_ar' => 'بنغازي',
+            'code' => 'BEN',
+        ]);
+
+        $tripoliProject = Project::query()->create([
+            'municipality_id' => $tripoli->id,
+            'name_en' => 'Tripoli Roads',
+            'name_ar' => 'طرق طرابلس',
+            'status' => 'active',
+        ]);
+
+        $benghaziProject = Project::query()->create([
+            'municipality_id' => $benghazi->id,
+            'name_en' => 'Benghazi Schools',
+            'name_ar' => 'مدارس بنغازي',
+            'status' => 'active',
+        ]);
+
+        $reporter = User::factory()->create([
+            'role' => UserRole::REPORTER->value,
+            'municipality_id' => $benghazi->id,
+        ]);
+
+        Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $tripoliProject->id,
+            'municipality_id' => $tripoli->id,
+            'status' => SubmissionStatus::APPROVED->value,
+            'title' => 'Tripoli submission',
+        ]);
+
+        Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $benghaziProject->id,
+            'municipality_id' => $benghazi->id,
+            'status' => SubmissionStatus::UNDER_REVIEW->value,
+            'title' => 'Benghazi submission',
+        ]);
+
         $admin = User::factory()->create([
             'role' => UserRole::UNDP_ADMIN->value,
         ]);
 
         Sanctum::actingAs($admin);
 
-        $response = $this->getJson('/api/dashboard/municipal-overview');
+        $response = $this->getJson("/api/dashboard/municipal-overview?municipality_id={$benghazi->id}");
 
-        $response->assertForbidden();
+        $response
+            ->assertOk()
+            ->assertJsonPath('municipality.id', $benghazi->id)
+            ->assertJsonPath('kpis.total_submissions', 1)
+            ->assertJsonPath('projects.0.id', $benghaziProject->id);
+    }
+
+    public function test_system_kpis_include_funding_overview_and_breakdown_rates(): void
+    {
+        $municipality = Municipality::query()->create([
+            'name_en' => 'Misrata',
+            'name_ar' => 'مصراتة',
+            'code' => 'MIS',
+        ]);
+
+        $project = Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Clinic Upgrade',
+            'name_ar' => 'تحديث العيادة',
+            'status' => 'active',
+        ]);
+
+        $donor = User::factory()->create([
+            'role' => UserRole::PARTNER_DONOR_VIEWER->value,
+        ]);
+
+        FundingRequest::query()->create([
+            'project_id' => $project->id,
+            'donor_user_id' => $donor->id,
+            'amount' => 8500,
+            'currency' => 'USD',
+            'status' => FundingRequestStatus::PENDING->value,
+        ]);
+
+        $reporter = User::factory()->create([
+            'role' => UserRole::REPORTER->value,
+            'municipality_id' => $municipality->id,
+        ]);
+
+        Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $project->id,
+            'municipality_id' => $municipality->id,
+            'status' => SubmissionStatus::APPROVED->value,
+            'title' => 'Approved item',
+        ]);
+
+        $admin = User::factory()->create([
+            'role' => UserRole::UNDP_ADMIN->value,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->getJson('/api/dashboard/kpis');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('funding_overview.total_requests', 1)
+            ->assertJsonPath('funding_overview.pending_requests', 1)
+            ->assertJsonPath('municipality_breakdown.0.approval_rate_percent', 100)
+            ->assertJsonPath('project_breakdown.0.approval_rate_percent', 100);
     }
 }

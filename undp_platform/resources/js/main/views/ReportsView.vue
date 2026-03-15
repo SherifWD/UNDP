@@ -13,9 +13,12 @@ const auth = useAuthStore();
 
 const kpis = ref({});
 const statusBreakdown = ref({});
+const statusSummary = ref([]);
 const municipalityBreakdown = ref([]);
 const projectBreakdown = ref([]);
 const trend = ref([]);
+const reviewBacklog = ref([]);
+const fundingOverview = ref(null);
 const municipalities = ref([]);
 const projects = ref([]);
 const markers = ref([]);
@@ -44,7 +47,8 @@ const detailFilters = reactive({
 const fundingRequests = ref([]);
 const fundingLoading = ref(false);
 const fundingError = ref('');
-const fundingReviewComment = ref('');
+const fundingStatusFilter = ref('pending');
+const fundingReviewNotes = reactive({});
 
 const filters = reactive({
     date_from: '',
@@ -70,6 +74,12 @@ const STATUS_COLORS = {
     submitted: '#0ea5e9',
     draft: '#64748b',
     queued: '#94a3b8',
+};
+
+const FUNDING_STATUS_COLORS = {
+    pending: '#f59e0b',
+    approved: '#16a34a',
+    declined: '#dc2626',
 };
 
 const statusSlices = computed(() => {
@@ -99,6 +109,40 @@ const statusSlices = computed(() => {
 const municipalityMax = computed(() => {
     const values = municipalityBreakdown.value.map((item) => Number(item.count || 0));
     return values.length ? Math.max(...values, 1) : 1;
+});
+
+const projectMax = computed(() => {
+    const values = projectBreakdown.value.map((item) => Number(item.count || 0));
+    return values.length ? Math.max(...values, 1) : 1;
+});
+
+const reviewBacklogMax = computed(() => {
+    const values = reviewBacklog.value.map((item) => Number(item.count || 0));
+    return values.length ? Math.max(...values, 1) : 1;
+});
+
+const fundingSlices = computed(() => {
+    const entries = Object.entries(fundingOverview.value?.status_breakdown || {})
+        .filter(([, count]) => Number(count) > 0);
+
+    const total = entries.reduce((sum, [, count]) => sum + Number(count), 0);
+    let offset = 0;
+
+    return entries.map(([status, count]) => {
+        const safeCount = Number(count);
+        const ratio = total > 0 ? safeCount / total : 0;
+        const arc = ratio * 100;
+        const slice = {
+            status,
+            count: safeCount,
+            ratio,
+            dash: `${arc} ${100 - arc}`,
+            offset: -offset,
+            color: FUNDING_STATUS_COLORS[status] || '#0ea5e9',
+        };
+        offset += arc;
+        return slice;
+    });
 });
 
 const trendPath = computed(() => {
@@ -407,9 +451,12 @@ const loadKpis = async () => {
     const { data } = await api.get('/dashboard/kpis', { params: filters });
     kpis.value = data.kpis || {};
     statusBreakdown.value = data.status_breakdown || {};
+    statusSummary.value = data.status_summary || [];
     municipalityBreakdown.value = data.municipality_breakdown || [];
     projectBreakdown.value = data.project_breakdown || [];
     trend.value = data.trend || [];
+    reviewBacklog.value = data.review_backlog || [];
+    fundingOverview.value = data.funding_overview || null;
 };
 
 const loadMapData = async (silent = false) => {
@@ -540,10 +587,12 @@ const loadFundingRequests = async () => {
     try {
         const { data } = await api.get('/funding-requests', {
             params: {
-                status: 'pending',
+                status: fundingStatusFilter.value || undefined,
                 municipality_id: filters.municipality_id || undefined,
                 project_id: filters.project_id || undefined,
                 per_page: 30,
+                sort_by: fundingStatusFilter.value === 'pending' ? 'created_at' : 'reviewed_at',
+                sort_dir: 'desc',
             },
         });
 
@@ -710,7 +759,7 @@ const reviewFundingRequest = async (row, decision) => {
         return;
     }
 
-    const reviewComment = String(fundingReviewComment.value || '').trim();
+    const reviewComment = String(fundingReviewNotes[row.id] || '').trim();
     if (!reviewComment) {
         fundingError.value = 'Review reason is required to approve or decline.';
         return;
@@ -729,8 +778,11 @@ const reviewFundingRequest = async (row, decision) => {
             });
         }
 
-        fundingReviewComment.value = '';
-        await loadFundingRequests();
+        fundingReviewNotes[row.id] = '';
+        await Promise.all([
+            loadFundingRequests(),
+            loadKpis(),
+        ]);
     } catch (err) {
         fundingError.value = err.response?.data?.message || 'Unable to review funding request.';
     }
@@ -895,19 +947,28 @@ onBeforeUnmount(() => {
                             <li v-for="slice in statusSlices" :key="slice.status">
                                 <button class="status-legend__btn" type="button" @click="drillStatus(slice.status)">
                                     <span class="status-legend__dot" :style="{ backgroundColor: slice.color }" />
-                                    <span>{{ slice.status }}</span>
+                                    <span>{{ slice.status.replaceAll('_', ' ') }}</span>
                                     <strong>{{ slice.count }}</strong>
                                 </button>
                             </li>
                         </ul>
                     </div>
+                    <ul class="stat-list stat-list--dense" v-if="statusSummary.length">
+                        <li v-for="row in statusSummary" :key="`status-summary-${row.status}`">
+                            <span>{{ row.label }}</span>
+                            <strong>{{ row.count }} / {{ row.percentage }}%</strong>
+                        </li>
+                    </ul>
                 </div>
 
                 <div class="detail-block">
                     <h3>Municipality Breakdown</h3>
                     <ul class="bar-list">
                         <li v-for="row in municipalityBreakdown" :key="row.municipality_id">
-                            <span>{{ row.municipality_name }}</span>
+                            <div>
+                                <span>{{ row.municipality_name }}</span>
+                                <small>{{ row.approval_rate_percent || 0 }}% approved</small>
+                            </div>
                             <div class="bar-list__track">
                                 <div
                                     class="bar-list__fill"
@@ -923,9 +984,18 @@ onBeforeUnmount(() => {
             <div class="split-grid">
                 <div class="detail-block">
                     <h3>Project Breakdown</h3>
-                    <ul class="stat-list">
+                    <ul class="bar-list">
                         <li v-for="row in projectBreakdown" :key="row.project_id">
-                            <span>{{ row.project_name }}</span>
+                            <div>
+                                <span>{{ row.project_name }}</span>
+                                <small>{{ row.municipality_name || '-' }} | {{ row.approval_rate_percent || 0 }}% approved</small>
+                            </div>
+                            <div class="bar-list__track">
+                                <div
+                                    class="bar-list__fill"
+                                    :style="{ width: `${(Number(row.count || 0) / projectMax) * 100}%` }"
+                                />
+                            </div>
                             <strong>{{ row.count }}</strong>
                         </li>
                     </ul>
@@ -944,6 +1014,74 @@ onBeforeUnmount(() => {
                         <li v-for="item in trend" :key="item.day">
                             <small>{{ item.day }}</small>
                             <strong>{{ item.count }}</strong>
+                            <span>Approved {{ item.approved || 0 }}</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="split-grid">
+                <div class="detail-block">
+                    <h3>Review Backlog Aging</h3>
+                    <ul class="bar-list">
+                        <li v-for="bucket in reviewBacklog" :key="bucket.key">
+                            <span>{{ bucket.label }}</span>
+                            <div class="bar-list__track">
+                                <div
+                                    class="bar-list__fill"
+                                    :style="{ width: `${(Number(bucket.count || 0) / reviewBacklogMax) * 100}%` }"
+                                />
+                            </div>
+                            <strong>{{ bucket.count }}</strong>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="detail-block" v-if="fundingOverview">
+                    <h3>Funding Request Overview</h3>
+                    <div class="status-chart-wrap">
+                        <svg viewBox="0 0 42 42" class="status-donut" role="img" aria-label="Funding status breakdown chart">
+                            <circle cx="21" cy="21" r="15.9155" fill="transparent" stroke="#e2e8f0" stroke-width="6" />
+                            <circle
+                                v-for="slice in fundingSlices"
+                                :key="slice.status"
+                                cx="21"
+                                cy="21"
+                                r="15.9155"
+                                fill="transparent"
+                                :stroke="slice.color"
+                                stroke-width="6"
+                                :stroke-dasharray="slice.dash"
+                                :stroke-dashoffset="slice.offset"
+                                stroke-linecap="round"
+                            />
+                        </svg>
+                        <ul class="status-legend">
+                            <li v-for="slice in fundingSlices" :key="`funding-${slice.status}`">
+                                <div class="status-legend__btn status-legend__btn--static">
+                                    <span class="status-legend__dot" :style="{ backgroundColor: slice.color }" />
+                                    <span>{{ slice.status.replaceAll('_', ' ') }}</span>
+                                    <strong>{{ slice.count }}</strong>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                    <ul class="stat-list stat-list--dense">
+                        <li>
+                            <span>Total Requested</span>
+                            <strong>{{ Number(fundingOverview.total_requested_amount || 0).toLocaleString() }}</strong>
+                        </li>
+                        <li>
+                            <span>Pending Amount</span>
+                            <strong>{{ Number(fundingOverview.pending_requested_amount || 0).toLocaleString() }}</strong>
+                        </li>
+                        <li>
+                            <span>Approved Amount</span>
+                            <strong>{{ Number(fundingOverview.approved_requested_amount || 0).toLocaleString() }}</strong>
+                        </li>
+                        <li>
+                            <span>Approval Rate</span>
+                            <strong>{{ fundingOverview.approval_rate_percent || 0 }}%</strong>
                         </li>
                     </ul>
                 </div>
@@ -1120,7 +1258,11 @@ onBeforeUnmount(() => {
                 <p class="field-error" v-if="fundingError">{{ fundingError }}</p>
 
                 <div class="toolbar">
-                    <input v-model="fundingReviewComment" placeholder="Review reason (required)">
+                    <select v-model="fundingStatusFilter" @change="loadFundingRequests">
+                        <option value="pending">Pending Review</option>
+                        <option value="approved">Approved</option>
+                        <option value="declined">Declined</option>
+                    </select>
                     <button class="btn btn--ghost" type="button" @click="loadFundingRequests">Refresh Requests</button>
                 </div>
 
@@ -1130,11 +1272,14 @@ onBeforeUnmount(() => {
                             <tr>
                                 <th>ID</th>
                                 <th>Project</th>
+                                <th>Municipality</th>
                                 <th>Donor</th>
                                 <th>Amount</th>
                                 <th>Status</th>
-                                <th>Reason</th>
+                                <th>Request Reason</th>
+                                <th>Review Reason</th>
                                 <th>Requested</th>
+                                <th>Reviewed</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -1142,18 +1287,31 @@ onBeforeUnmount(() => {
                             <tr v-for="row in fundingRequests" :key="`funding-${row.id}`">
                                 <td>#{{ row.id }}</td>
                                 <td>{{ row.project?.name || '-' }}</td>
+                                <td>{{ row.project?.municipality?.name || '-' }}</td>
                                 <td>{{ row.donor?.name || '-' }}</td>
                                 <td>{{ row.currency }} {{ Number(row.amount || 0).toLocaleString() }}</td>
                                 <td>
-                                    <span class="status-pill">{{ row.status_label }}</span>
+                                    <span class="status-pill" :class="row.status === 'approved' ? 'status-pill--active' : row.status === 'declined' ? 'status-pill--disabled' : ''">
+                                        {{ row.status_label }}
+                                    </span>
                                 </td>
                                 <td>{{ row.reason || '-' }}</td>
+                                <td>{{ row.review_comment || '-' }}</td>
                                 <td>{{ formatDateTime(row.created_at) }}</td>
+                                <td>{{ formatDateTime(row.reviewed_at) }}</td>
                                 <td>
-                                    <div class="inline-group">
-                                        <button class="btn btn--primary" type="button" @click="reviewFundingRequest(row, 'approve')">Approve</button>
-                                        <button class="btn btn--danger" type="button" @click="reviewFundingRequest(row, 'decline')">Decline</button>
+                                    <div class="tracky-funding-review-cell" v-if="row.status === 'pending'">
+                                        <textarea
+                                            v-model="fundingReviewNotes[row.id]"
+                                            rows="2"
+                                            placeholder="Review reason (required)"
+                                        />
+                                        <div class="inline-group">
+                                            <button class="btn btn--primary" type="button" @click="reviewFundingRequest(row, 'approve')">Approve</button>
+                                            <button class="btn btn--danger" type="button" @click="reviewFundingRequest(row, 'decline')">Decline</button>
+                                        </div>
                                     </div>
+                                    <span v-else>Reviewed</span>
                                 </td>
                             </tr>
                         </tbody>

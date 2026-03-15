@@ -41,7 +41,6 @@ const navItems = computed(() => {
             name: 'municipal-overview',
             label: t('nav.municipal'),
             permission: 'dashboards.view.municipality',
-            roles: ['municipal_focal_point'],
             icon: 'municipal',
             group: 'main',
         },

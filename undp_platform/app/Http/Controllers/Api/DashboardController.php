@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\FundingRequestStatus;
 use App\Enums\SubmissionStatus;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
+use App\Models\FundingRequest;
 use App\Models\Municipality;
 use App\Models\Project;
 use App\Models\Submission;
@@ -50,65 +52,27 @@ class DashboardController extends Controller
         $approvalRate = $total > 0 ? round(($approved / $total) * 100, 1) : 0.0;
         $rejectionRate = $total > 0 ? round(($rejected / $total) * 100, 1) : 0.0;
         $pendingValidation = $underReview + $submitted + $queued;
+        $statusCounts = [
+            SubmissionStatus::APPROVED->value => $approved,
+            SubmissionStatus::UNDER_REVIEW->value => $underReview,
+            SubmissionStatus::REWORK_REQUESTED->value => $rework,
+            SubmissionStatus::REJECTED->value => $rejected,
+            SubmissionStatus::SUBMITTED->value => $submitted,
+            SubmissionStatus::QUEUED->value => $queued,
+            SubmissionStatus::DRAFT->value => $draft,
+        ];
 
         $dataMetrics = $this->extractSubmissionDataMetrics($query);
-
-        $statusBreakdown = (clone $query)
-            ->selectRaw('status, COUNT(*) as total')
-            ->groupBy('status')
-            ->pluck('total', 'status')
-            ->map(fn ($value) => (int) $value)
-            ->all();
-
-        $municipalityRows = (clone $query)
-            ->selectRaw('municipality_id, COUNT(*) as total')
-            ->groupBy('municipality_id')
-            ->get();
-
-        $municipalities = Municipality::query()
-            ->whereIn('id', $municipalityRows->pluck('municipality_id')->filter()->all())
-            ->get()
-            ->keyBy('id');
-
-        $municipalityBreakdown = $municipalityRows->map(function ($row) use ($municipalities): array {
-            $municipality = $municipalities->get($row->municipality_id);
-
-            return [
-                'municipality_id' => (int) $row->municipality_id,
-                'municipality_name' => $municipality?->name,
-                'count' => (int) $row->total,
-            ];
-        })->values();
-
-        $projectRows = (clone $query)
-            ->selectRaw('project_id, COUNT(*) as total')
-            ->groupBy('project_id')
-            ->get();
-
-        $projects = Project::query()
-            ->whereIn('id', $projectRows->pluck('project_id')->all())
-            ->get()
-            ->keyBy('id');
-
-        $projectBreakdown = $projectRows->map(function ($row) use ($projects): array {
-            $project = $projects->get($row->project_id);
-
-            return [
-                'project_id' => (int) $row->project_id,
-                'project_name' => $project?->name,
-                'count' => (int) $row->total,
-            ];
-        })->values();
-
-        $trend = (clone $query)
-            ->selectRaw('DATE(created_at) as day, COUNT(*) as total')
-            ->groupBy('day')
-            ->orderBy('day')
-            ->get()
-            ->map(fn ($row): array => [
-                'day' => $row->day,
-                'count' => (int) $row->total,
-            ]);
+        $statusBreakdown = array_filter(
+            $statusCounts,
+            static fn (int $count): bool => $count > 0,
+        );
+        $statusSummary = $this->buildStatusSummary($statusCounts, $total);
+        $municipalityBreakdown = $this->buildMunicipalityBreakdown($query, $total);
+        $projectBreakdown = $this->buildProjectBreakdown($query, $total);
+        $trend = $this->buildTrendSeries($query);
+        $reviewBacklog = $this->buildReviewBacklog($query);
+        $fundingOverview = $this->buildFundingOverview($request, $validated);
 
         return response()->json([
             'kpis' => [
@@ -127,19 +91,31 @@ class DashboardController extends Controller
                 'average_completion_percentage' => $dataMetrics['average_completion_percentage'],
             ],
             'status_breakdown' => $statusBreakdown,
+            'status_summary' => $statusSummary,
             'municipality_breakdown' => $municipalityBreakdown,
             'project_breakdown' => $projectBreakdown,
+            'review_backlog' => $reviewBacklog,
+            'funding_overview' => $fundingOverview,
             'trend' => $trend,
+            'generated_at' => now()->toIso8601String(),
         ]);
     }
 
     public function municipalOverview(Request $request): JsonResponse
     {
-        if (! $request->user()->hasRole(UserRole::MUNICIPAL_FOCAL_POINT)) {
+        $user = $request->user();
+
+        if (! $user->hasRole(UserRole::MUNICIPAL_FOCAL_POINT) && ! $user->hasPermission('dashboards.view.system')) {
             return response()->json(['message' => 'Access denied.'], 403);
         }
 
-        $municipalityId = $request->user()->municipality_id;
+        $requestedMunicipalityId = $request->validate([
+            'municipality_id' => ['nullable', 'integer', 'exists:municipalities,id'],
+        ])['municipality_id'] ?? null;
+
+        $municipalityId = $user->hasRole(UserRole::MUNICIPAL_FOCAL_POINT)
+            ? $user->municipality_id
+            : ($requestedMunicipalityId ?: ($user->municipality_id ?: Municipality::query()->orderBy('name_en')->value('id')));
 
         if (! $municipalityId) {
             return response()->json([
@@ -406,58 +382,13 @@ class DashboardController extends Controller
         $approvedLast30Days = (clone $query)->whereDate('created_at', '>=', now()->subDays(30))->count();
         $approvedLast7Days = (clone $query)->whereDate('created_at', '>=', now()->subDays(7))->count();
         $dataMetrics = $this->extractSubmissionDataMetrics($query);
-
-        $municipalityRows = (clone $query)
-            ->selectRaw('municipality_id, COUNT(*) as total')
-            ->groupBy('municipality_id')
-            ->orderByDesc('total')
-            ->get();
-
-        $municipalities = Municipality::query()
-            ->whereIn('id', $municipalityRows->pluck('municipality_id')->filter()->all())
-            ->get()
-            ->keyBy('id');
-
-        $municipalityBreakdown = $municipalityRows->map(function ($row) use ($municipalities): array {
-            $municipality = $municipalities->get($row->municipality_id);
-
-            return [
-                'municipality_id' => (int) $row->municipality_id,
-                'municipality_name' => $municipality?->name,
-                'count' => (int) $row->total,
-            ];
-        })->values();
-
-        $projectRows = (clone $query)
-            ->selectRaw('project_id, COUNT(*) as total')
-            ->groupBy('project_id')
-            ->orderByDesc('total')
-            ->get();
-
-        $projects = Project::query()
-            ->whereIn('id', $projectRows->pluck('project_id')->all())
-            ->get()
-            ->keyBy('id');
-
-        $projectBreakdown = $projectRows->map(function ($row) use ($projects): array {
-            $project = $projects->get($row->project_id);
-
-            return [
-                'project_id' => (int) $row->project_id,
-                'project_name' => $project?->name,
-                'count' => (int) $row->total,
-            ];
-        })->values();
-
-        $trend = (clone $query)
-            ->selectRaw('DATE(created_at) as day, COUNT(*) as total')
-            ->groupBy('day')
-            ->orderBy('day')
-            ->get()
-            ->map(fn ($row): array => [
-                'day' => $row->day,
-                'count' => (int) $row->total,
-            ]);
+        $statusCounts = [
+            SubmissionStatus::APPROVED->value => $approvedTotal,
+        ];
+        $municipalityBreakdown = $this->buildMunicipalityBreakdown($query, $approvedTotal);
+        $projectBreakdown = $this->buildProjectBreakdown($query, $approvedTotal);
+        $trend = $this->buildTrendSeries($query);
+        $fundingOverview = $this->buildFundingOverview($request, $validated);
 
         return response()->json([
             'kpis' => [
@@ -469,12 +400,13 @@ class DashboardController extends Controller
                 'total_actual_beneficiaries' => $dataMetrics['total_actual_beneficiaries'],
                 'average_completion_percentage' => $dataMetrics['average_completion_percentage'],
             ],
-            'status_breakdown' => [
-                SubmissionStatus::APPROVED->value => $approvedTotal,
-            ],
+            'status_breakdown' => $statusCounts,
+            'status_summary' => $this->buildStatusSummary($statusCounts, $approvedTotal),
             'municipality_breakdown' => $municipalityBreakdown,
             'project_breakdown' => $projectBreakdown,
+            'funding_overview' => $fundingOverview,
             'trend' => $trend,
+            'generated_at' => now()->toIso8601String(),
         ]);
     }
 
@@ -505,6 +437,302 @@ class DashboardController extends Controller
         }
 
         return $query;
+    }
+
+    private function buildStatusSummary(array $counts, int $total): array
+    {
+        return collect($counts)
+            ->map(function ($count, $status) use ($total): array {
+                return [
+                    'status' => (string) $status,
+                    'label' => $this->submissionStatusLabel((string) $status),
+                    'count' => (int) $count,
+                    'percentage' => $total > 0 ? round(((int) $count / $total) * 100, 1) : 0.0,
+                ];
+            })
+            ->filter(fn (array $row): bool => $row['count'] > 0)
+            ->values()
+            ->all();
+    }
+
+    private function buildMunicipalityBreakdown(Builder $query, int $grandTotal): array
+    {
+        $rows = (clone $query)
+            ->selectRaw(
+                'municipality_id,
+                COUNT(*) as total,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as approved,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as under_review,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as rework_requested,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as rejected,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as submitted,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as queued,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as draft',
+                [
+                    SubmissionStatus::APPROVED->value,
+                    SubmissionStatus::UNDER_REVIEW->value,
+                    SubmissionStatus::REWORK_REQUESTED->value,
+                    SubmissionStatus::REJECTED->value,
+                    SubmissionStatus::SUBMITTED->value,
+                    SubmissionStatus::QUEUED->value,
+                    SubmissionStatus::DRAFT->value,
+                ],
+            )
+            ->groupBy('municipality_id')
+            ->orderByDesc('total')
+            ->get();
+
+        $municipalities = Municipality::query()
+            ->whereIn('id', $rows->pluck('municipality_id')->filter()->all())
+            ->get()
+            ->keyBy('id');
+
+        return $rows->map(function ($row) use ($grandTotal, $municipalities): array {
+            $municipality = $municipalities->get($row->municipality_id);
+            $total = (int) $row->total;
+            $approved = (int) $row->approved;
+            $underReview = (int) $row->under_review;
+            $submitted = (int) $row->submitted;
+            $queued = (int) $row->queued;
+
+            return [
+                'municipality_id' => (int) $row->municipality_id,
+                'municipality_name' => $municipality?->name,
+                'count' => $total,
+                'approved' => $approved,
+                'under_review' => $underReview,
+                'rework_requested' => (int) $row->rework_requested,
+                'rejected' => (int) $row->rejected,
+                'submitted' => $submitted,
+                'queued' => $queued,
+                'draft' => (int) $row->draft,
+                'approval_rate_percent' => $total > 0 ? round(($approved / $total) * 100, 1) : 0.0,
+                'pending_validation' => $underReview + $submitted + $queued,
+                'percentage_of_total' => $grandTotal > 0 ? round(($total / $grandTotal) * 100, 1) : 0.0,
+            ];
+        })->values()->all();
+    }
+
+    private function buildProjectBreakdown(Builder $query, int $grandTotal): array
+    {
+        $rows = (clone $query)
+            ->selectRaw(
+                'project_id,
+                COUNT(*) as total,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as approved,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as under_review,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as rework_requested,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as rejected,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as submitted,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as queued,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as draft',
+                [
+                    SubmissionStatus::APPROVED->value,
+                    SubmissionStatus::UNDER_REVIEW->value,
+                    SubmissionStatus::REWORK_REQUESTED->value,
+                    SubmissionStatus::REJECTED->value,
+                    SubmissionStatus::SUBMITTED->value,
+                    SubmissionStatus::QUEUED->value,
+                    SubmissionStatus::DRAFT->value,
+                ],
+            )
+            ->groupBy('project_id')
+            ->orderByDesc('total')
+            ->get();
+
+        $projects = Project::query()
+            ->with('municipality:id,name_en,name_ar')
+            ->whereIn('id', $rows->pluck('project_id')->filter()->all())
+            ->get()
+            ->keyBy('id');
+
+        return $rows->map(function ($row) use ($grandTotal, $projects): array {
+            $project = $projects->get($row->project_id);
+            $total = (int) $row->total;
+            $approved = (int) $row->approved;
+            $underReview = (int) $row->under_review;
+            $submitted = (int) $row->submitted;
+            $queued = (int) $row->queued;
+
+            return [
+                'project_id' => (int) $row->project_id,
+                'project_name' => $project?->name,
+                'municipality_name' => $project?->municipality?->name,
+                'count' => $total,
+                'approved' => $approved,
+                'under_review' => $underReview,
+                'rework_requested' => (int) $row->rework_requested,
+                'rejected' => (int) $row->rejected,
+                'submitted' => $submitted,
+                'queued' => $queued,
+                'draft' => (int) $row->draft,
+                'approval_rate_percent' => $total > 0 ? round(($approved / $total) * 100, 1) : 0.0,
+                'pending_validation' => $underReview + $submitted + $queued,
+                'percentage_of_total' => $grandTotal > 0 ? round(($total / $grandTotal) * 100, 1) : 0.0,
+            ];
+        })->values()->all();
+    }
+
+    private function buildTrendSeries(Builder $query): array
+    {
+        return (clone $query)
+            ->selectRaw(
+                'DATE(created_at) as day,
+                COUNT(*) as total,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as approved,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as under_review,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as rework_requested,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as rejected,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as submitted,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as queued,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as draft',
+                [
+                    SubmissionStatus::APPROVED->value,
+                    SubmissionStatus::UNDER_REVIEW->value,
+                    SubmissionStatus::REWORK_REQUESTED->value,
+                    SubmissionStatus::REJECTED->value,
+                    SubmissionStatus::SUBMITTED->value,
+                    SubmissionStatus::QUEUED->value,
+                    SubmissionStatus::DRAFT->value,
+                ],
+            )
+            ->groupBy('day')
+            ->orderBy('day')
+            ->get()
+            ->map(fn ($row): array => [
+                'day' => (string) $row->day,
+                'count' => (int) $row->total,
+                'approved' => (int) $row->approved,
+                'under_review' => (int) $row->under_review,
+                'rework_requested' => (int) $row->rework_requested,
+                'rejected' => (int) $row->rejected,
+                'submitted' => (int) $row->submitted,
+                'queued' => (int) $row->queued,
+                'draft' => (int) $row->draft,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function buildReviewBacklog(Builder $query): array
+    {
+        $pendingBase = (clone $query)->whereIn('status', [
+            SubmissionStatus::UNDER_REVIEW->value,
+            SubmissionStatus::SUBMITTED->value,
+            SubmissionStatus::QUEUED->value,
+        ]);
+
+        return [
+            [
+                'key' => 'fresh',
+                'label' => '0-3 days',
+                'count' => (clone $pendingBase)->whereDate('created_at', '>=', now()->subDays(3))->count(),
+            ],
+            [
+                'key' => 'watch',
+                'label' => '4-7 days',
+                'count' => (clone $pendingBase)
+                    ->whereDate('created_at', '<', now()->subDays(3))
+                    ->whereDate('created_at', '>=', now()->subDays(7))
+                    ->count(),
+            ],
+            [
+                'key' => 'stale',
+                'label' => '8+ days',
+                'count' => (clone $pendingBase)->whereDate('created_at', '<', now()->subDays(7))->count(),
+            ],
+        ];
+    }
+
+    private function buildFundingOverview(Request $request, array $filters): ?array
+    {
+        $user = $request->user();
+
+        if (
+            ! $user->hasPermission('funding_requests.view.all')
+            && ! $user->hasPermission('funding_requests.view.own')
+            && ! $user->hasPermission('funding_requests.create')
+            && ! $user->hasPermission('funding_requests.review')
+        ) {
+            return null;
+        }
+
+        $query = FundingRequest::query();
+
+        if (
+            ! $user->hasPermission('funding_requests.view.all')
+            && ! $user->hasPermission('funding_requests.review')
+        ) {
+            $query->where('donor_user_id', $user->id);
+        }
+
+        if (! empty($filters['project_id'])) {
+            $query->where('project_id', $filters['project_id']);
+        }
+
+        if (! empty($filters['municipality_id'])) {
+            $query->whereHas('project', function (Builder $builder) use ($filters): void {
+                $builder->where('municipality_id', $filters['municipality_id']);
+            });
+        }
+
+        if (! empty($filters['date_from'])) {
+            $query->whereDate('created_at', '>=', $filters['date_from']);
+        }
+
+        if (! empty($filters['date_to'])) {
+            $query->whereDate('created_at', '<=', $filters['date_to']);
+        }
+
+        $total = (clone $query)->count();
+        $pending = (clone $query)->where('status', FundingRequestStatus::PENDING->value)->count();
+        $approved = (clone $query)->where('status', FundingRequestStatus::APPROVED->value)->count();
+        $declined = (clone $query)->where('status', FundingRequestStatus::DECLINED->value)->count();
+        $totalAmount = round((float) (clone $query)->sum('amount'), 2);
+        $pendingAmount = round((float) (clone $query)->where('status', FundingRequestStatus::PENDING->value)->sum('amount'), 2);
+        $approvedAmount = round((float) (clone $query)->where('status', FundingRequestStatus::APPROVED->value)->sum('amount'), 2);
+        $declinedAmount = round((float) (clone $query)->where('status', FundingRequestStatus::DECLINED->value)->sum('amount'), 2);
+
+        return [
+            'total_requests' => $total,
+            'pending_requests' => $pending,
+            'approved_requests' => $approved,
+            'declined_requests' => $declined,
+            'total_requested_amount' => $totalAmount,
+            'pending_requested_amount' => $pendingAmount,
+            'approved_requested_amount' => $approvedAmount,
+            'declined_requested_amount' => $declinedAmount,
+            'approval_rate_percent' => $total > 0 ? round(($approved / $total) * 100, 1) : 0.0,
+            'pending_share_percent' => $total > 0 ? round(($pending / $total) * 100, 1) : 0.0,
+            'status_breakdown' => [
+                FundingRequestStatus::PENDING->value => $pending,
+                FundingRequestStatus::APPROVED->value => $approved,
+                FundingRequestStatus::DECLINED->value => $declined,
+            ],
+            'status_summary' => collect([
+                FundingRequestStatus::PENDING->value => $pending,
+                FundingRequestStatus::APPROVED->value => $approved,
+                FundingRequestStatus::DECLINED->value => $declined,
+            ])->map(function ($count, $status) use ($total): array {
+                $statusEnum = FundingRequestStatus::tryFrom((string) $status);
+
+                return [
+                    'status' => (string) $status,
+                    'label' => $statusEnum?->label() ?? ucfirst(str_replace('_', ' ', (string) $status)),
+                    'count' => (int) $count,
+                    'percentage' => $total > 0 ? round(((int) $count / $total) * 100, 1) : 0.0,
+                ];
+            })->filter(fn (array $row): bool => $row['count'] > 0)->values()->all(),
+        ];
+    }
+
+    private function submissionStatusLabel(string $status): string
+    {
+        return match ($status) {
+            SubmissionStatus::UNDER_REVIEW->value => 'Under Review',
+            SubmissionStatus::REWORK_REQUESTED->value => 'Rework Requested',
+            default => ucfirst(str_replace('_', ' ', $status)),
+        };
     }
 
     private function buildMarkerClusters(array $markers, int $zoom): array

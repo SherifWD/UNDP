@@ -90,7 +90,6 @@ const routes = [
         meta: {
             requiresAuth: true,
             permission: 'dashboards.view.municipality',
-            role: 'municipal_focal_point',
         },
     },
     {

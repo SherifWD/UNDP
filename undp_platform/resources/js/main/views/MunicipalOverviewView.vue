@@ -150,6 +150,9 @@ const loadOverview = async (silent = false) => {
         const { data } = await api.get('/dashboard/municipal-overview', { params });
         overview.value = data;
         autoRefreshAt.value = data.generated_at || new Date().toISOString();
+        if (canChooseMunicipality.value && !filters.municipality_id && data.municipality?.id) {
+            filters.municipality_id = String(data.municipality.id);
+        }
     } catch (err) {
         error.value = err.response?.data?.message || 'Unable to load municipal overview.';
     } finally {
@@ -216,7 +219,7 @@ onBeforeUnmount(() => {
 
             <div class="toolbar">
                 <select v-if="canChooseMunicipality" v-model="filters.municipality_id">
-                    <option value="">My default municipality</option>
+                    <option value="">Select municipality</option>
                     <option v-for="municipality in municipalities" :key="municipality.id" :value="municipality.id">
                         {{ municipality.name }}
                     </option>

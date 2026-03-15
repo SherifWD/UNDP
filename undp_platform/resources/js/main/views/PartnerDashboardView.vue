@@ -13,6 +13,12 @@ const STATUS_COLORS = {
     rejected: '#dc2626',
 };
 
+const FUNDING_STATUS_COLORS = {
+    pending: '#f59e0b',
+    approved: '#16a34a',
+    declined: '#dc2626',
+};
+
 const asyncExport = useAsyncExport();
 const router = useRouter();
 
@@ -21,6 +27,7 @@ const trend = ref([]);
 const statusBreakdown = ref({});
 const municipalityBreakdown = ref([]);
 const projectBreakdown = ref([]);
+const fundingOverview = ref(null);
 const projectCards = ref([]);
 const submissions = ref([]);
 const municipalities = ref([]);
@@ -116,6 +123,31 @@ const municipalityMax = computed(() => {
 const projectMax = computed(() => {
     const values = projectBreakdown.value.map((item) => Number(item.count || 0));
     return values.length ? Math.max(...values, 1) : 1;
+});
+
+const fundingSlices = computed(() => {
+    const rows = Object.entries(fundingOverview.value?.status_breakdown || {})
+        .map(([status, count]) => ({
+            key: status,
+            count: Number(count || 0),
+            color: FUNDING_STATUS_COLORS[status] || '#0ea5e9',
+        }))
+        .filter((row) => row.count > 0);
+
+    const total = rows.reduce((sum, row) => sum + row.count, 0);
+    let offset = 0;
+
+    return rows.map((row) => {
+        const ratio = total > 0 ? row.count / total : 0;
+        const arc = ratio * 100;
+        const slice = {
+            ...row,
+            dash: `${arc} ${100 - arc}`,
+            offset: -offset,
+        };
+        offset += arc;
+        return slice;
+    });
 });
 
 const trendPath = computed(() => {
@@ -259,6 +291,7 @@ const loadPartnerDashboard = async () => {
         statusBreakdown.value = data.status_breakdown || {};
         municipalityBreakdown.value = data.municipality_breakdown || [];
         projectBreakdown.value = data.project_breakdown || [];
+        fundingOverview.value = data.funding_overview || null;
     } catch (err) {
         error.value = err.response?.data?.message || 'Unable to load partner dashboard.';
         kpis.value = {};
@@ -266,6 +299,7 @@ const loadPartnerDashboard = async () => {
         statusBreakdown.value = {};
         municipalityBreakdown.value = [];
         projectBreakdown.value = [];
+        fundingOverview.value = null;
     } finally {
         loading.value = false;
     }
@@ -434,6 +468,55 @@ onMounted(async () => {
             </div>
 
             <KpiCards :kpis="kpis" />
+
+            <div class="detail-block" v-if="fundingOverview">
+                <h3>My Funding Requests</h3>
+                <div class="status-chart-wrap">
+                    <svg viewBox="0 0 42 42" class="status-donut" role="img" aria-label="Funding request status chart">
+                        <circle cx="21" cy="21" r="15.9155" fill="transparent" stroke="#e2e8f0" stroke-width="6" />
+                        <circle
+                            v-for="slice in fundingSlices"
+                            :key="slice.key"
+                            cx="21"
+                            cy="21"
+                            r="15.9155"
+                            fill="transparent"
+                            :stroke="slice.color"
+                            stroke-width="6"
+                            :stroke-dasharray="slice.dash"
+                            :stroke-dashoffset="slice.offset"
+                            stroke-linecap="round"
+                        />
+                    </svg>
+                    <ul class="status-legend">
+                        <li v-for="slice in fundingSlices" :key="`partner-funding-${slice.key}`">
+                            <div class="status-legend__btn status-legend__btn--static">
+                                <span class="status-legend__dot" :style="{ backgroundColor: slice.color }" />
+                                <span>{{ rowStatusLabel(slice.key) }}</span>
+                                <strong>{{ slice.count }}</strong>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                <ul class="stat-list stat-list--dense">
+                    <li>
+                        <span>Total Requested Amount</span>
+                        <strong>{{ Number(fundingOverview.total_requested_amount || 0).toLocaleString() }}</strong>
+                    </li>
+                    <li>
+                        <span>Pending Amount</span>
+                        <strong>{{ Number(fundingOverview.pending_requested_amount || 0).toLocaleString() }}</strong>
+                    </li>
+                    <li>
+                        <span>Approved Amount</span>
+                        <strong>{{ Number(fundingOverview.approved_requested_amount || 0).toLocaleString() }}</strong>
+                    </li>
+                    <li>
+                        <span>Approval Rate</span>
+                        <strong>{{ fundingOverview.approval_rate_percent || 0 }}%</strong>
+                    </li>
+                </ul>
+            </div>
 
             <div class="split-grid">
                 <div class="detail-block">

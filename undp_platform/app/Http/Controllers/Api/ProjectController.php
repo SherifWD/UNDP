@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\FundingRequestStatus;
 use App\Enums\SubmissionStatus;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
@@ -48,6 +49,7 @@ class ProjectController extends Controller
 
         if ($withStats) {
             $this->applyStatCounts($request, $query);
+            $this->applyFundingRequestStats($request, $query);
         }
 
         $query
@@ -121,6 +123,7 @@ class ProjectController extends Controller
             'municipality:id,name_en,name_ar,code',
             'assignedReporters:id,name,email,role,status,municipality_id',
         ]);
+        $this->loadFundingRequestStats($request, $project);
 
         $submissionQuery = Submission::query()->where('project_id', $project->id);
         SubmissionAccessService::scope($request->user(), $submissionQuery);
@@ -481,6 +484,92 @@ class ProjectController extends Controller
         ]);
     }
 
+    private function applyFundingRequestStats(Request $request, Builder $query): void
+    {
+        if (! $this->shouldExposeFundingSummary($request)) {
+            return;
+        }
+
+        $user = $request->user();
+        $scope = function (Builder $fundingQuery) use ($user): void {
+            if (
+                ! $user->hasPermission('funding_requests.view.all')
+                && ! $user->hasPermission('funding_requests.review')
+            ) {
+                $fundingQuery->where('donor_user_id', $user->id);
+            }
+        };
+
+        $query->withCount([
+            'fundingRequests as funding_requests_total_count' => function (Builder $fundingQuery) use ($scope): void {
+                $scope($fundingQuery);
+            },
+            'fundingRequests as funding_requests_pending_count' => function (Builder $fundingQuery) use ($scope): void {
+                $scope($fundingQuery);
+                $fundingQuery->where('status', FundingRequestStatus::PENDING->value);
+            },
+            'fundingRequests as funding_requests_approved_count' => function (Builder $fundingQuery) use ($scope): void {
+                $scope($fundingQuery);
+                $fundingQuery->where('status', FundingRequestStatus::APPROVED->value);
+            },
+            'fundingRequests as funding_requests_declined_count' => function (Builder $fundingQuery) use ($scope): void {
+                $scope($fundingQuery);
+                $fundingQuery->where('status', FundingRequestStatus::DECLINED->value);
+            },
+        ])->withSum([
+            'fundingRequests as funding_requested_total_amount' => function (Builder $fundingQuery) use ($scope): void {
+                $scope($fundingQuery);
+            },
+        ], 'amount')->withMax([
+            'fundingRequests as latest_funding_request_at' => function (Builder $fundingQuery) use ($scope): void {
+                $scope($fundingQuery);
+            },
+        ], 'created_at');
+    }
+
+    private function loadFundingRequestStats(Request $request, Project $project): void
+    {
+        if (! $this->shouldExposeFundingSummary($request)) {
+            return;
+        }
+
+        $user = $request->user();
+        $scope = function (Builder $fundingQuery) use ($user): void {
+            if (
+                ! $user->hasPermission('funding_requests.view.all')
+                && ! $user->hasPermission('funding_requests.review')
+            ) {
+                $fundingQuery->where('donor_user_id', $user->id);
+            }
+        };
+
+        $project->loadCount([
+            'fundingRequests as funding_requests_total_count' => function (Builder $fundingQuery) use ($scope): void {
+                $scope($fundingQuery);
+            },
+            'fundingRequests as funding_requests_pending_count' => function (Builder $fundingQuery) use ($scope): void {
+                $scope($fundingQuery);
+                $fundingQuery->where('status', FundingRequestStatus::PENDING->value);
+            },
+            'fundingRequests as funding_requests_approved_count' => function (Builder $fundingQuery) use ($scope): void {
+                $scope($fundingQuery);
+                $fundingQuery->where('status', FundingRequestStatus::APPROVED->value);
+            },
+            'fundingRequests as funding_requests_declined_count' => function (Builder $fundingQuery) use ($scope): void {
+                $scope($fundingQuery);
+                $fundingQuery->where('status', FundingRequestStatus::DECLINED->value);
+            },
+        ])->loadSum([
+            'fundingRequests as funding_requested_total_amount' => function (Builder $fundingQuery) use ($scope): void {
+                $scope($fundingQuery);
+            },
+        ], 'amount')->loadMax([
+            'fundingRequests as latest_funding_request_at' => function (Builder $fundingQuery) use ($scope): void {
+                $scope($fundingQuery);
+            },
+        ], 'created_at');
+    }
+
     private function buildTabCounts(Builder $query): array
     {
         $total = (clone $query)->count();
@@ -542,6 +631,7 @@ class ProjectController extends Controller
             'contacts' => $meta['contacts'],
             'created_by_label' => $meta['created_by_label'],
             'updated_by_label' => $meta['updated_by_label'],
+            'funding_requests_summary' => $this->serializeFundingRequestSummary($project),
             'assigned_reporters_count' => $assignedReportersCount,
             'latitude' => $project->latitude,
             'longitude' => $project->longitude,
@@ -576,6 +666,41 @@ class ProjectController extends Controller
         }
 
         return $payload;
+    }
+
+    private function serializeFundingRequestSummary(Project $project): ?array
+    {
+        $attributes = $project->getAttributes();
+
+        if (
+            ! array_key_exists('funding_requests_total_count', $attributes)
+            && ! array_key_exists('funding_requested_total_amount', $attributes)
+        ) {
+            return null;
+        }
+
+        $latestRequestedAt = data_get($attributes, 'latest_funding_request_at');
+
+        return [
+            'total_requests' => (int) ($project->funding_requests_total_count ?? 0),
+            'pending_requests' => (int) ($project->funding_requests_pending_count ?? 0),
+            'approved_requests' => (int) ($project->funding_requests_approved_count ?? 0),
+            'declined_requests' => (int) ($project->funding_requests_declined_count ?? 0),
+            'total_requested_amount' => round((float) ($project->funding_requested_total_amount ?? 0), 2),
+            'latest_requested_at' => $latestRequestedAt
+                ? Carbon::parse((string) $latestRequestedAt)->toIso8601String()
+                : null,
+        ];
+    }
+
+    private function shouldExposeFundingSummary(Request $request): bool
+    {
+        $user = $request->user();
+
+        return $user->hasPermission('funding_requests.view.all')
+            || $user->hasPermission('funding_requests.view.own')
+            || $user->hasPermission('funding_requests.create')
+            || $user->hasPermission('funding_requests.review');
     }
 
     private function projectMeta(Project $project): array
