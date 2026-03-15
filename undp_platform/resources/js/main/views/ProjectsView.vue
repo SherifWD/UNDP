@@ -20,6 +20,7 @@ const tabCounts = ref({ all: 0, by_municipality: {} });
 const projectDetails = ref(null);
 const projectReporters = ref([]);
 const projectMediaAttachments = ref([]);
+const projectFundingRequests = ref([]);
 const availableReporters = ref([]);
 
 const projectOptionSets = reactive({
@@ -37,6 +38,8 @@ const optionsLoading = ref(false);
 const saving = ref(false);
 const deleting = ref(false);
 const error = ref('');
+const projectFundingRequestsError = ref('');
+const fundingRequestError = ref('');
 
 const activeMunicipalityTab = ref('all');
 const projectDetailsModalOpen = ref(false);
@@ -44,6 +47,16 @@ const projectFormModalOpen = ref(false);
 const municipalityModalOpen = ref(false);
 const editingProjectId = ref(null);
 const selectedReporterId = ref('');
+const fundingRequestModalOpen = ref(false);
+const fundingRequestSubmitting = ref(false);
+const fundingRequestTargetProject = ref(null);
+const projectFundingRequestsLoading = ref(false);
+
+const fundingReviewNotes = reactive({});
+const fundingRequestForm = reactive({
+    amount: '',
+    reason: '',
+});
 
 const detailMapEl = ref(null);
 const formMapEl = ref(null);
@@ -146,6 +159,9 @@ const fallbackOptionSets = {
 
 const canManageMunicipalities = computed(() => auth.hasPermission('municipalities.manage'));
 const canManageProjects = computed(() => auth.hasPermission('projects.manage'));
+const canRequestFunding = computed(() => auth.hasPermission('funding_requests.create'));
+const canReviewFundingRequests = computed(() => auth.hasPermission('funding_requests.review'));
+const canViewFundingRequests = computed(() => canRequestFunding.value || canReviewFundingRequests.value);
 const canViewProjectSubmissions = computed(() => (
     auth.hasPermission('submissions.view.own')
     || auth.hasPermission('submissions.view.municipality')
@@ -252,6 +268,7 @@ const applyFallbackOptionSets = () => {
 
 const projectReference = (project) => project?.code || `PRJ-${String(project?.id || '').padStart(3, '0')}`;
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : '-');
+const formatDateTime = (value) => (value ? new Date(value).toLocaleString() : '-');
 const formatCurrency = (value) => `USD ${Number(value || 0).toLocaleString()}`;
 const linesToArray = (value) => String(value || '')
     .split('\n')
@@ -279,6 +296,127 @@ const openProjectSubmissions = (project) => {
             id: String(project.id),
         },
     });
+};
+
+const openFundingRequestModal = (project) => {
+    if (! project || ! canRequestFunding.value) {
+        return;
+    }
+
+    fundingRequestTargetProject.value = project;
+    fundingRequestError.value = '';
+    fundingRequestForm.amount = '';
+    fundingRequestForm.reason = '';
+    fundingRequestModalOpen.value = true;
+};
+
+const closeFundingRequestModal = () => {
+    fundingRequestModalOpen.value = false;
+    fundingRequestTargetProject.value = null;
+    fundingRequestError.value = '';
+    fundingRequestForm.amount = '';
+    fundingRequestForm.reason = '';
+};
+
+const loadProjectFundingRequests = async (projectId) => {
+    if (! canViewFundingRequests.value || ! projectId) {
+        projectFundingRequests.value = [];
+        return;
+    }
+
+    projectFundingRequestsLoading.value = true;
+    projectFundingRequestsError.value = '';
+
+    try {
+        const { data } = await api.get('/funding-requests', {
+            params: {
+                project_id: projectId,
+                per_page: 100,
+                sort_by: 'created_at',
+                sort_dir: 'desc',
+            },
+        });
+
+        projectFundingRequests.value = data.data || [];
+    } catch (err) {
+        projectFundingRequests.value = [];
+        projectFundingRequestsError.value = err.response?.data?.message || 'Unable to load funding requests.';
+    } finally {
+        projectFundingRequestsLoading.value = false;
+    }
+};
+
+const submitFundingRequest = async () => {
+    if (! canRequestFunding.value || ! fundingRequestTargetProject.value) {
+        return;
+    }
+
+    fundingRequestError.value = '';
+    const amount = Number(fundingRequestForm.amount);
+
+    if (! Number.isFinite(amount) || amount <= 0) {
+        fundingRequestError.value = 'Funding amount must be greater than zero.';
+        return;
+    }
+
+    fundingRequestSubmitting.value = true;
+
+    try {
+        await api.post('/funding-requests', {
+            project_id: fundingRequestTargetProject.value.id,
+            amount,
+            reason: fundingRequestForm.reason || null,
+        });
+
+        ui.pushToast('Funding request submitted successfully.');
+        const currentProjectId = projectDetails.value?.id;
+        closeFundingRequestModal();
+
+        if (currentProjectId) {
+            await loadProjectFundingRequests(currentProjectId);
+        }
+    } catch (err) {
+        fundingRequestError.value = err.response?.data?.message || 'Unable to submit funding request.';
+    } finally {
+        fundingRequestSubmitting.value = false;
+    }
+};
+
+const reviewFundingRequest = async (fundingRequest, decision) => {
+    if (! canReviewFundingRequests.value || ! fundingRequest?.id) {
+        return;
+    }
+
+    const note = String(fundingReviewNotes[fundingRequest.id] || '').trim();
+
+    if (! note) {
+        projectFundingRequestsError.value = 'Review reason is required for approve/decline.';
+        return;
+    }
+
+    projectFundingRequestsError.value = '';
+
+    try {
+        if (decision === 'approve') {
+            await api.post(`/funding-requests/${fundingRequest.id}/approve`, {
+                review_comment: note,
+            });
+            ui.pushToast('Funding request approved.');
+        } else {
+            await api.post(`/funding-requests/${fundingRequest.id}/decline`, {
+                review_comment: note,
+            });
+            ui.pushToast('Funding request declined.');
+        }
+
+        fundingReviewNotes[fundingRequest.id] = '';
+
+        if (projectDetails.value?.id) {
+            await loadProjectFundingRequests(projectDetails.value.id);
+        }
+    } catch (err) {
+        projectFundingRequestsError.value = err.response?.data?.message || 'Unable to review funding request.';
+    }
 };
 
 const setMunicipalityTab = async (tabId) => {
@@ -467,7 +605,10 @@ const openProjectDetails = async (project) => {
     projectDetailsModalOpen.value = true;
 
     try {
-        await fetchProjectDetails(project.id);
+        await Promise.all([
+            fetchProjectDetails(project.id),
+            loadProjectFundingRequests(project.id),
+        ]);
         await ensureDetailMap();
     } catch {
         projectDetailsModalOpen.value = false;
@@ -476,6 +617,8 @@ const openProjectDetails = async (project) => {
 
 const closeProjectDetails = () => {
     projectDetailsModalOpen.value = false;
+    projectFundingRequests.value = [];
+    projectFundingRequestsError.value = '';
 };
 
 const openCreateProjectModal = async () => {
@@ -1015,6 +1158,14 @@ onBeforeUnmount(() => {
                                     <button
                                         class="tracky-btn tracky-btn--ghost"
                                         type="button"
+                                        v-if="canRequestFunding"
+                                        @click="openFundingRequestModal(project)"
+                                    >
+                                        Request Fund
+                                    </button>
+                                    <button
+                                        class="tracky-btn tracky-btn--ghost"
+                                        type="button"
                                         v-if="canManageProjects"
                                         @click="openEditProjectModal(project)"
                                     >
@@ -1070,6 +1221,14 @@ onBeforeUnmount(() => {
                                 @click="openProjectSubmissions(projectDetails)"
                             >
                                 Go to Submissions
+                            </button>
+                            <button
+                                class="tracky-btn tracky-btn--soft"
+                                type="button"
+                                v-if="projectDetails && canRequestFunding"
+                                @click="openFundingRequestModal(projectDetails)"
+                            >
+                                Request Fund
                             </button>
                             <button
                                 class="tracky-btn tracky-btn--ghost"
@@ -1213,6 +1372,70 @@ onBeforeUnmount(() => {
                                             <li v-if="!projectDetails.funding_types?.length">No funding types provided.</li>
                                         </ul>
                                     </div>
+                                </div>
+                            </div>
+
+                            <div class="tracky-project-section" v-if="canViewFundingRequests">
+                                <h4>Project Funding Requests</h4>
+                                <p class="field-error" v-if="projectFundingRequestsError">{{ projectFundingRequestsError }}</p>
+
+                                <div class="inline-group" v-if="projectDetails && canRequestFunding">
+                                    <button class="btn btn--ghost" type="button" @click="openFundingRequestModal(projectDetails)">
+                                        Request Funding For This Project
+                                    </button>
+                                </div>
+
+                                <div class="table-wrap">
+                                    <table class="table" v-if="!projectFundingRequestsLoading && projectFundingRequests.length">
+                                        <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Donor</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                            <th>Request Reason</th>
+                                            <th>Review Reason</th>
+                                            <th>Requested At</th>
+                                            <th v-if="canReviewFundingRequests">Actions</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr v-for="requestRow in projectFundingRequests" :key="requestRow.id">
+                                            <td>#{{ requestRow.id }}</td>
+                                            <td>{{ requestRow.donor?.name || '-' }}</td>
+                                            <td>{{ requestRow.currency }} {{ Number(requestRow.amount || 0).toLocaleString() }}</td>
+                                            <td>
+                                                <span
+                                                    class="status-pill"
+                                                    :class="requestRow.status === 'approved' ? 'status-pill--active' : requestRow.status === 'declined' ? 'status-pill--disabled' : ''"
+                                                >
+                                                    {{ requestRow.status_label }}
+                                                </span>
+                                            </td>
+                                            <td>{{ requestRow.reason || '-' }}</td>
+                                            <td>{{ requestRow.review_comment || '-' }}</td>
+                                            <td>{{ formatDateTime(requestRow.created_at) }}</td>
+                                            <td v-if="canReviewFundingRequests">
+                                                <div v-if="requestRow.status === 'pending'" class="inline-group">
+                                                    <input
+                                                        v-model="fundingReviewNotes[requestRow.id]"
+                                                        type="text"
+                                                        placeholder="Review reason"
+                                                    >
+                                                    <button class="btn btn--primary" type="button" @click="reviewFundingRequest(requestRow, 'approve')">
+                                                        Approve
+                                                    </button>
+                                                    <button class="btn btn--danger" type="button" @click="reviewFundingRequest(requestRow, 'decline')">
+                                                        Decline
+                                                    </button>
+                                                </div>
+                                                <span v-else>Reviewed</span>
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                    <p class="panel__hint" v-else-if="projectFundingRequestsLoading">Loading funding requests...</p>
+                                    <p class="panel__hint" v-else>No funding requests found for this project.</p>
                                 </div>
                             </div>
 
@@ -1460,6 +1683,35 @@ onBeforeUnmount(() => {
                                 </div>
                             </section>
                         </section>
+                    </div>
+                </article>
+            </div>
+
+            <div class="modal-backdrop" v-if="fundingRequestModalOpen" @click.self="closeFundingRequestModal">
+                <article class="modal-card tracky-form-modal">
+                    <h3>Request Project Funding</h3>
+                    <p class="panel__hint">
+                        Project: <strong>{{ fundingRequestTargetProject?.name || '-' }}</strong>
+                    </p>
+                    <p class="field-error" v-if="fundingRequestError">{{ fundingRequestError }}</p>
+
+                    <label class="field">
+                        Funding Amount (USD)
+                        <input v-model="fundingRequestForm.amount" type="number" min="1" step="0.01" placeholder="e.g. 15000">
+                    </label>
+
+                    <label class="field">
+                        Reason (Optional)
+                        <textarea v-model="fundingRequestForm.reason" rows="4" placeholder="Optional context for the requested fund"></textarea>
+                    </label>
+
+                    <div class="inline-group">
+                        <button class="btn btn--primary" type="button" :disabled="fundingRequestSubmitting" @click="submitFundingRequest">
+                            Submit Funding Request
+                        </button>
+                        <button class="btn btn--ghost" type="button" :disabled="fundingRequestSubmitting" @click="closeFundingRequestModal">
+                            {{ t('common.cancel') }}
+                        </button>
                     </div>
                 </article>
             </div>

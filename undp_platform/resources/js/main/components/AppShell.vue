@@ -40,7 +40,8 @@ const navItems = computed(() => {
         {
             name: 'municipal-overview',
             label: t('nav.municipal'),
-            anyPermissions: ['dashboards.view.system', 'dashboards.view.municipality'],
+            permission: 'dashboards.view.municipality',
+            roles: ['municipal_focal_point'],
             icon: 'municipal',
             group: 'main',
         },
@@ -50,6 +51,7 @@ const navItems = computed(() => {
     ];
 
     return all.filter((item) => {
+        if (item.roles && !item.roles.includes(auth.role)) return false;
         if (item.permission) return auth.hasPermission(item.permission);
         if (item.anyPermissions) return item.anyPermissions.some((permission) => auth.hasPermission(permission));
         return true;

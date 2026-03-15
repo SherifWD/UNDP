@@ -130,6 +130,46 @@ class FundingRequestTest extends TestCase
         $repeatReview->assertStatus(422);
     }
 
+    public function test_admin_review_requires_reason(): void
+    {
+        $municipality = Municipality::query()->create([
+            'name_en' => 'Tripoli',
+            'name_ar' => 'طرابلس',
+            'code' => 'TRI',
+        ]);
+
+        $project = Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Roads Upgrade',
+            'name_ar' => 'تطوير الطرق',
+            'status' => 'active',
+        ]);
+
+        $donor = User::factory()->create([
+            'role' => UserRole::PARTNER_DONOR_VIEWER->value,
+        ]);
+
+        $admin = User::factory()->create([
+            'role' => UserRole::UNDP_ADMIN->value,
+        ]);
+
+        $request = FundingRequest::query()->create([
+            'project_id' => $project->id,
+            'donor_user_id' => $donor->id,
+            'amount' => 4500,
+            'currency' => 'USD',
+            'status' => FundingRequestStatus::PENDING->value,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson("/api/funding-requests/{$request->id}/approve", []);
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['review_comment']);
+    }
+
     public function test_donor_cannot_review_funding_requests(): void
     {
         $municipality = Municipality::query()->create([

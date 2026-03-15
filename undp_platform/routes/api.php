@@ -70,7 +70,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:api'])->group(function ()
     Route::get('/dashboard/kpis', [DashboardController::class, 'kpis'])
         ->middleware('any_permission:dashboards.view.system,dashboards.view.municipality,dashboards.view.partner,dashboards.view.own');
     Route::get('/dashboard/municipal-overview', [DashboardController::class, 'municipalOverview'])
-        ->middleware('any_permission:dashboards.view.system,dashboards.view.municipality');
+        ->middleware('permission:dashboards.view.municipality');
     Route::get('/dashboard/map', [DashboardController::class, 'mapData'])
         ->middleware('any_permission:dashboards.view.system,dashboards.view.municipality,dashboards.view.partner,dashboards.view.own');
     Route::get('/dashboard/partner', [DashboardController::class, 'partnerOverview'])

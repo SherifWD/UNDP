@@ -23,15 +23,12 @@ const municipalityBreakdown = ref([]);
 const projectBreakdown = ref([]);
 const projectCards = ref([]);
 const submissions = ref([]);
-const fundingRequests = ref([]);
 const municipalities = ref([]);
 const projects = ref([]);
 const loading = ref(false);
 const tableLoading = ref(false);
 const projectCardsLoading = ref(false);
-const fundingLoading = ref(false);
 const error = ref('');
-const fundingError = ref('');
 const selectedStatus = ref('approved');
 
 const filters = reactive({
@@ -47,12 +44,6 @@ const pagination = reactive({
     last_page: 1,
     per_page: 12,
     total: 0,
-});
-
-const fundingForm = reactive({
-    project_id: '',
-    amount: '',
-    reason: '',
 });
 
 const exportStatusLabel = computed(() => {
@@ -314,34 +305,11 @@ const loadApprovedSubmissions = async (page = 1) => {
     }
 };
 
-const loadFundingRequests = async () => {
-    fundingLoading.value = true;
-    fundingError.value = '';
-
-    try {
-        const { data } = await api.get('/funding-requests', {
-            params: {
-                per_page: 20,
-                project_id: filters.project_id || undefined,
-                municipality_id: filters.municipality_id || undefined,
-            },
-        });
-
-        fundingRequests.value = data.data || [];
-    } catch (err) {
-        fundingRequests.value = [];
-        fundingError.value = err.response?.data?.message || 'Unable to load funding requests.';
-    } finally {
-        fundingLoading.value = false;
-    }
-};
-
 const applyFilters = async () => {
     await Promise.all([
         loadPartnerDashboard(),
         loadProjectCards(),
         loadApprovedSubmissions(1),
-        loadFundingRequests(),
     ]);
 };
 
@@ -409,33 +377,6 @@ const startSummaryPdfExport = async () => {
         date_from: filters.date_from || null,
         date_to: filters.date_to || null,
     });
-};
-
-const submitFundingRequest = async () => {
-    fundingError.value = '';
-
-    if (!fundingForm.project_id || !fundingForm.amount) {
-        fundingError.value = 'Project and amount are required to submit a funding request.';
-        return;
-    }
-
-    try {
-        await api.post('/funding-requests', {
-            project_id: Number(fundingForm.project_id),
-            amount: Number(fundingForm.amount),
-            reason: fundingForm.reason || null,
-        });
-
-        Object.assign(fundingForm, {
-            project_id: '',
-            amount: '',
-            reason: '',
-        });
-
-        await loadFundingRequests();
-    } catch (err) {
-        fundingError.value = err.response?.data?.message || 'Unable to submit funding request.';
-    }
 };
 
 onMounted(async () => {
@@ -662,56 +603,6 @@ onMounted(async () => {
                 </div>
             </div>
 
-            <div class="detail-block">
-                <h3>Project Funding Request</h3>
-                <p class="panel__hint">Request a funding amount for a project. Admin will approve or decline it.</p>
-                <p class="field-error" v-if="fundingError">{{ fundingError }}</p>
-
-                <div class="toolbar">
-                    <select v-model="fundingForm.project_id">
-                        <option value="">Select project</option>
-                        <option v-for="project in projects" :key="project.id" :value="project.id">
-                            {{ project.name }}
-                        </option>
-                    </select>
-                    <input v-model="fundingForm.amount" type="number" min="1" step="0.01" placeholder="Funding amount">
-                    <input v-model="fundingForm.reason" placeholder="Optional reason">
-                    <button class="btn btn--primary" type="button" @click="submitFundingRequest">Submit Request</button>
-                </div>
-
-                <div class="table-wrap">
-                    <table class="table" v-if="!fundingLoading && fundingRequests.length">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Project</th>
-                                <th>Amount</th>
-                                <th>Status</th>
-                                <th>Reason</th>
-                                <th>Review</th>
-                                <th>Created</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="request in fundingRequests" :key="request.id">
-                                <td>#{{ request.id }}</td>
-                                <td>{{ request.project?.name || '-' }}</td>
-                                <td>{{ request.currency }} {{ Number(request.amount || 0).toLocaleString() }}</td>
-                                <td>
-                                    <span class="status-pill" :class="request.status === 'approved' ? 'status-pill--active' : request.status === 'declined' ? 'status-pill--disabled' : ''">
-                                        {{ request.status_label }}
-                                    </span>
-                                </td>
-                                <td>{{ request.reason || '-' }}</td>
-                                <td>{{ request.review_comment || '-' }}</td>
-                                <td>{{ formatDateTime(request.created_at) }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <p class="panel__hint" v-else-if="fundingLoading">Loading funding requests...</p>
-                    <p class="panel__hint" v-else>No funding requests yet.</p>
-                </div>
-            </div>
         </section>
     </AppShell>
 </template>

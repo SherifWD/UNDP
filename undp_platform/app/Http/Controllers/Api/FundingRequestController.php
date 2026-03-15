@@ -155,7 +155,7 @@ class FundingRequestController extends Controller
         }
 
         $validated = $request->validate([
-            'review_comment' => ['nullable', 'string', 'max:2000'],
+            'review_comment' => ['required', 'string', 'max:2000'],
         ]);
 
         if ($fundingRequest->status !== FundingRequestStatus::PENDING->value) {
@@ -244,4 +244,3 @@ class FundingRequestController extends Controller
         ];
     }
 }
-

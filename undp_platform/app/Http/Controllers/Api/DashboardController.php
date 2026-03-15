@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\SubmissionStatus;
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\Municipality;
 use App\Models\Project;
@@ -134,18 +135,11 @@ class DashboardController extends Controller
 
     public function municipalOverview(Request $request): JsonResponse
     {
-        if (! $request->user()->hasPermission('dashboards.view.municipality')
-            && ! $request->user()->hasPermission('dashboards.view.system')) {
+        if (! $request->user()->hasRole(UserRole::MUNICIPAL_FOCAL_POINT)) {
             return response()->json(['message' => 'Access denied.'], 403);
         }
 
-        $validated = $request->validate([
-            'municipality_id' => ['nullable', 'integer', 'exists:municipalities,id'],
-        ]);
-
-        $municipalityId = $request->user()->hasPermission('dashboards.view.system')
-            ? ($validated['municipality_id'] ?? $request->user()->municipality_id)
-            : $request->user()->municipality_id;
+        $municipalityId = $request->user()->municipality_id;
 
         if (! $municipalityId) {
             return response()->json([

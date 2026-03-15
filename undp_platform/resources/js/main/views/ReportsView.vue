@@ -710,16 +710,22 @@ const reviewFundingRequest = async (row, decision) => {
         return;
     }
 
+    const reviewComment = String(fundingReviewComment.value || '').trim();
+    if (!reviewComment) {
+        fundingError.value = 'Review reason is required to approve or decline.';
+        return;
+    }
+
     fundingError.value = '';
 
     try {
         if (decision === 'approve') {
             await api.post(`/funding-requests/${row.id}/approve`, {
-                review_comment: fundingReviewComment.value || null,
+                review_comment: reviewComment,
             });
         } else {
             await api.post(`/funding-requests/${row.id}/decline`, {
-                review_comment: fundingReviewComment.value || null,
+                review_comment: reviewComment,
             });
         }
 
@@ -1108,13 +1114,13 @@ onBeforeUnmount(() => {
             <div class="detail-block" v-if="canReviewFundingRequests">
                 <div class="map-shell__head">
                     <h3>Funding Requests Review (Admin)</h3>
-                    <p class="panel__hint">Review donor funding requests and approve or decline with an optional note.</p>
+                    <p class="panel__hint">Review donor funding requests and approve or decline with a required reason.</p>
                 </div>
 
                 <p class="field-error" v-if="fundingError">{{ fundingError }}</p>
 
                 <div class="toolbar">
-                    <input v-model="fundingReviewComment" placeholder="Optional review comment">
+                    <input v-model="fundingReviewComment" placeholder="Review reason (required)">
                     <button class="btn btn--ghost" type="button" @click="loadFundingRequests">Refresh Requests</button>
                 </div>
 

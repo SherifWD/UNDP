@@ -388,4 +388,17 @@ class DashboardApiTest extends TestCase
             ->assertJsonPath('projects.0.rework_submissions', 1)
             ->assertJsonPath('projects.0.rejected_submissions', 1);
     }
+
+    public function test_admin_cannot_access_municipal_overview_endpoint(): void
+    {
+        $admin = User::factory()->create([
+            'role' => UserRole::UNDP_ADMIN->value,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->getJson('/api/dashboard/municipal-overview');
+
+        $response->assertForbidden();
+    }
 }

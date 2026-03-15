@@ -89,7 +89,8 @@ const routes = [
         component: MunicipalOverviewView,
         meta: {
             requiresAuth: true,
-            anyPermissions: ['dashboards.view.municipality', 'dashboards.view.system'],
+            permission: 'dashboards.view.municipality',
+            role: 'municipal_focal_point',
         },
     },
     {
@@ -153,6 +154,10 @@ router.beforeEach(async (to) => {
     }
 
     if (to.meta.permission && !auth.hasPermission(to.meta.permission)) {
+        return { name: 'access-denied' };
+    }
+
+    if (to.meta.role && auth.role !== to.meta.role) {
         return { name: 'access-denied' };
     }
 
