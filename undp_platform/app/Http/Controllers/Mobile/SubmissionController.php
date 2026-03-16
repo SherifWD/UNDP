@@ -973,7 +973,7 @@ class SubmissionController extends MobileController
         array $files,
         int $startingDisplayOrder = 0,
     ): array {
-        $disk = (string) config('media.direct_upload_disk', config('media.disk', 's3'));
+        $disk = (string) config('media.direct_upload_disk', config('media.disk', 'public'));
         $diskConfig = config("filesystems.disks.{$disk}");
 
         if (! is_array($diskConfig)) {
@@ -999,7 +999,7 @@ class SubmissionController extends MobileController
                 $uuid = (string) Str::uuid();
                 $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: ($mediaType === 'video' ? 'mp4' : 'jpg'));
                 $objectKey = sprintf(
-                    'evidence/raw/%d/%s/original.%s',
+                    'mobile/assets/%d/%s.%s',
                     $submission->id,
                     $uuid,
                     $extension,

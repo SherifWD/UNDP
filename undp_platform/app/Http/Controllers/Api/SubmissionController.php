@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\Submission;
 use App\Models\SubmissionStatusEvent;
 use App\Services\AuditLogger;
+use App\Services\MediaStorageService;
 use App\Services\ProjectAccessService;
 use App\Services\SubmissionAccessService;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +18,10 @@ use Illuminate\Validation\Rule;
 
 class SubmissionController extends Controller
 {
+    public function __construct(private readonly MediaStorageService $mediaStorageService)
+    {
+    }
+
     public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Submission::class);
@@ -450,7 +455,16 @@ class SubmissionController extends Controller
                     'id' => $asset->id,
                     'uuid' => $asset->uuid,
                     'media_type' => $asset->media_type,
+                    'mime_type' => $asset->mime_type,
                     'status' => $asset->status,
+                    'disk' => $asset->disk,
+                    'object_key' => $asset->object_key,
+                    'url' => $asset->object_key
+                        ? $this->mediaStorageService->createDownloadUrl(
+                            $asset,
+                            (int) config('media.presigned_download_expiry_seconds', 600),
+                        )
+                        : null,
                     'variants' => $asset->variants,
                     'uploaded_at' => optional($asset->uploaded_at)->toIso8601String(),
                     'processed_at' => optional($asset->processed_at)->toIso8601String(),

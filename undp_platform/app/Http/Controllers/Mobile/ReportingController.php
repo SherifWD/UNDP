@@ -39,6 +39,9 @@ class ReportingController extends MobileController
         }
 
         $availableOptions = $this->availableOptions();
+        $mediaDisk = (string) config('media.direct_upload_disk', config('media.disk', 'public'));
+        $mediaDiskConfig = config("filesystems.disks.{$mediaDisk}");
+        $presignedUploadsEnabled = ($mediaDiskConfig['driver'] ?? null) === 's3';
 
         return $this->successResponse([
             'version' => $optionsVersion,
@@ -87,38 +90,63 @@ class ReportingController extends MobileController
                         'activities_workshops_or_training_started',
                     ],
                 ],
-                'media_upload_flow' => [
-                    [
-                        'step' => 1,
-                        'action' => 'Optional direct-upload path: send multipart form-data with repeated assets[] file fields on create or update.',
-                        'endpoint' => 'POST /api/mobile/submissions or POST /api/mobile/submissions/{submission_id} with _method=PUT',
-                    ],
-                    [
-                        'step' => 2,
-                        'action' => 'Alternative presigned path: create the draft submission first to receive submission_id.',
-                        'endpoint' => 'POST /api/mobile/submissions',
-                    ],
-                    [
-                        'step' => 3,
-                        'action' => 'Request an upload URL and media asset id for each file.',
-                        'endpoint' => 'POST /api/mobile/media/presign-upload',
-                    ],
-                    [
-                        'step' => 4,
-                        'action' => 'Upload the binary file to the returned upload.url using the returned method and headers.',
-                        'endpoint' => 'upload.url',
-                    ],
-                    [
-                        'step' => 5,
-                        'action' => 'Mark the upload as completed after the binary upload succeeds.',
-                        'endpoint' => 'POST /api/mobile/media/{media_asset_id}/complete',
-                    ],
-                    [
-                        'step' => 6,
-                        'action' => 'Attach uploaded media to the submission using assets or media.',
-                        'endpoint' => 'PUT /api/mobile/submissions/{submission_id}',
-                    ],
+                'media_storage' => [
+                    'disk' => $mediaDisk,
+                    'driver' => $mediaDiskConfig['driver'] ?? null,
+                    'base_url' => url('/storage/mobile/assets'),
+                    'public_path_pattern' => 'storage/app/public/mobile/assets/{submission_id}/{filename}',
+                    'presigned_uploads_enabled' => $presignedUploadsEnabled,
                 ],
+                'media_upload_flow' => $presignedUploadsEnabled
+                    ? [
+                        [
+                            'step' => 1,
+                            'action' => 'Optional direct-upload path: send multipart form-data with repeated assets[] file fields on create or update.',
+                            'endpoint' => 'POST /api/mobile/submissions or POST /api/mobile/submissions/{submission_id} with _method=PUT',
+                        ],
+                        [
+                            'step' => 2,
+                            'action' => 'Alternative presigned path: create the draft submission first to receive submission_id.',
+                            'endpoint' => 'POST /api/mobile/submissions',
+                        ],
+                        [
+                            'step' => 3,
+                            'action' => 'Request an upload URL and media asset id for each file.',
+                            'endpoint' => 'POST /api/mobile/media/presign-upload',
+                        ],
+                        [
+                            'step' => 4,
+                            'action' => 'Upload the binary file to the returned upload.url using the returned method and headers.',
+                            'endpoint' => 'upload.url',
+                        ],
+                        [
+                            'step' => 5,
+                            'action' => 'Mark the upload as completed after the binary upload succeeds.',
+                            'endpoint' => 'POST /api/mobile/media/{media_asset_id}/complete',
+                        ],
+                        [
+                            'step' => 6,
+                            'action' => 'Attach uploaded media to the submission using assets or media.',
+                            'endpoint' => 'PUT /api/mobile/submissions/{submission_id}',
+                        ],
+                    ]
+                    : [
+                        [
+                            'step' => 1,
+                            'action' => 'Create a draft with attachments or upload attachments while submitting using repeated assets[] multipart file fields.',
+                            'endpoint' => 'POST /api/mobile/submissions',
+                        ],
+                        [
+                            'step' => 2,
+                            'action' => 'For submission updates, keep the HTTP request as POST and send _method=PUT together with repeated assets[] file fields.',
+                            'endpoint' => 'POST /api/mobile/submissions/{submission_id} with _method=PUT',
+                        ],
+                        [
+                            'step' => 3,
+                            'action' => 'Read uploaded files directly from the public storage URL returned in each asset payload or from the download-url endpoint.',
+                            'endpoint' => 'GET /api/mobile/media/{media_asset_id}/download-url',
+                        ],
+                    ],
             ],
             'media_limits' => [
                 'images' => [

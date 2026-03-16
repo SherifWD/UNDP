@@ -21,6 +21,16 @@ class MediaController extends Controller
 
     public function presignUpload(Request $request): JsonResponse
     {
+        $disk = (string) config('media.disk', 'public');
+        $diskConfig = config("filesystems.disks.{$disk}");
+
+        if (($diskConfig['driver'] ?? null) !== 's3') {
+            return response()->json([
+                'message' => 'Presigned uploads are only available for S3-compatible storage. Upload files directly using multipart form-data on the submission endpoints.',
+                'disk' => $disk,
+            ], 422);
+        }
+
         $validated = $request->validate([
             'submission_id' => ['required', 'integer', 'exists:submissions,id'],
             'client_media_id' => ['nullable', 'string', 'max:120'],
@@ -76,7 +86,7 @@ class MediaController extends Controller
         $uuid = (string) Str::uuid();
 
         $objectKey = sprintf(
-            'evidence/raw/%d/%s/original.%s',
+            'mobile/assets/%d/%s.%s',
             $submission->id,
             $uuid,
             strtolower($extension),
@@ -89,8 +99,8 @@ class MediaController extends Controller
             'client_media_id' => $validated['client_media_id'] ?? null,
             'label' => $validated['label'] ?? null,
             'display_order' => $validated['display_order'] ?? null,
-            'disk' => config('media.disk', 's3'),
-            'bucket' => config('filesystems.disks.'.config('media.disk', 's3').'.bucket'),
+            'disk' => $disk,
+            'bucket' => $diskConfig['bucket'] ?? null,
             'object_key' => $objectKey,
             'media_type' => $validated['media_type'],
             'mime_type' => $validated['mime_type'],
@@ -230,7 +240,12 @@ class MediaController extends Controller
             'status' => $mediaAsset->status,
             'label' => $mediaAsset->label,
             'display_order' => $mediaAsset->display_order,
+            'disk' => $mediaAsset->disk,
             'object_key' => $mediaAsset->object_key,
+            'url' => $this->mediaStorageService->createDownloadUrl(
+                $mediaAsset,
+                (int) config('media.presigned_download_expiry_seconds', 600),
+            ),
             'size_bytes' => $mediaAsset->size_bytes,
             'variants' => $mediaAsset->variants,
             'uploaded_at' => optional($mediaAsset->uploaded_at)->toIso8601String(),

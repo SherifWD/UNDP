@@ -10,12 +10,12 @@ class MediaStorageService
 {
     public function createUploadUrl(MediaAsset $mediaAsset, int $expiresInSeconds = 900): array
     {
-        $disk = $mediaAsset->disk ?: config('media.disk', 's3');
+        $disk = $mediaAsset->disk ?: config('media.disk', 'public');
         $diskConfig = config("filesystems.disks.{$disk}");
 
         if (($diskConfig['driver'] ?? null) !== 's3') {
             return [
-                'url' => Storage::disk($disk)->url($mediaAsset->object_key),
+                'url' => $this->publicUrl($mediaAsset),
                 'headers' => [
                     'Content-Type' => $mediaAsset->mime_type,
                 ],
@@ -53,11 +53,30 @@ class MediaStorageService
 
     public function createDownloadUrl(MediaAsset $mediaAsset, int $expiresInSeconds = 600): string
     {
+        $disk = $mediaAsset->disk ?: config('media.disk', 'public');
+        $diskConfig = config("filesystems.disks.{$disk}");
+
+        if (($diskConfig['driver'] ?? null) !== 's3') {
+            return $this->publicUrl($mediaAsset);
+        }
+
         try {
-            return Storage::disk($mediaAsset->disk)
+            return Storage::disk($disk)
                 ->temporaryUrl($mediaAsset->object_key, now()->addSeconds($expiresInSeconds));
         } catch (\Throwable) {
-            return Storage::disk($mediaAsset->disk)->url($mediaAsset->object_key);
+            return $this->publicUrl($mediaAsset);
         }
+    }
+
+    public function publicUrl(MediaAsset $mediaAsset): string
+    {
+        $disk = $mediaAsset->disk ?: config('media.disk', 'public');
+        $url = Storage::disk($disk)->url($mediaAsset->object_key);
+
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+            return $url;
+        }
+
+        return url($url);
     }
 }

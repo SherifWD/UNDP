@@ -8,6 +8,7 @@ use App\Models\MediaAsset;
 use App\Models\Project;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\MediaStorageService;
 use Carbon\Carbon;
 
 abstract class MobileController extends Controller
@@ -248,7 +249,9 @@ abstract class MobileController extends Controller
                     'label' => $label !== '' ? $label : null,
                     'display_order' => $asset->display_order,
                     'client_media_id' => $asset->client_media_id,
+                    'disk' => $asset->disk,
                     'object_key' => $asset->object_key,
+                    'url' => $this->mediaAssetUrl($asset),
                     'size_bytes' => $asset->size_bytes,
                     'uploaded_at' => optional($asset->uploaded_at)->toIso8601String(),
                     'processed_at' => optional($asset->processed_at)->toIso8601String(),
@@ -256,6 +259,14 @@ abstract class MobileController extends Controller
             })
             ->values()
             ->all();
+    }
+
+    protected function mediaAssetUrl(MediaAsset $asset): string
+    {
+        return app(MediaStorageService::class)->createDownloadUrl(
+            $asset,
+            (int) config('media.presigned_download_expiry_seconds', 600),
+        );
     }
 
     protected function submissionFormLabels(array $form): array

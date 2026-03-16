@@ -27,18 +27,22 @@ class ProcessMediaAssetJob implements ShouldQueue
             'status' => 'processing',
         ])->save();
 
-        $baseFolder = preg_replace('/\/original\.[^\/]+$/', '', $mediaAsset->object_key);
+        $baseFolder = sprintf(
+            '%s/processed/%s',
+            dirname($mediaAsset->object_key),
+            pathinfo($mediaAsset->object_key, PATHINFO_FILENAME),
+        );
 
         if ($mediaAsset->media_type === 'image') {
             $variants = [
-                'thumb' => str_replace('evidence/raw/', 'evidence/derived/', $baseFolder.'/thumb.jpg'),
-                'medium' => str_replace('evidence/raw/', 'evidence/derived/', $baseFolder.'/medium.jpg'),
-                'large' => str_replace('evidence/raw/', 'evidence/derived/', $baseFolder.'/large.jpg'),
+                'thumb' => $baseFolder.'/thumb.jpg',
+                'medium' => $baseFolder.'/medium.jpg',
+                'large' => $baseFolder.'/large.jpg',
             ];
         } else {
             $variants = [
-                'processed' => str_replace('evidence/raw/', 'evidence/video/', $baseFolder.'/processed.mp4'),
-                'poster' => str_replace('evidence/raw/', 'evidence/video/', $baseFolder.'/poster.jpg'),
+                'processed' => $baseFolder.'/processed.mp4',
+                'poster' => $baseFolder.'/poster.jpg',
             ];
         }
 
