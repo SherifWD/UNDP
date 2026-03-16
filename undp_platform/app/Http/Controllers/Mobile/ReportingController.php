@@ -60,15 +60,21 @@ class ReportingController extends MobileController
                     'path' => '/api/mobile/submissions',
                     'accepted_modes' => ['draft', 'submit'],
                     'allows_media_references' => false,
+                    'allows_direct_file_uploads' => true,
                     'notes' => [
-                        'Use POST /api/mobile/submissions to create the submission first.',
-                        'Do not send assets or media ids on the first create request.',
+                        'Direct file uploads are supported on create via multipart form-data using repeated assets[] file fields.',
+                        'Existing uploaded asset ids still require an existing submission_id and must be attached on update.',
                     ],
                 ],
                 'update' => [
                     'method' => 'PUT',
                     'path' => '/api/mobile/submissions/{submission_id}',
+                    'multipart_transport' => [
+                        'http_method' => 'POST',
+                        'form_field' => '_method=PUT',
+                    ],
                     'accepted_media_reference_keys' => ['assets', 'media'],
+                    'accepted_direct_file_keys' => ['assets[]'],
                     'media_item_schema' => [
                         'id' => 'integer|required',
                         'type' => 'image|video|optional',
@@ -84,26 +90,31 @@ class ReportingController extends MobileController
                 'media_upload_flow' => [
                     [
                         'step' => 1,
-                        'action' => 'Create the draft submission first to receive submission_id.',
-                        'endpoint' => 'POST /api/mobile/submissions',
+                        'action' => 'Optional direct-upload path: send multipart form-data with repeated assets[] file fields on create or update.',
+                        'endpoint' => 'POST /api/mobile/submissions or POST /api/mobile/submissions/{submission_id} with _method=PUT',
                     ],
                     [
                         'step' => 2,
+                        'action' => 'Alternative presigned path: create the draft submission first to receive submission_id.',
+                        'endpoint' => 'POST /api/mobile/submissions',
+                    ],
+                    [
+                        'step' => 3,
                         'action' => 'Request an upload URL and media asset id for each file.',
                         'endpoint' => 'POST /api/mobile/media/presign-upload',
                     ],
                     [
-                        'step' => 3,
+                        'step' => 4,
                         'action' => 'Upload the binary file to the returned upload.url using the returned method and headers.',
                         'endpoint' => 'upload.url',
                     ],
                     [
-                        'step' => 4,
+                        'step' => 5,
                         'action' => 'Mark the upload as completed after the binary upload succeeds.',
                         'endpoint' => 'POST /api/mobile/media/{media_asset_id}/complete',
                     ],
                     [
-                        'step' => 5,
+                        'step' => 6,
                         'action' => 'Attach uploaded media to the submission using assets or media.',
                         'endpoint' => 'PUT /api/mobile/submissions/{submission_id}',
                     ],

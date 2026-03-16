@@ -635,7 +635,7 @@ class MobileApiTest extends TestCase
 
     public function test_reporter_can_upload_assets_via_submission_form_data(): void
     {
-        Storage::fake(config('media.disk', 's3'));
+        Storage::fake(config('media.direct_upload_disk', config('media.disk', 's3')));
 
         $municipality = Municipality::query()->create([
             'name_en' => 'Alkufraa',
@@ -675,7 +675,8 @@ class MobileApiTest extends TestCase
 
         $submissionId = $draftResponse->json('data.submission.id');
 
-        $submitResponse = $this->put('/api/mobile/submissions/'.$submissionId, [
+        $submitResponse = $this->post('/api/mobile/submissions/'.$submissionId, [
+            '_method' => 'PUT',
             'project_id' => $project->id,
             'mode' => 'submit',
             'title' => 'Completed Project Verification',
@@ -712,7 +713,68 @@ class MobileApiTest extends TestCase
             ->first();
 
         $this->assertNotNull($mediaAsset);
-        Storage::disk(config('media.disk', 's3'))->assertExists($mediaAsset->object_key);
+        Storage::disk(config('media.direct_upload_disk', config('media.disk', 's3')))
+            ->assertExists($mediaAsset->object_key);
+    }
+
+    public function test_multipart_put_submission_update_returns_clear_error(): void
+    {
+        $municipality = Municipality::query()->create([
+            'name_en' => 'Alkufraa',
+            'name_ar' => 'الكفرة',
+            'code' => 'ALK',
+        ]);
+
+        $project = Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Alkufraa Police Station Project',
+            'name_ar' => 'مشروع مركز شرطة الكفرة',
+            'status' => 'active',
+            'latitude' => 23.3112,
+            'longitude' => 21.8569,
+            'last_update_at' => now(),
+        ]);
+
+        $reporter = User::factory()->create([
+            'role' => UserRole::REPORTER->value,
+            'municipality_id' => $municipality->id,
+            'status' => 'active',
+        ]);
+
+        $project->assignedReporters()->sync([
+            $reporter->id => ['assigned_by' => $reporter->id],
+        ]);
+
+        Sanctum::actingAs($reporter);
+
+        $draftResponse = $this->postJson('/api/mobile/submissions', [
+            'client_uuid' => (string) Str::uuid(),
+            'project_id' => $project->id,
+            'mode' => 'draft',
+            'title' => 'Completed Status Draft',
+            'project_status' => 'completed',
+        ])->assertCreated();
+
+        $submissionId = $draftResponse->json('data.submission.id');
+
+        $response = $this->call(
+            'PUT',
+            '/api/mobile/submissions/'.$submissionId,
+            [],
+            [],
+            [],
+            [
+                'HTTP_ACCEPT' => 'application/json',
+                'CONTENT_TYPE' => 'multipart/form-data; boundary=----CodexBoundary',
+            ],
+        );
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonPath(
+                'message',
+                'Multipart submission updates must be sent as POST with `_method=PUT` so PHP can parse uploaded files.',
+            );
     }
 
     public function test_reporter_can_resubmit_submitted_report_before_validator_action(): void
@@ -847,9 +909,12 @@ class MobileApiTest extends TestCase
             ->assertJsonPath('data.available_options.functional_statuses.1.label_ar', 'تشغيلي لكنه يحتاج صيانة')
             ->assertJsonPath('data.submission_contract.create.path', '/api/mobile/submissions')
             ->assertJsonPath('data.submission_contract.update.accepted_media_reference_keys.0', 'assets')
+            ->assertJsonPath('data.submission_contract.update.multipart_transport.http_method', 'POST')
+            ->assertJsonPath('data.submission_contract.update.multipart_transport.form_field', '_method=PUT')
             ->assertJsonPath('data.submission_contract.field_aliases.activities_started.0', 'activity_started')
             ->assertJsonPath('data.submission_contract.field_aliases.activities_started.1', 'activities_workshops_or_training_started')
-            ->assertJsonPath('data.submission_contract.media_upload_flow.4.endpoint', 'PUT /api/mobile/submissions/{submission_id}')
+            ->assertJsonPath('data.submission_contract.media_upload_flow.0.endpoint', 'POST /api/mobile/submissions or POST /api/mobile/submissions/{submission_id} with _method=PUT')
+            ->assertJsonPath('data.submission_contract.media_upload_flow.5.endpoint', 'PUT /api/mobile/submissions/{submission_id}')
             ->assertJsonPath('data.media_limits.images.max_count', 10);
     }
 

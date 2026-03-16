@@ -157,6 +157,13 @@ class SubmissionController extends MobileController
             return $this->errorResponse('This submission can no longer be edited.', 422);
         }
 
+        if ($this->isMultipartFileUpdateWithoutPostTransport($request)) {
+            return $this->errorResponse(
+                'Multipart submission updates must be sent as POST with `_method=PUT` so PHP can parse uploaded files.',
+                422,
+            );
+        }
+
         $validator = $this->makeSubmissionValidator($request, false);
 
         if ($validator->fails()) {
@@ -452,9 +459,9 @@ class SubmissionController extends MobileController
                     $validator->errors()->add('approximate_completion_percentage', 'Approximate completion percentage is required.');
                 }
 
-                if (empty($input['additional_observations'])) {
-                    $validator->errors()->add('additional_observations', 'Additional observations are required.');
-                }
+                // if (empty($input['additional_observations'])) {
+                //     $validator->errors()->add('additional_observations', 'Additional observations are required.');
+                // }
             }
 
             if ($projectStatus === 'completed') {
@@ -558,14 +565,20 @@ class SubmissionController extends MobileController
         ])->save();
 
         if ($uploadedAssetFiles !== []) {
-            $mediaReferences = array_merge(
-                $mediaReferences,
-                $this->storeUploadedAssetFiles(
+            try {
+                $storedMediaReferences = $this->storeUploadedAssetFiles(
                     $request,
                     $submission,
                     $uploadedAssetFiles,
                     count($mediaReferences),
-                ),
+                );
+            } catch (\RuntimeException $exception) {
+                return $this->errorResponse($exception->getMessage(), 500);
+            }
+
+            $mediaReferences = array_merge(
+                $mediaReferences,
+                $storedMediaReferences,
             );
 
             $submission->forceFill([
@@ -727,6 +740,15 @@ class SubmissionController extends MobileController
             ->filter(fn ($file): bool => $file instanceof UploadedFile)
             ->values()
             ->all();
+    }
+
+    private function isMultipartFileUpdateWithoutPostTransport(Request $request): bool
+    {
+        $contentType = strtolower((string) $request->header('Content-Type', ''));
+        $realMethod = strtoupper($request->getRealMethod());
+
+        return in_array($realMethod, ['PUT', 'PATCH'], true)
+            && str_starts_with($contentType, 'multipart/form-data');
     }
 
     private function validateUploadedAssetFiles(array $files, ?Submission $submission, $validator): void
@@ -951,11 +973,22 @@ class SubmissionController extends MobileController
         array $files,
         int $startingDisplayOrder = 0,
     ): array {
-        $disk = (string) config('media.disk', 's3');
-        $bucket = config("filesystems.disks.{$disk}.bucket");
+        $disk = (string) config('media.direct_upload_disk', config('media.disk', 's3'));
+        $diskConfig = config("filesystems.disks.{$disk}");
 
-        return collect(array_values($files))
-            ->map(function (UploadedFile $file, int $offset) use ($request, $submission, $disk, $bucket, $startingDisplayOrder): ?array {
+        if (! is_array($diskConfig)) {
+            throw new \RuntimeException("Media direct upload disk [{$disk}] is not configured.");
+        }
+
+        $bucket = ($diskConfig['driver'] ?? null) === 's3'
+            ? ($diskConfig['bucket'] ?? null)
+            : null;
+
+        $storedAssets = [];
+
+        try {
+            return collect(array_values($files))
+                ->map(function (UploadedFile $file, int $offset) use ($request, $submission, $disk, $bucket, $startingDisplayOrder, &$storedAssets): ?array {
                 $mimeType = $file->getMimeType() ?: $file->getClientMimeType();
                 $mediaType = $this->uploadedAssetMediaType($file, $mimeType);
 
@@ -978,8 +1011,10 @@ class SubmissionController extends MobileController
                     basename($objectKey),
                 );
 
-                if (! $storedPath) {
-                    return null;
+                if (! is_string($storedPath) || trim($storedPath) === '') {
+                    throw new \RuntimeException(
+                        "Unable to store uploaded assets on disk [{$disk}]. Configure MEDIA_DIRECT_UPLOAD_DISK or MEDIA_DISK correctly.",
+                    );
                 }
 
                 $label = trim((string) pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
@@ -1000,6 +1035,12 @@ class SubmissionController extends MobileController
                     'status' => 'uploaded',
                     'uploaded_at' => now(),
                 ]);
+
+                $storedAssets[] = [
+                    'id' => $mediaAsset->id,
+                    'disk' => $disk,
+                    'object_key' => $objectKey,
+                ];
 
                 ProcessMediaAssetJob::dispatch($mediaAsset->id)
                     ->onQueue(config('media.processing_queue', 'media'));
@@ -1022,10 +1063,30 @@ class SubmissionController extends MobileController
                     'type' => $mediaType,
                     'label' => $label !== '' ? $label : null,
                 ];
-            })
-            ->filter()
-            ->values()
-            ->all();
+                })
+                ->filter()
+                ->values()
+                ->all();
+        } catch (\Throwable $exception) {
+            foreach (array_reverse($storedAssets) as $storedAsset) {
+                try {
+                    Storage::disk($storedAsset['disk'])->delete($storedAsset['object_key']);
+                } catch (\Throwable) {
+                    // Best effort cleanup for partially stored files.
+                }
+
+                MediaAsset::query()->whereKey($storedAsset['id'])->delete();
+            }
+
+            if ($exception instanceof \RuntimeException) {
+                throw $exception;
+            }
+
+            throw new \RuntimeException(
+                "Unable to store uploaded assets on disk [{$disk}]. Configure MEDIA_DIRECT_UPLOAD_DISK or MEDIA_DISK correctly.",
+                previous: $exception,
+            );
+        }
     }
 
     private function pruneStatusSpecificData(array $data): array
