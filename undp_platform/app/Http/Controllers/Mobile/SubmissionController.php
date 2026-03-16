@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Mobile;
 
 use App\Enums\SubmissionStatus;
+use App\Jobs\ProcessMediaAssetJob;
 use App\Models\MediaAsset;
 use App\Models\Project;
 use App\Models\Submission;
@@ -13,8 +14,10 @@ use App\Services\ProjectAccessService;
 use App\Services\SubmissionAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class SubmissionController extends MobileController
@@ -295,7 +298,12 @@ class SubmissionController extends MobileController
 
     private function makeSubmissionValidator(Request $request, bool $creating)
     {
+        $uploadedAssetFiles = $this->uploadedAssetFiles($request);
         $input = $this->normalizeSubmissionInput($request->all());
+
+        if ($uploadedAssetFiles !== []) {
+            unset($input['assets']);
+        }
 
         $rules = [
             'client_uuid' => ['nullable', 'uuid'],
@@ -347,7 +355,7 @@ class SubmissionController extends MobileController
 
         $validator = Validator::make($input, $rules);
 
-        $validator->after(function ($validator) use ($request, $creating): void {
+        $validator->after(function ($validator) use ($request, $creating, $uploadedAssetFiles): void {
             $input = $validator->safe()->all();
             $routeSubmission = $request->route('submission');
             $mode = $this->resolveSubmissionMode(
@@ -391,6 +399,14 @@ class SubmissionController extends MobileController
                 if ($ownedMediaCount !== $mediaIds->count()) {
                     $validator->errors()->add('media', 'One or more media assets do not belong to this submission.');
                 }
+            }
+
+            if ($uploadedAssetFiles !== []) {
+                $this->validateUploadedAssetFiles(
+                    $uploadedAssetFiles,
+                    $routeSubmission instanceof Submission ? $routeSubmission : null,
+                    $validator,
+                );
             }
 
             if ($mode !== 'submit') {
@@ -475,6 +491,7 @@ class SubmissionController extends MobileController
     {
         $user = $request->user();
         $isNew = ! $submission;
+        $uploadedAssetFiles = $this->uploadedAssetFiles($request);
 
         $projectId = (int) ($validated['project_id'] ?? $submission?->project_id);
         $project = Project::query()->with('municipality')->findOrFail($projectId);
@@ -508,7 +525,13 @@ class SubmissionController extends MobileController
             ?? $validated['notes']
             ?? $submission?->details;
 
-        $hasMediaPayload = array_key_exists('media', $validated) || array_key_exists('assets', $validated);
+        if ($uploadedAssetFiles !== [] && ! $user->hasPermission('media.upload')) {
+            return $this->errorResponse('Access denied.', 403);
+        }
+
+        $hasMediaPayload = array_key_exists('media', $validated)
+            || array_key_exists('assets', $validated)
+            || $uploadedAssetFiles !== [];
         $mediaReferences = $hasMediaPayload
             ? $this->normalizeMediaReferences($this->resolveMediaRows($validated))
             : ($submission ? $this->submissionMediaReferences($submission) : []);
@@ -533,6 +556,22 @@ class SubmissionController extends MobileController
             'validated_by' => null,
             'validation_comment' => null,
         ])->save();
+
+        if ($uploadedAssetFiles !== []) {
+            $mediaReferences = array_merge(
+                $mediaReferences,
+                $this->storeUploadedAssetFiles(
+                    $request,
+                    $submission,
+                    $uploadedAssetFiles,
+                    count($mediaReferences),
+                ),
+            );
+
+            $submission->forceFill([
+                'media' => $mediaReferences,
+            ])->save();
+        }
 
         $this->syncMediaAssetsMetadata($submission, $mediaReferences);
 
@@ -628,6 +667,18 @@ class SubmissionController extends MobileController
 
     private function normalizeSubmissionInput(array $input): array
     {
+        foreach ([
+            'physical_progress',
+            'is_project_being_used',
+            'is_used_as_intended',
+            'negative_environmental_impact',
+            'confirm_accuracy',
+        ] as $booleanKey) {
+            if (array_key_exists($booleanKey, $input)) {
+                $input[$booleanKey] = $this->normalizeBooleanInput($input[$booleanKey]);
+            }
+        }
+
         if (! array_key_exists('activities_started', $input)) {
             foreach (['activity_started', 'activities_workshops_or_training_started'] as $alias) {
                 if (! array_key_exists($alias, $input)) {
@@ -653,10 +704,106 @@ class SubmissionController extends MobileController
         $normalized = strtolower(trim($value));
 
         return match ($normalized) {
-            '1', 'true', 'yes', 'y' => true,
-            '0', 'false', 'no', 'n' => false,
+            '1', 'true', 'yes', 'y', 'on' => true,
+            '0', 'false', 'no', 'n', 'off' => false,
             default => $value,
         };
+    }
+
+    private function uploadedAssetFiles(Request $request): array
+    {
+        $files = $request->file('assets');
+
+        if ($files instanceof UploadedFile) {
+            return [$files];
+        }
+
+        if (! is_array($files)) {
+            return [];
+        }
+
+        return collect($files)
+            ->flatten(1)
+            ->filter(fn ($file): bool => $file instanceof UploadedFile)
+            ->values()
+            ->all();
+    }
+
+    private function validateUploadedAssetFiles(array $files, ?Submission $submission, $validator): void
+    {
+        $countsByType = [
+            'image' => 0,
+            'video' => 0,
+        ];
+
+        if ($submission) {
+            MediaAsset::query()
+                ->where('submission_id', $submission->id)
+                ->selectRaw('media_type, COUNT(*) as aggregate_count')
+                ->groupBy('media_type')
+                ->get()
+                ->each(function (MediaAsset $asset) use (&$countsByType): void {
+                    if (isset($countsByType[$asset->media_type])) {
+                        $countsByType[$asset->media_type] = (int) $asset->aggregate_count;
+                    }
+                });
+        }
+
+        foreach (array_values($files) as $index => $file) {
+            if (! $file instanceof UploadedFile || ! $file->isValid()) {
+                $validator->errors()->add("assets.{$index}", 'Uploaded asset is invalid.');
+
+                continue;
+            }
+
+            $mimeType = $file->getMimeType() ?: $file->getClientMimeType();
+            $mediaType = $this->uploadedAssetMediaType($file, $mimeType);
+            $sizeBytes = (int) ($file->getSize() ?? 0);
+
+            if (! $mediaType || ! in_array($mimeType, config('media.allowed_mime_types', []), true)) {
+                $validator->errors()->add("assets.{$index}", 'Uploaded asset must be a supported image or video.');
+
+                continue;
+            }
+
+            if (! $this->withinDirectUploadLimits($countsByType[$mediaType] ?? 0, $mediaType, $sizeBytes)) {
+                $validator->errors()->add("assets.{$index}", 'Media limits exceeded for this submission.');
+
+                continue;
+            }
+
+            $countsByType[$mediaType]++;
+        }
+    }
+
+    private function withinDirectUploadLimits(int $existingCount, string $mediaType, int $sizeBytes): bool
+    {
+        if ($mediaType === 'image') {
+            $maxCount = (int) config('media.images.max_count', 10);
+            $maxBytes = (int) config('media.images.max_upload_mb', 15) * 1024 * 1024;
+
+            return $existingCount < $maxCount && $sizeBytes > 0 && $sizeBytes <= $maxBytes;
+        }
+
+        $maxCount = (int) config('media.videos.max_count', 1);
+        $maxBytes = (int) config('media.videos.max_upload_mb', 300) * 1024 * 1024;
+
+        return $existingCount < $maxCount && $sizeBytes > 0 && $sizeBytes <= $maxBytes;
+    }
+
+    private function uploadedAssetMediaType(UploadedFile $file, ?string $mimeType = null): ?string
+    {
+        $mimeType ??= $file->getMimeType() ?: $file->getClientMimeType();
+
+        if (is_string($mimeType) && str_starts_with($mimeType, 'image/')) {
+            return 'image';
+        }
+
+        if (is_string($mimeType) && str_starts_with($mimeType, 'video/')) {
+            return 'video';
+        }
+
+        return null;
     }
 
     private function valueFromPayload(array $validated, array $existing, string $key, mixed $fallback = null): mixed
@@ -796,6 +943,89 @@ class SubmissionController extends MobileController
             ->where('submission_id', $submission->id)
             ->whereNotIn('id', $orderedIds->all())
             ->update(['display_order' => null]);
+    }
+
+    private function storeUploadedAssetFiles(
+        Request $request,
+        Submission $submission,
+        array $files,
+        int $startingDisplayOrder = 0,
+    ): array {
+        $disk = (string) config('media.disk', 's3');
+        $bucket = config("filesystems.disks.{$disk}.bucket");
+
+        return collect(array_values($files))
+            ->map(function (UploadedFile $file, int $offset) use ($request, $submission, $disk, $bucket, $startingDisplayOrder): ?array {
+                $mimeType = $file->getMimeType() ?: $file->getClientMimeType();
+                $mediaType = $this->uploadedAssetMediaType($file, $mimeType);
+
+                if (! $mediaType || ! is_string($mimeType)) {
+                    return null;
+                }
+
+                $uuid = (string) Str::uuid();
+                $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: ($mediaType === 'video' ? 'mp4' : 'jpg'));
+                $objectKey = sprintf(
+                    'evidence/raw/%d/%s/original.%s',
+                    $submission->id,
+                    $uuid,
+                    $extension,
+                );
+
+                $storedPath = Storage::disk($disk)->putFileAs(
+                    dirname($objectKey),
+                    $file,
+                    basename($objectKey),
+                );
+
+                if (! $storedPath) {
+                    return null;
+                }
+
+                $label = trim((string) pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
+                $mediaAsset = MediaAsset::query()->create([
+                    'uuid' => $uuid,
+                    'submission_id' => $submission->id,
+                    'uploaded_by' => $request->user()->id,
+                    'client_media_id' => null,
+                    'label' => $label !== '' ? $label : null,
+                    'display_order' => $startingDisplayOrder + $offset,
+                    'disk' => $disk,
+                    'bucket' => $bucket,
+                    'object_key' => $objectKey,
+                    'media_type' => $mediaType,
+                    'mime_type' => $mimeType,
+                    'original_filename' => $file->getClientOriginalName(),
+                    'size_bytes' => (int) ($file->getSize() ?? 0),
+                    'status' => 'uploaded',
+                    'uploaded_at' => now(),
+                ]);
+
+                ProcessMediaAssetJob::dispatch($mediaAsset->id)
+                    ->onQueue(config('media.processing_queue', 'media'));
+
+                AuditLogger::log(
+                    action: 'mobile.submissions.asset_uploaded',
+                    entityType: 'media_assets',
+                    entityId: $mediaAsset->id,
+                    metadata: [
+                        'submission_id' => $submission->id,
+                        'media_type' => $mediaType,
+                        'object_key' => $objectKey,
+                        'source' => 'mobile',
+                    ],
+                    request: $request,
+                );
+
+                return [
+                    'id' => $mediaAsset->id,
+                    'type' => $mediaType,
+                    'label' => $label !== '' ? $label : null,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     private function pruneStatusSpecificData(array $data): array

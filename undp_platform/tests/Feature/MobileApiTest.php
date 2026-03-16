@@ -633,6 +633,88 @@ class MobileApiTest extends TestCase
             ->assertJsonPath('data.submission.assets.0.id', $mediaAsset->id);
     }
 
+    public function test_reporter_can_upload_assets_via_submission_form_data(): void
+    {
+        Storage::fake(config('media.disk', 's3'));
+
+        $municipality = Municipality::query()->create([
+            'name_en' => 'Alkufraa',
+            'name_ar' => 'الكفرة',
+            'code' => 'ALK',
+        ]);
+
+        $project = Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Alkufraa Police Station Project',
+            'name_ar' => 'مشروع مركز شرطة الكفرة',
+            'status' => 'active',
+            'latitude' => 23.3112,
+            'longitude' => 21.8569,
+            'last_update_at' => now(),
+        ]);
+
+        $reporter = User::factory()->create([
+            'role' => UserRole::REPORTER->value,
+            'municipality_id' => $municipality->id,
+            'status' => 'active',
+        ]);
+
+        $project->assignedReporters()->sync([
+            $reporter->id => ['assigned_by' => $reporter->id],
+        ]);
+
+        Sanctum::actingAs($reporter);
+
+        $draftResponse = $this->postJson('/api/mobile/submissions', [
+            'client_uuid' => (string) Str::uuid(),
+            'project_id' => $project->id,
+            'mode' => 'draft',
+            'title' => 'Completed Status Draft',
+            'project_status' => 'completed',
+        ])->assertCreated();
+
+        $submissionId = $draftResponse->json('data.submission.id');
+
+        $submitResponse = $this->put('/api/mobile/submissions/'.$submissionId, [
+            'project_id' => $project->id,
+            'mode' => 'submit',
+            'title' => 'Completed Project Verification',
+            'project_status' => 'completed',
+            'is_project_being_used' => '1',
+            'activity_started' => 'Yes',
+            'user_categories' => ['all_of_the_above'],
+            'is_used_as_intended' => '1',
+            'functional_status' => 'fully_functional',
+            'negative_environmental_impact' => '0',
+            'summary_of_observation' => 'Project assets are operational and in daily use.',
+            'actual_beneficiaries' => '460',
+            'location_label' => 'Alkufraa Municipality, Southern Libya',
+            'location_source' => 'manual',
+            'assets' => [
+                UploadedFile::fake()->image('completed-site-condition.jpg'),
+            ],
+            'notes' => 'Community feedback indicates high satisfaction with service quality.',
+            'confirm_accuracy' => '1',
+        ], [
+            'Accept' => 'application/json',
+        ]);
+
+        $submitResponse
+            ->assertOk()
+            ->assertJsonPath('data.submission.status', SubmissionStatus::SUBMITTED->value)
+            ->assertJsonPath('data.submission.data.activities_started', true)
+            ->assertJsonPath('data.submission.data.activity_started', true)
+            ->assertJsonPath('data.submission.assets.0.media_type', 'image');
+
+        $mediaAsset = MediaAsset::query()
+            ->where('submission_id', $submissionId)
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($mediaAsset);
+        Storage::disk(config('media.disk', 's3'))->assertExists($mediaAsset->object_key);
+    }
+
     public function test_reporter_can_resubmit_submitted_report_before_validator_action(): void
     {
         $municipality = Municipality::query()->create([
