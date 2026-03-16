@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\MediaAsset;
 use Aws\S3\S3Client;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
 class MediaStorageService
@@ -71,6 +72,24 @@ class MediaStorageService
     public function publicUrl(MediaAsset $mediaAsset): string
     {
         $disk = $mediaAsset->disk ?: config('media.disk', 'public');
+        $path = trim((string) $mediaAsset->object_key, '/');
+
+        if ($disk === 'public') {
+            if (preg_match('#^mobile/assets/([0-9]+)/([A-Za-z0-9._-]+)$#', $path, $matches) === 1
+                && Route::has('storage.mobile-asset')) {
+                return route('storage.mobile-asset', [
+                    'submission' => $matches[1],
+                    'filename' => $matches[2],
+                ]);
+            }
+
+            if (str_starts_with($path, 'mobile/avatars/') && Route::has('storage.mobile-avatar')) {
+                return route('storage.mobile-avatar', [
+                    'filename' => basename($path),
+                ]);
+            }
+        }
+
         $url = Storage::disk($disk)->url($mediaAsset->object_key);
 
         if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {

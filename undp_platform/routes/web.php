@@ -16,4 +16,20 @@ Route::get('/storage/mobile/avatars/{filename}', function (string $filename) {
     );
 })->where('filename', '[A-Za-z0-9._-]+')->name('storage.mobile-avatar');
 
+Route::get('/storage/mobile/assets/{submission}/{filename}', function (string $submission, string $filename) {
+    $path = 'mobile/assets/'.$submission.'/'.$filename;
+
+    abort_unless(Storage::disk('public')->exists($path), 404);
+
+    return response()->file(
+        Storage::disk('public')->path($path),
+        [
+            'Content-Type' => Storage::disk('public')->mimeType($path) ?? 'application/octet-stream',
+        ],
+    );
+})->where([
+    'submission' => '[0-9]+',
+    'filename' => '[A-Za-z0-9._-]+',
+])->name('storage.mobile-asset');
+
 Route::view('/{any?}', 'app')->where('any', '^(?!api).*$');

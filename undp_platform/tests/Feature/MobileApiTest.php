@@ -1157,6 +1157,8 @@ class MobileApiTest extends TestCase
 
     public function test_mobile_media_download_url_returns_public_storage_url(): void
     {
+        Storage::fake('public');
+
         $municipality = Municipality::query()->create([
             'name_en' => 'Alkufraa',
             'name_ar' => 'الكفرة',
@@ -1201,14 +1203,29 @@ class MobileApiTest extends TestCase
             'status' => 'uploaded',
         ]);
 
+        UploadedFile::fake()
+            ->image('downloadable.jpg')
+            ->storeAs(
+                'mobile/assets/'.$submission->id,
+                'downloadable.jpg',
+                'public',
+            );
+
         Sanctum::actingAs($reporter);
 
         $response = $this->getJson('/api/mobile/media/'.$mediaAsset->id.'/download-url');
+
+        $downloadUrl = $response->json('url');
+        $downloadPath = parse_url((string) $downloadUrl, PHP_URL_PATH);
 
         $response
             ->assertOk()
             ->assertJsonPath('media_asset_id', $mediaAsset->id)
             ->assertJsonPath('url', url('/storage/'.$mediaAsset->object_key));
+
+        $this->get($downloadPath)
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/jpeg');
     }
 
     public function test_reporter_can_read_and_mark_mobile_notifications(): void
