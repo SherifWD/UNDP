@@ -1258,6 +1258,21 @@ class MobileApiTest extends TestCase
             'title' => 'Rework requested submission',
         ]);
 
+        $olderNotification = DatabaseNotification::query()->create([
+            'id' => (string) Str::uuid(),
+            'type' => 'App\\Notifications\\SubmissionStatusChangedNotification',
+            'notifiable_type' => User::class,
+            'notifiable_id' => $reporter->id,
+            'data' => [
+                'submission_id' => $submission->id,
+                'title' => 'Earlier update',
+                'status' => SubmissionStatus::SUBMITTED->value,
+                'project_name' => $project->name_en,
+            ],
+            'created_at' => now()->subMinutes(2),
+            'updated_at' => now()->subMinutes(2),
+        ]);
+
         $notification = DatabaseNotification::query()->create([
             'id' => (string) Str::uuid(),
             'type' => 'App\\Notifications\\SubmissionStatusChangedNotification',
@@ -1269,16 +1284,58 @@ class MobileApiTest extends TestCase
                 'status' => $submission->status,
                 'project_name' => $project->name_en,
             ],
+            'created_at' => now()->subMinute(),
+            'updated_at' => now()->subMinute(),
+        ]);
+
+        $readNotification = DatabaseNotification::query()->create([
+            'id' => (string) Str::uuid(),
+            'type' => 'App\\Notifications\\SubmissionStatusChangedNotification',
+            'notifiable_type' => User::class,
+            'notifiable_id' => $reporter->id,
+            'data' => [
+                'submission_id' => $submission->id,
+                'title' => 'Approved update',
+                'status' => SubmissionStatus::APPROVED->value,
+                'project_name' => $project->name_en,
+            ],
+            'read_at' => now()->subSeconds(30),
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         Sanctum::actingAs($reporter);
 
-        $indexResponse = $this->getJson('/api/mobile/inbox');
+        $indexResponse = $this->getJson('/api/mobile/inbox?page=1&per_page=2');
 
         $indexResponse
             ->assertOk()
-            ->assertJsonPath('data.meta.unread_count', 1)
-            ->assertJsonPath('data.items.0.status_label', 'Sent Back');
+            ->assertJsonPath('data.meta.unread_count', 2)
+            ->assertJsonPath('data.meta.returned', 2)
+            ->assertJsonPath('data.pagination.page', 1)
+            ->assertJsonPath('data.pagination.per_page', 2)
+            ->assertJsonPath('data.pagination.total', 3)
+            ->assertJsonPath('data.pagination.total_pages', 2)
+            ->assertJsonPath('data.pagination.has_previous', false)
+            ->assertJsonPath('data.pagination.has_more', true)
+            ->assertJsonPath('data.filters.unread_only', false)
+            ->assertJsonPath('data.items.0.id', $readNotification->id)
+            ->assertJsonPath('data.items.1.id', $notification->id)
+            ->assertJsonPath('data.items.1.status_label', 'Sent Back');
+
+        $unreadOnlyResponse = $this->getJson('/api/mobile/inbox?unread_only=true&page=1&per_page=1');
+
+        $unreadOnlyResponse
+            ->assertOk()
+            ->assertJsonPath('data.meta.unread_count', 2)
+            ->assertJsonPath('data.meta.returned', 1)
+            ->assertJsonPath('data.pagination.page', 1)
+            ->assertJsonPath('data.pagination.per_page', 1)
+            ->assertJsonPath('data.pagination.total', 2)
+            ->assertJsonPath('data.pagination.total_pages', 2)
+            ->assertJsonPath('data.pagination.has_more', true)
+            ->assertJsonPath('data.filters.unread_only', true)
+            ->assertJsonPath('data.items.0.id', $notification->id);
 
         $readResponse = $this->patchJson('/api/mobile/inbox/'.$notification->id.'/read');
 

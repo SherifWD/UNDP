@@ -11,8 +11,16 @@ class InboxController extends MobileController
 {
     public function index(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
+        $input = $request->all();
+
+        if (array_key_exists('unread_only', $input)) {
+            $input['unread_only'] = $request->boolean('unread_only');
+        }
+
+        $validator = Validator::make($input, [
             'unread_only' => ['nullable', 'boolean'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -22,20 +30,34 @@ class InboxController extends MobileController
 
         $validated = $validator->validated();
         $query = $request->user()->notifications()->latest();
+        $unreadOnly = $request->boolean('unread_only');
 
-        if ($request->boolean('unread_only')) {
+        if ($unreadOnly) {
             $query->whereNull('read_at');
         }
 
-        $limit = $validated['limit'] ?? 25;
-        $notifications = $query->limit($limit)->get();
+        $perPage = (int) ($validated['per_page'] ?? $validated['limit'] ?? 25);
+        $page = (int) ($validated['page'] ?? 1);
+        $notifications = $query->paginate($perPage, ['*'], 'page', $page);
 
         return $this->successResponse([
-            'items' => $notifications->map(fn (DatabaseNotification $notification): array => $this->serializeNotification($notification))
+            'items' => $notifications->getCollection()
+                ->map(fn (DatabaseNotification $notification): array => $this->serializeNotification($notification))
                 ->values(),
             'meta' => [
                 'unread_count' => $request->user()->unreadNotifications()->count(),
                 'returned' => $notifications->count(),
+            ],
+            'pagination' => [
+                'page' => $notifications->currentPage(),
+                'per_page' => $notifications->perPage(),
+                'total' => $notifications->total(),
+                'total_pages' => $notifications->lastPage(),
+                'has_previous' => $notifications->currentPage() > 1,
+                'has_more' => $notifications->hasMorePages(),
+            ],
+            'filters' => [
+                'unread_only' => $unreadOnly,
             ],
         ]);
     }

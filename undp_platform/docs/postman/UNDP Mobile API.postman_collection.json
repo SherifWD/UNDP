@@ -8960,7 +8960,7 @@
                                 "inbox"
                             ]
                         },
-                        "description": "List user inbox notifications.\n\nFilters:\n- `unread_only`: `true` | `false`\n- `limit`: integer 1..100\n\nFilter URL examples:\n- `{{base_url}}/mobile/inbox?unread_only=true&limit=25`\n- `{{base_url}}/mobile/inbox?limit=10`"
+                        "description": "List user inbox notifications.\n\nFilters:\n- `unread_only`: `true` | `false`\n- `page`: integer >= 1\n- `per_page`: integer 1..100\n- `limit`: legacy alias for `per_page`\n\nFilter URL examples:\n- `{{base_url}}/mobile/inbox?unread_only=true&page=1&per_page=25`\n- `{{base_url}}/mobile/inbox?page=2&per_page=10`"
                     },
                     "response": [
                         {
@@ -8987,7 +8987,7 @@
                                         "inbox"
                                     ]
                                 },
-                                "description": "List user inbox notifications.\n\nFilters:\n- `unread_only`: `true` | `false`\n- `limit`: integer 1..100\n\nFilter URL examples:\n- `{{base_url}}/mobile/inbox?unread_only=true&limit=25`\n- `{{base_url}}/mobile/inbox?limit=10`"
+                                "description": "List user inbox notifications.\n\nFilters:\n- `unread_only`: `true` | `false`\n- `page`: integer >= 1\n- `per_page`: integer 1..100\n- `limit`: legacy alias for `per_page`\n\nFilter URL examples:\n- `{{base_url}}/mobile/inbox?unread_only=true&page=1&per_page=25`\n- `{{base_url}}/mobile/inbox?page=2&per_page=10`"
                             },
                             "status": "OK",
                             "code": 200,
@@ -8999,7 +8999,7 @@
                                 }
                             ],
                             "cookie": [],
-                            "body": "{\n  \"result\": true,\n  \"message\": \"\",\n  \"msg\": \"\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"4c77f0c3-1111-2222-3333-444444444444\",\n        \"type\": \"SubmissionStatusChangedNotification\",\n        \"title\": \"Phase 1 Reinforcement Progress Update\",\n        \"message\": \"Phase 1 Reinforcement Progress Update is now Approved\",\n        \"submission_id\": 15,\n        \"status\": \"approved\",\n        \"status_label\": \"Approved\",\n        \"is_read\": false\n      }\n    ],\n    \"meta\": {\n      \"unread_count\": 3,\n      \"returned\": 1\n    }\n  }\n}"
+                            "body": "{\n  \"result\": true,\n  \"message\": \"\",\n  \"msg\": \"\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"4c77f0c3-1111-2222-3333-444444444444\",\n        \"type\": \"SubmissionStatusChangedNotification\",\n        \"title\": \"Phase 1 Reinforcement Progress Update\",\n        \"message\": \"Phase 1 Reinforcement Progress Update is now Approved\",\n        \"submission_id\": 15,\n        \"status\": \"approved\",\n        \"status_label\": \"Approved\",\n        \"is_read\": false\n      }\n    ],\n    \"meta\": {\n      \"unread_count\": 3,\n      \"returned\": 1\n    },\n    \"pagination\": {\n      \"page\": 1,\n      \"per_page\": 10,\n      \"total\": 3,\n      \"total_pages\": 1,\n      \"has_previous\": false,\n      \"has_more\": false\n    },\n    \"filters\": {\n      \"unread_only\": false\n    }\n  }\n}"
                         },
                         {
                             "name": "422 Invalid Filters",
@@ -9025,7 +9025,7 @@
                                         "inbox"
                                     ]
                                 },
-                                "description": "List user inbox notifications.\n\nFilters:\n- `unread_only`: `true` | `false`\n- `limit`: integer 1..100\n\nFilter URL examples:\n- `{{base_url}}/mobile/inbox?unread_only=true&limit=25`\n- `{{base_url}}/mobile/inbox?limit=10`"
+                                "description": "List user inbox notifications.\n\nFilters:\n- `unread_only`: `true` | `false`\n- `page`: integer >= 1\n- `per_page`: integer 1..100\n- `limit`: legacy alias for `per_page`\n\nFilter URL examples:\n- `{{base_url}}/mobile/inbox?unread_only=true&page=1&per_page=25`\n- `{{base_url}}/mobile/inbox?page=2&per_page=10`"
                             },
                             "status": "Unprocessable Content",
                             "code": 422,
@@ -9063,7 +9063,7 @@
                                         "inbox"
                                     ]
                                 },
-                                "description": "List user inbox notifications.\n\nFilters:\n- `unread_only`: `true` | `false`\n- `limit`: integer 1..100\n\nFilter URL examples:\n- `{{base_url}}/mobile/inbox?unread_only=true&limit=25`\n- `{{base_url}}/mobile/inbox?limit=10`"
+                                "description": "List user inbox notifications.\n\nFilters:\n- `unread_only`: `true` | `false`\n- `page`: integer >= 1\n- `per_page`: integer 1..100\n- `limit`: legacy alias for `per_page`\n\nFilter URL examples:\n- `{{base_url}}/mobile/inbox?unread_only=true&page=1&per_page=25`\n- `{{base_url}}/mobile/inbox?page=2&per_page=10`"
                             },
                             "status": "Unauthorized",
                             "code": 401,
@@ -9101,7 +9101,7 @@
                                         "inbox"
                                     ]
                                 },
-                                "description": "List user inbox notifications.\n\nFilters:\n- `unread_only`: `true` | `false`\n- `limit`: integer 1..100\n\nFilter URL examples:\n- `{{base_url}}/mobile/inbox?unread_only=true&limit=25`\n- `{{base_url}}/mobile/inbox?limit=10`"
+                                "description": "List user inbox notifications.\n\nFilters:\n- `unread_only`: `true` | `false`\n- `page`: integer >= 1\n- `per_page`: integer 1..100\n- `limit`: legacy alias for `per_page`\n\nFilter URL examples:\n- `{{base_url}}/mobile/inbox?unread_only=true&page=1&per_page=25`\n- `{{base_url}}/mobile/inbox?page=2&per_page=10`"
                             },
                             "status": "Forbidden",
                             "code": 403,
