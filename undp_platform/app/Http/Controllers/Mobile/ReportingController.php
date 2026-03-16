@@ -77,6 +77,7 @@ class ReportingController extends MobileController
                 ],
                 'field_aliases' => [
                     'activities_started' => [
+                        'activity_started',
                         'activities_workshops_or_training_started',
                     ],
                 ],
@@ -235,6 +236,7 @@ class ReportingController extends MobileController
                                 'required' => false,
                                 'options_key' => 'yes_no',
                                 'aliases' => [
+                                    'activity_started',
                                     'activities_workshops_or_training_started',
                                 ],
                             ],

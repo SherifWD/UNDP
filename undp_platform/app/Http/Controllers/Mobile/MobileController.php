@@ -23,16 +23,22 @@ abstract class MobileController extends Controller
         $expectedEndDate = $stored['end_date']
             ?? $stored['expected_end_date']
             ?? now()->addMonths(9)->endOfMonth()->toDateString();
+        $fundingSources = collect($stored['funding_sources'] ?? $stored['donors'] ?? ['UNDP Libya'])
+            ->filter(fn ($value): bool => is_string($value) && trim($value) !== '')
+            ->values()
+            ->all();
+        $fundingBudget = (float) ($stored['funding_budget'] ?? 0);
 
         return [
             'code' => (string) ($stored['code'] ?? sprintf('PRJ-%03d', $project->id)),
             'goal_area' => (string) ($stored['development_goal_area'] ?? $stored['goal_area'] ?? ($project->municipality?->name ?? 'General Area')),
             'location_label' => (string) ($stored['location_label'] ?? ($project->municipality?->name ?? 'Unassigned area')),
             'component_category' => (string) ($stored['project_category'] ?? $stored['component_category'] ?? 'Hard Component - Infrastructure'),
-            'donors' => collect($stored['funding_sources'] ?? $stored['donors'] ?? ['UNDP Libya'])
-                ->filter(fn ($value): bool => is_string($value) && trim($value) !== '')
-                ->values()
-                ->all(),
+            'donors' => $fundingSources,
+            'funding_sources' => $fundingSources,
+            'funding_sources_label' => implode(' - ', $fundingSources),
+            'funding_budget' => $fundingBudget,
+            'funding_budget_label' => $fundingBudget > 0 ? 'USD '.number_format($fundingBudget, 0) : 'USD 0',
             'program_lead' => (string) ($stored['program_lead'] ?? 'UNDP Libya'),
             'duration_months' => max(1, (int) ($stored['duration_months'] ?? 3)),
             'implemented_by' => (string) ($stored['implementing_partner'] ?? $stored['implemented_by'] ?? ($project->municipality?->name ?? 'UNDP Partner')),
@@ -70,6 +76,10 @@ abstract class MobileController extends Controller
             'component_category' => $meta['component_category'],
             'donors' => $meta['donors'],
             'donors_label' => implode(' - ', $meta['donors']),
+            'funding_budget' => $meta['funding_budget'],
+            'funding_budget_label' => $meta['funding_budget_label'],
+            'funding_sources' => $meta['funding_sources'],
+            'funding_sources_label' => $meta['funding_sources_label'],
             'program_lead' => $meta['program_lead'],
             'duration_months' => $meta['duration_months'],
             'duration_label' => $this->durationLabel($meta['duration_months']),
@@ -130,12 +140,19 @@ abstract class MobileController extends Controller
         $payload = $this->serializeSubmissionCard($submission);
         $form = $this->submissionFormData($submission);
         $labels = $this->submissionFormLabels($form);
+        $mediaAssets = $this->serializeSubmissionMedia($submission);
+
+        if (array_key_exists('activities_started', $form)) {
+            $form['activity_started'] = $form['activities_started'];
+            $labels['activity_started'] = $labels['activities_started'] ?? null;
+        }
 
         $payload['validation_comment'] = $submission->validation_comment;
         $payload['validated_at'] = optional($submission->validated_at)->toIso8601String();
         $payload['data'] = $form;
         $payload['data_labels'] = $labels;
-        $payload['media_assets'] = $this->serializeSubmissionMedia($submission);
+        $payload['media_assets'] = $mediaAssets;
+        $payload['assets'] = $mediaAssets;
         $payload['summary'] = [
             'report_type' => $form['report_type'] ?? config('mobile.reporting.report_type'),
             'reporting_period' => $form['reporting_period_label'] ?? $this->reportingPeriodLabel($submission),
@@ -149,6 +166,7 @@ abstract class MobileController extends Controller
             'functional_status_label' => $labels['functional_status'] ?? null,
             'is_project_being_used_label' => $labels['is_project_being_used'] ?? null,
             'activities_started_label' => $labels['activities_started'] ?? null,
+            'activity_started_label' => $labels['activity_started'] ?? null,
             'is_used_as_intended_label' => $labels['is_used_as_intended'] ?? null,
             'negative_environmental_impact_label' => $labels['negative_environmental_impact'] ?? null,
             'user_categories_labels' => $labels['user_categories'] ?? [],

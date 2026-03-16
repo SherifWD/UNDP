@@ -227,10 +227,12 @@ class SubmissionController extends MobileController
         }
 
         $submission->load('mediaAssets');
+        $mediaAssets = $this->serializeSubmissionMedia($submission);
 
         return $this->successResponse([
             'submission_id' => $submission->id,
-            'media_assets' => $this->serializeSubmissionMedia($submission),
+            'media_assets' => $mediaAssets,
+            'assets' => $mediaAssets,
         ]);
     }
 
@@ -282,15 +284,19 @@ class SubmissionController extends MobileController
         );
 
         $submission->load('mediaAssets');
+        $mediaAssets = $this->serializeSubmissionMedia($submission);
 
         return $this->successResponse([
             'submission_id' => $submission->id,
-            'media_assets' => $this->serializeSubmissionMedia($submission),
+            'media_assets' => $mediaAssets,
+            'assets' => $mediaAssets,
         ], 'Media removed successfully.');
     }
 
     private function makeSubmissionValidator(Request $request, bool $creating)
     {
+        $input = $this->normalizeSubmissionInput($request->all());
+
         $rules = [
             'client_uuid' => ['nullable', 'uuid'],
             'project_id' => [$creating ? 'required' : 'sometimes', 'integer', 'exists:projects,id'],
@@ -339,7 +345,7 @@ class SubmissionController extends MobileController
             'observed_at' => ['nullable', 'date'],
         ];
 
-        $validator = Validator::make($request->all(), $rules);
+        $validator = Validator::make($input, $rules);
 
         $validator->after(function ($validator) use ($request, $creating): void {
             $input = $validator->safe()->all();
@@ -360,6 +366,16 @@ class SubmissionController extends MobileController
 
             if ($mediaRows->contains(fn (array $row): bool => ! empty($row) && empty($row['id']))) {
                 $validator->errors()->add('media', 'Each selected media item must include its media asset id.');
+            }
+
+            if ($mediaIds->isNotEmpty()) {
+                $existingMediaCount = MediaAsset::query()
+                    ->whereIn('id', $mediaIds->all())
+                    ->count();
+
+                if ($existingMediaCount !== $mediaIds->count()) {
+                    $validator->errors()->add('media', 'One or more media assets could not be found.');
+                }
             }
 
             if ($creating && $mediaIds->isNotEmpty()) {
@@ -610,6 +626,39 @@ class SubmissionController extends MobileController
         return $this->pruneStatusSpecificData($data);
     }
 
+    private function normalizeSubmissionInput(array $input): array
+    {
+        if (! array_key_exists('activities_started', $input)) {
+            foreach (['activity_started', 'activities_workshops_or_training_started'] as $alias) {
+                if (! array_key_exists($alias, $input)) {
+                    continue;
+                }
+
+                $input['activities_started'] = $this->normalizeBooleanInput($input[$alias]);
+                break;
+            }
+        } else {
+            $input['activities_started'] = $this->normalizeBooleanInput($input['activities_started']);
+        }
+
+        return $input;
+    }
+
+    private function normalizeBooleanInput(mixed $value): mixed
+    {
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        $normalized = strtolower(trim($value));
+
+        return match ($normalized) {
+            '1', 'true', 'yes', 'y' => true,
+            '0', 'false', 'no', 'n' => false,
+            default => $value,
+        };
+    }
+
     private function valueFromPayload(array $validated, array $existing, string $key, mixed $fallback = null): mixed
     {
         if (array_key_exists($key, $validated)) {
@@ -666,17 +715,34 @@ class SubmissionController extends MobileController
     {
         $mediaRows = $payload['media'] ?? null;
 
-        if (is_array($mediaRows)) {
-            return $mediaRows;
-        }
-
         $assetRows = $payload['assets'] ?? null;
 
-        if (is_array($assetRows)) {
-            return $assetRows;
+        if (! is_array($mediaRows) && is_array($assetRows)) {
+            $mediaRows = $assetRows;
         }
 
-        return [];
+        if (! is_array($mediaRows)) {
+            return [];
+        }
+
+        return collect($mediaRows)
+            ->map(function ($row): array {
+                if (is_array($row)) {
+                    return $row;
+                }
+
+                if (is_numeric($row)) {
+                    return ['id' => (int) $row];
+                }
+
+                if (is_string($row) && trim($row) !== '' && is_numeric($row)) {
+                    return ['id' => (int) $row];
+                }
+
+                return [];
+            })
+            ->values()
+            ->all();
     }
 
     private function syncMediaAssetsMetadata(Submission $submission, array $mediaReferences): void

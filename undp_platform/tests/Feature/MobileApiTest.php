@@ -44,6 +44,8 @@ class MobileApiTest extends TestCase
                 'location_label' => 'South Region - Alkufraa',
                 'execution_status' => 'in_progress',
                 'progress_percent' => 55,
+                'funding_budget' => 1200000,
+                'funding_sources' => ['UNDP Libya', 'European Union'],
                 'is_invited' => true,
             ],
         ]);
@@ -123,6 +125,9 @@ class MobileApiTest extends TestCase
         $detailResponse
             ->assertOk()
             ->assertJsonPath('data.project.code', 'PRJ-ALK-001')
+            ->assertJsonPath('data.project.funding_budget', 1200000)
+            ->assertJsonPath('data.project.funding_sources.0', 'UNDP Libya')
+            ->assertJsonPath('data.project.funding_sources.1', 'European Union')
             ->assertJsonPath('data.project.can_report', true);
     }
 
@@ -580,8 +585,8 @@ class MobileApiTest extends TestCase
             'client_uuid' => (string) Str::uuid(),
             'project_id' => $project->id,
             'mode' => 'draft',
-            'title' => 'Planned Status Draft',
-            'project_status' => 'planned',
+            'title' => 'Completed Status Draft',
+            'project_status' => 'completed',
         ])->assertCreated();
 
         $submissionId = $draftResponse->json('data.submission.id');
@@ -604,24 +609,28 @@ class MobileApiTest extends TestCase
 
         $submitResponse = $this->putJson('/api/mobile/submissions/'.$submissionId, [
             'mode' => 'submit',
-            'project_status' => 'planned',
-            'delay_reason' => 'funding_gap',
-            'actual_beneficiaries' => 0,
+            'project_status' => 'completed',
+            'is_project_being_used' => true,
+            'activity_started' => 'Yes',
+            'user_categories' => ['all_of_the_above'],
+            'is_used_as_intended' => true,
+            'functional_status' => 'fully_functional',
+            'negative_environmental_impact' => false,
+            'actual_beneficiaries' => 200,
             'location_label' => 'South Region - Alkufraa',
             'confirm_accuracy' => true,
             'assets' => [
-                [
-                    'id' => $mediaAsset->id,
-                    'type' => 'image',
-                    'label' => 'Training room',
-                ],
+                $mediaAsset->id,
             ],
         ]);
 
         $submitResponse
             ->assertOk()
             ->assertJsonPath('data.submission.status', SubmissionStatus::SUBMITTED->value)
-            ->assertJsonPath('data.submission.media_assets.0.id', $mediaAsset->id);
+            ->assertJsonPath('data.submission.data.activities_started', true)
+            ->assertJsonPath('data.submission.data.activity_started', true)
+            ->assertJsonPath('data.submission.media_assets.0.id', $mediaAsset->id)
+            ->assertJsonPath('data.submission.assets.0.id', $mediaAsset->id);
     }
 
     public function test_reporter_can_resubmit_submitted_report_before_validator_action(): void
@@ -750,12 +759,14 @@ class MobileApiTest extends TestCase
             ->assertJsonPath('data.flow.steps.1.status_sections.0.status', 'planned')
             ->assertJsonPath('data.flow.steps.1.status_sections.2.status', 'completed')
             ->assertJsonPath('data.flow.steps.1.status_sections.2.fields.1.key', 'activities_started')
-            ->assertJsonPath('data.flow.steps.1.status_sections.2.fields.1.aliases.0', 'activities_workshops_or_training_started')
+            ->assertJsonPath('data.flow.steps.1.status_sections.2.fields.1.aliases.0', 'activity_started')
+            ->assertJsonPath('data.flow.steps.1.status_sections.2.fields.1.aliases.1', 'activities_workshops_or_training_started')
             ->assertJsonPath('data.available_options.functional_statuses.1.label', 'Operational but needs maintenance')
             ->assertJsonPath('data.available_options.functional_statuses.1.label_ar', 'تشغيلي لكنه يحتاج صيانة')
             ->assertJsonPath('data.submission_contract.create.path', '/api/mobile/submissions')
             ->assertJsonPath('data.submission_contract.update.accepted_media_reference_keys.0', 'assets')
-            ->assertJsonPath('data.submission_contract.field_aliases.activities_started.0', 'activities_workshops_or_training_started')
+            ->assertJsonPath('data.submission_contract.field_aliases.activities_started.0', 'activity_started')
+            ->assertJsonPath('data.submission_contract.field_aliases.activities_started.1', 'activities_workshops_or_training_started')
             ->assertJsonPath('data.submission_contract.media_upload_flow.4.endpoint', 'PUT /api/mobile/submissions/{submission_id}')
             ->assertJsonPath('data.media_limits.images.max_count', 10);
     }
