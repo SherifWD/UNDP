@@ -4846,7 +4846,7 @@
                                 }
                             ],
                             "cookie": [],
-                            "body": "{\n  \"result\": false,\n  \"message\": \"Approximate completion percentage is required.\",\n  \"msg\": \"Approximate completion percentage is required.\",\n  \"data\": {\n    \"errors\": {\n      \"approximate_completion_percentage\": [\n        \"Approximate completion percentage is required.\"\n      ]\n    }\n  },\n  \"errors\": {\n    \"approximate_completion_percentage\": [\n      \"Approximate completion percentage is required.\"\n    ]\n  }\n}"
+                            "body": "{\n  \"result\": false,\n  \"message\": \"At least one user category is required.\",\n  \"msg\": \"At least one user category is required.\",\n  \"data\": {\n    \"errors\": {\n      \"user_categories\": [\n        \"At least one user category is required.\"\n      ]\n    }\n  },\n  \"errors\": {\n    \"user_categories\": [\n      \"At least one user category is required.\"\n    ]\n  }\n}"
                         },
                         {
                             "name": "422 Cannot Edit Submission",
@@ -5740,7 +5740,7 @@
                                 }
                             ],
                             "cookie": [],
-                            "body": "{\n  \"result\": false,\n  \"message\": \"Approximate completion percentage is required.\",\n  \"msg\": \"Approximate completion percentage is required.\",\n  \"data\": {\n    \"errors\": {\n      \"approximate_completion_percentage\": [\n        \"Approximate completion percentage is required.\"\n      ]\n    }\n  },\n  \"errors\": {\n    \"approximate_completion_percentage\": [\n      \"Approximate completion percentage is required.\"\n    ]\n  }\n}"
+                            "body": "{\n  \"result\": false,\n  \"message\": \"At least one user category is required.\",\n  \"msg\": \"At least one user category is required.\",\n  \"data\": {\n    \"errors\": {\n      \"user_categories\": [\n        \"At least one user category is required.\"\n      ]\n    }\n  },\n  \"errors\": {\n    \"user_categories\": [\n      \"At least one user category is required.\"\n    ]\n  }\n}"
                         },
                         {
                             "name": "422 Cannot Edit Submission",
@@ -6253,11 +6253,6 @@
                                     "type": "text"
                                 },
                                 {
-                                    "key": "negative_impact_details",
-                                    "value": "Minor construction debris left near the entrance area.",
-                                    "type": "text"
-                                },
-                                {
                                     "key": "summary_of_observation",
                                     "value": "Project assets are operational and in daily use.",
                                     "type": "text"
@@ -6305,7 +6300,7 @@
                                 "{{submission_id}}"
                             ]
                         },
-                        "description": "Submit/update a completed report (`project_status=completed`) using `form-data` sent as `POST` with `_method=PUT`.\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`\n\nCompleted-status question field:\n- Preferred mobile key: `activity_started` with `Yes` / `No`\n- Canonical stored key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nAttachments:\n- Upload one or more files using repeated `assets[]` file fields.\n- If you are attaching existing uploaded assets instead of files, send asset ids as text fields.\n\nTransport note:\n- Keep the HTTP method as `POST` in Postman and send `_method=PUT`. PHP does not parse uploaded files on raw multipart PUT requests."
+                        "description": "Submit/update a completed report (`project_status=completed`) using `form-data` sent as `POST` with `_method=PUT`.\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n\nCompleted-status question field:\n- Preferred mobile key: `activity_started` with `Yes` / `No`\n- Canonical stored key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nAttachments:\n- Upload one or more files using repeated `assets[]` file fields.\n- If you are attaching existing uploaded assets instead of files, send asset ids as text fields.\n\nTransport note:\n- Keep the HTTP method as `POST` in Postman and send `_method=PUT`. PHP does not parse uploaded files on raw multipart PUT requests."
                     },
                     "response": [
                         {
@@ -6381,11 +6376,6 @@
                                             "type": "text"
                                         },
                                         {
-                                            "key": "negative_impact_details",
-                                            "value": "Minor construction debris left near the entrance area.",
-                                            "type": "text"
-                                        },
-                                        {
                                             "key": "summary_of_observation",
                                             "value": "Project assets are operational and in daily use.",
                                             "type": "text"
@@ -6433,7 +6423,7 @@
                                         "{{submission_id}}"
                                     ]
                                 },
-                                "description": "Submit/update a completed report (`project_status=completed`) using `form-data` sent as `POST` with `_method=PUT`.\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`\n\nCompleted-status question field:\n- Preferred mobile key: `activity_started` with `Yes` / `No`\n- Canonical stored key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nAttachments:\n- Upload one or more files using repeated `assets[]` file fields.\n- If you are attaching existing uploaded assets instead of files, send asset ids as text fields.\n\nTransport note:\n- Keep the HTTP method as `POST` in Postman and send `_method=PUT`. PHP does not parse uploaded files on raw multipart PUT requests."
+                                "description": "Submit/update a completed report (`project_status=completed`) using `form-data` sent as `POST` with `_method=PUT`.\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n\nCompleted-status question field:\n- Preferred mobile key: `activity_started` with `Yes` / `No`\n- Canonical stored key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nAttachments:\n- Upload one or more files using repeated `assets[]` file fields.\n- If you are attaching existing uploaded assets instead of files, send asset ids as text fields.\n\nTransport note:\n- Keep the HTTP method as `POST` in Postman and send `_method=PUT`. PHP does not parse uploaded files on raw multipart PUT requests."
                             },
                             "status": "OK",
                             "code": 200,
@@ -6500,11 +6490,6 @@
                                             "type": "text"
                                         },
                                         {
-                                            "key": "user_categories[0]",
-                                            "value": "all_of_the_above",
-                                            "type": "text"
-                                        },
-                                        {
                                             "key": "is_used_as_intended",
                                             "value": "1",
                                             "type": "text"
@@ -6517,11 +6502,6 @@
                                         {
                                             "key": "negative_environmental_impact",
                                             "value": "1",
-                                            "type": "text"
-                                        },
-                                        {
-                                            "key": "negative_impact_details",
-                                            "value": "Minor construction debris left near the entrance area.",
                                             "type": "text"
                                         },
                                         {
@@ -6572,7 +6552,7 @@
                                         "{{submission_id}}"
                                     ]
                                 },
-                                "description": "Submit/update a completed report (`project_status=completed`) using `form-data` sent as `POST` with `_method=PUT`.\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`\n\nCompleted-status question field:\n- Preferred mobile key: `activity_started` with `Yes` / `No`\n- Canonical stored key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nAttachments:\n- Upload one or more files using repeated `assets[]` file fields.\n- If you are attaching existing uploaded assets instead of files, send asset ids as text fields.\n\nTransport note:\n- Keep the HTTP method as `POST` in Postman and send `_method=PUT`. PHP does not parse uploaded files on raw multipart PUT requests."
+                                "description": "Submit/update a completed report (`project_status=completed`) using `form-data` sent as `POST` with `_method=PUT`.\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n\nCompleted-status question field:\n- Preferred mobile key: `activity_started` with `Yes` / `No`\n- Canonical stored key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nAttachments:\n- Upload one or more files using repeated `assets[]` file fields.\n- If you are attaching existing uploaded assets instead of files, send asset ids as text fields.\n\nTransport note:\n- Keep the HTTP method as `POST` in Postman and send `_method=PUT`. PHP does not parse uploaded files on raw multipart PUT requests."
                             },
                             "status": "Unprocessable Content",
                             "code": 422,
@@ -6584,7 +6564,7 @@
                                 }
                             ],
                             "cookie": [],
-                            "body": "{\n  \"result\": false,\n  \"message\": \"Please describe the environmental impact observed.\",\n  \"msg\": \"Please describe the environmental impact observed.\",\n  \"data\": {\n    \"errors\": {\n      \"negative_impact_details\": [\n        \"Please describe the environmental impact observed.\"\n      ]\n    }\n  },\n  \"errors\": {\n    \"negative_impact_details\": [\n      \"Please describe the environmental impact observed.\"\n    ]\n  }\n}"
+                            "body": "{\n  \"result\": false,\n  \"message\": \"At least one user category is required.\",\n  \"msg\": \"At least one user category is required.\",\n  \"data\": {\n    \"errors\": {\n      \"user_categories\": [\n        \"At least one user category is required.\"\n      ]\n    }\n  },\n  \"errors\": {\n    \"user_categories\": [\n      \"At least one user category is required.\"\n    ]\n  }\n}"
                         },
                         {
                             "name": "422 Cannot Edit Submission",
@@ -6659,11 +6639,6 @@
                                             "type": "text"
                                         },
                                         {
-                                            "key": "negative_impact_details",
-                                            "value": "Minor construction debris left near the entrance area.",
-                                            "type": "text"
-                                        },
-                                        {
                                             "key": "summary_of_observation",
                                             "value": "Project assets are operational and in daily use.",
                                             "type": "text"
@@ -6711,7 +6686,7 @@
                                         "{{submission_id}}"
                                     ]
                                 },
-                                "description": "Submit/update a completed report (`project_status=completed`) using `form-data` sent as `POST` with `_method=PUT`.\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`\n\nCompleted-status question field:\n- Preferred mobile key: `activity_started` with `Yes` / `No`\n- Canonical stored key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nAttachments:\n- Upload one or more files using repeated `assets[]` file fields.\n- If you are attaching existing uploaded assets instead of files, send asset ids as text fields.\n\nTransport note:\n- Keep the HTTP method as `POST` in Postman and send `_method=PUT`. PHP does not parse uploaded files on raw multipart PUT requests."
+                                "description": "Submit/update a completed report (`project_status=completed`) using `form-data` sent as `POST` with `_method=PUT`.\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n\nCompleted-status question field:\n- Preferred mobile key: `activity_started` with `Yes` / `No`\n- Canonical stored key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nAttachments:\n- Upload one or more files using repeated `assets[]` file fields.\n- If you are attaching existing uploaded assets instead of files, send asset ids as text fields.\n\nTransport note:\n- Keep the HTTP method as `POST` in Postman and send `_method=PUT`. PHP does not parse uploaded files on raw multipart PUT requests."
                             },
                             "status": "Unprocessable Content",
                             "code": 422,
@@ -6798,11 +6773,6 @@
                                             "type": "text"
                                         },
                                         {
-                                            "key": "negative_impact_details",
-                                            "value": "Minor construction debris left near the entrance area.",
-                                            "type": "text"
-                                        },
-                                        {
                                             "key": "summary_of_observation",
                                             "value": "Project assets are operational and in daily use.",
                                             "type": "text"
@@ -6850,7 +6820,7 @@
                                         "{{submission_id}}"
                                     ]
                                 },
-                                "description": "Submit/update a completed report (`project_status=completed`) using `form-data` sent as `POST` with `_method=PUT`.\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`\n\nCompleted-status question field:\n- Preferred mobile key: `activity_started` with `Yes` / `No`\n- Canonical stored key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nAttachments:\n- Upload one or more files using repeated `assets[]` file fields.\n- If you are attaching existing uploaded assets instead of files, send asset ids as text fields.\n\nTransport note:\n- Keep the HTTP method as `POST` in Postman and send `_method=PUT`. PHP does not parse uploaded files on raw multipart PUT requests."
+                                "description": "Submit/update a completed report (`project_status=completed`) using `form-data` sent as `POST` with `_method=PUT`.\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n\nCompleted-status question field:\n- Preferred mobile key: `activity_started` with `Yes` / `No`\n- Canonical stored key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nAttachments:\n- Upload one or more files using repeated `assets[]` file fields.\n- If you are attaching existing uploaded assets instead of files, send asset ids as text fields.\n\nTransport note:\n- Keep the HTTP method as `POST` in Postman and send `_method=PUT`. PHP does not parse uploaded files on raw multipart PUT requests."
                             },
                             "status": "Forbidden",
                             "code": 403,
@@ -6937,11 +6907,6 @@
                                             "type": "text"
                                         },
                                         {
-                                            "key": "negative_impact_details",
-                                            "value": "Minor construction debris left near the entrance area.",
-                                            "type": "text"
-                                        },
-                                        {
                                             "key": "summary_of_observation",
                                             "value": "Project assets are operational and in daily use.",
                                             "type": "text"
@@ -6989,7 +6954,7 @@
                                         "{{submission_id}}"
                                     ]
                                 },
-                                "description": "Submit/update a completed report (`project_status=completed`) using `form-data` sent as `POST` with `_method=PUT`.\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`\n\nCompleted-status question field:\n- Preferred mobile key: `activity_started` with `Yes` / `No`\n- Canonical stored key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nAttachments:\n- Upload one or more files using repeated `assets[]` file fields.\n- If you are attaching existing uploaded assets instead of files, send asset ids as text fields.\n\nTransport note:\n- Keep the HTTP method as `POST` in Postman and send `_method=PUT`. PHP does not parse uploaded files on raw multipart PUT requests."
+                                "description": "Submit/update a completed report (`project_status=completed`) using `form-data` sent as `POST` with `_method=PUT`.\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n\nCompleted-status question field:\n- Preferred mobile key: `activity_started` with `Yes` / `No`\n- Canonical stored key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nAttachments:\n- Upload one or more files using repeated `assets[]` file fields.\n- If you are attaching existing uploaded assets instead of files, send asset ids as text fields.\n\nTransport note:\n- Keep the HTTP method as `POST` in Postman and send `_method=PUT`. PHP does not parse uploaded files on raw multipart PUT requests."
                             },
                             "status": "Not Found",
                             "code": 404,
@@ -7076,11 +7041,6 @@
                                             "type": "text"
                                         },
                                         {
-                                            "key": "negative_impact_details",
-                                            "value": "Minor construction debris left near the entrance area.",
-                                            "type": "text"
-                                        },
-                                        {
                                             "key": "summary_of_observation",
                                             "value": "Project assets are operational and in daily use.",
                                             "type": "text"
@@ -7128,7 +7088,7 @@
                                         "{{submission_id}}"
                                     ]
                                 },
-                                "description": "Submit/update a completed report (`project_status=completed`) using `form-data` sent as `POST` with `_method=PUT`.\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n- `negative_impact_details` when `negative_environmental_impact=true`\n\nCompleted-status question field:\n- Preferred mobile key: `activity_started` with `Yes` / `No`\n- Canonical stored key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nAttachments:\n- Upload one or more files using repeated `assets[]` file fields.\n- If you are attaching existing uploaded assets instead of files, send asset ids as text fields.\n\nTransport note:\n- Keep the HTTP method as `POST` in Postman and send `_method=PUT`. PHP does not parse uploaded files on raw multipart PUT requests."
+                                "description": "Submit/update a completed report (`project_status=completed`) using `form-data` sent as `POST` with `_method=PUT`.\n\nCompleted-specific required on submit:\n- `is_project_being_used`, `is_used_as_intended`, `functional_status`, `negative_environmental_impact`\n- `user_categories` when `is_project_being_used=true`\n\nCompleted-status question field:\n- Preferred mobile key: `activity_started` with `Yes` / `No`\n- Canonical stored key: `activities_started`\n- Also accepted: `activities_workshops_or_training_started`\n\nAttachments:\n- Upload one or more files using repeated `assets[]` file fields.\n- If you are attaching existing uploaded assets instead of files, send asset ids as text fields.\n\nTransport note:\n- Keep the HTTP method as `POST` in Postman and send `_method=PUT`. PHP does not parse uploaded files on raw multipart PUT requests."
                             },
                             "status": "Unauthorized",
                             "code": 401,

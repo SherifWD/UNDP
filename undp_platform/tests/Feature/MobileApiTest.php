@@ -847,7 +847,6 @@ class MobileApiTest extends TestCase
             'is_used_as_intended' => true,
             'functional_status' => 'fully_functional',
             'negative_environmental_impact' => true,
-            'negative_impact_details' => 'Minor construction debris left near the entrance area.',
             'actual_beneficiaries' => 200,
             'location_label' => 'South Region - Alkufraa',
             'confirm_accuracy' => true,
@@ -989,8 +988,7 @@ class MobileApiTest extends TestCase
         $invalidSubmit
             ->assertStatus(422)
             ->assertJsonPath('result', false)
-            ->assertJsonPath('data.errors.user_categories.0', 'At least one user category is required.')
-            ->assertJsonPath('data.errors.negative_impact_details.0', 'Please describe the environmental impact observed.');
+            ->assertJsonPath('data.errors.user_categories.0', 'At least one user category is required.');
 
         $validSubmit = $this->putJson('/api/mobile/submissions/'.$submissionId, [
             'mode' => 'submit',
@@ -1001,7 +999,6 @@ class MobileApiTest extends TestCase
             'is_used_as_intended' => true,
             'functional_status' => 'fully_functional',
             'negative_environmental_impact' => true,
-            'negative_impact_details' => 'Minor construction debris left near the entrance area.',
             'actual_beneficiaries' => 200,
             'location_label' => 'South Region - Alkufraa',
             'confirm_accuracy' => true,

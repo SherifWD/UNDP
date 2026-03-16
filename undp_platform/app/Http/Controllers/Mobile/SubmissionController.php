@@ -484,10 +484,6 @@ class SubmissionController extends MobileController
                 if (! array_key_exists('negative_environmental_impact', $input)) {
                     $validator->errors()->add('negative_environmental_impact', 'Please confirm whether there is a negative environmental impact.');
                 }
-
-                if (($input['negative_environmental_impact'] ?? false) && empty($input['negative_impact_details'])) {
-                    $validator->errors()->add('negative_impact_details', 'Please describe the environmental impact observed.');
-                }
             }
         });
 
