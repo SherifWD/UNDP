@@ -107,13 +107,14 @@ class RandomNotificationsSeeder extends Seeder
             return (new SubmissionStatusChangedNotification($submission))->toArray($user);
         }
 
-        $status = fake()->randomElement([
+        $statuses = [
             SubmissionStatus::SUBMITTED->value,
             SubmissionStatus::UNDER_REVIEW->value,
             SubmissionStatus::APPROVED->value,
             SubmissionStatus::REWORK_REQUESTED->value,
             SubmissionStatus::REJECTED->value,
-        ]);
+        ];
+        $status = $statuses[array_rand($statuses)];
 
         $titles = [
             'Field update',
@@ -155,7 +156,7 @@ class RandomNotificationsSeeder extends Seeder
 
     private function readAtFor(Carbon $createdAt): ?Carbon
     {
-        if (! fake()->boolean(70)) {
+        if (random_int(1, 100) > 70) {
             return null;
         }
 
