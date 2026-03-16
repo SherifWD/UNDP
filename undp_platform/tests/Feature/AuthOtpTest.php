@@ -9,6 +9,9 @@ use App\Models\Municipality;
 use App\Models\OtpCode;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Str;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class AuthOtpTest extends TestCase
@@ -150,6 +153,67 @@ class AuthOtpTest extends TestCase
         ]);
 
         $this->assertNotSame($issuedRefreshToken->plainTextToken, $response->json('refresh_token'));
+    }
+
+    public function test_auth_me_returns_unread_notifications_count(): void
+    {
+        $municipality = Municipality::query()->create([
+            'name_en' => 'Tripoli',
+            'name_ar' => 'طرابلس',
+            'code' => 'TRI',
+        ]);
+
+        $user = User::factory()->create([
+            'country_code' => '+218',
+            'phone' => '944444444',
+            'phone_e164' => '+218944444444',
+            'status' => UserStatus::ACTIVE->value,
+            'role' => UserRole::REPORTER->value,
+            'municipality_id' => $municipality->id,
+        ]);
+
+        DatabaseNotification::query()->create([
+            'id' => (string) Str::uuid(),
+            'type' => 'App\\Notifications\\SubmissionStatusChangedNotification',
+            'notifiable_type' => User::class,
+            'notifiable_id' => $user->id,
+            'data' => [
+                'title' => 'Unread 1',
+            ],
+        ]);
+
+        DatabaseNotification::query()->create([
+            'id' => (string) Str::uuid(),
+            'type' => 'App\\Notifications\\SubmissionStatusChangedNotification',
+            'notifiable_type' => User::class,
+            'notifiable_id' => $user->id,
+            'data' => [
+                'title' => 'Unread 2',
+            ],
+        ]);
+
+        DatabaseNotification::query()->create([
+            'id' => (string) Str::uuid(),
+            'type' => 'App\\Notifications\\SubmissionStatusChangedNotification',
+            'notifiable_type' => User::class,
+            'notifiable_id' => $user->id,
+            'data' => [
+                'title' => 'Read',
+            ],
+            'read_at' => now(),
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->getJson('/api/auth/me');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('user.id', $user->id)
+            ->assertJsonPath('unread_notifications_count', 2)
+            ->assertJsonPath('inbox.unread_count', 2)
+            ->assertJsonPath('data.unread_notifications_count', 2)
+            ->assertJsonPath('data.inbox.unread_count', 2);
     }
 
     public function test_registration_meta_returns_municipalities_and_gender_options(): void

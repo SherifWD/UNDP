@@ -1598,7 +1598,7 @@
                                 "me"
                             ]
                         },
-                        "description": "Get the authenticated user record. `avatar_url` and `image_url` both return the direct image URL when an avatar exists."
+                        "description": "Get the authenticated user record. `avatar_url` and `image_url` both return the direct image URL when an avatar exists. Response also includes the logged-in user's unread notification count."
                     },
                     "response": [
                         {
@@ -1625,7 +1625,7 @@
                                         "me"
                                     ]
                                 },
-                                "description": "Get the authenticated user record. `avatar_url` and `image_url` both return the direct image URL when an avatar exists."
+                                "description": "Get the authenticated user record. `avatar_url` and `image_url` both return the direct image URL when an avatar exists. Response also includes the logged-in user's unread notification count."
                             },
                             "status": "OK",
                             "code": 200,
@@ -1637,7 +1637,7 @@
                                 }
                             ],
                             "cookie": [],
-                            "body": "{\n  \"result\": true,\n  \"message\": \"\",\n  \"msg\": \"\",\n  \"data\": {\n    \"user\": {\n      \"id\": 7,\n      \"name\": \"Mobile Reporter\",\n      \"role\": \"reporter\",\n      \"status\": \"active\",\n      \"preferred_locale\": \"en\",\n      \"permissions\": [\n        \"projects.view\",\n        \"submissions.create\"\n      ]\n    }\n  },\n  \"user\": {\n    \"id\": 7,\n    \"name\": \"Mobile Reporter\",\n    \"role\": \"reporter\",\n    \"status\": \"active\",\n    \"preferred_locale\": \"en\",\n    \"permissions\": [\n      \"projects.view\",\n      \"submissions.create\"\n    ]\n  }\n}"
+                            "body": "{\n  \"result\": true,\n  \"message\": \"\",\n  \"msg\": \"\",\n  \"data\": {\n    \"user\": {\n      \"id\": 7,\n      \"name\": \"Mobile Reporter\",\n      \"role\": \"reporter\",\n      \"status\": \"active\",\n      \"preferred_locale\": \"en\",\n      \"permissions\": [\n        \"projects.view\",\n        \"submissions.create\"\n      ]\n    },\n    \"unread_notifications_count\": 4,\n    \"inbox\": {\n      \"unread_count\": 4\n    }\n  },\n  \"user\": {\n    \"id\": 7,\n    \"name\": \"Mobile Reporter\",\n    \"role\": \"reporter\",\n    \"status\": \"active\",\n    \"preferred_locale\": \"en\",\n    \"permissions\": [\n      \"projects.view\",\n      \"submissions.create\"\n    ]\n  },\n  \"unread_notifications_count\": 4,\n  \"inbox\": {\n    \"unread_count\": 4\n  }\n}"
                         },
                         {
                             "name": "401 Unauthenticated",
@@ -1663,7 +1663,7 @@
                                         "me"
                                     ]
                                 },
-                                "description": "Get the authenticated user record. `avatar_url` and `image_url` both return the direct image URL when an avatar exists."
+                                "description": "Get the authenticated user record. `avatar_url` and `image_url` both return the direct image URL when an avatar exists. Response also includes the logged-in user's unread notification count."
                             },
                             "status": "Unauthorized",
                             "code": 401,

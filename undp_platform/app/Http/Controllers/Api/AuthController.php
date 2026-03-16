@@ -385,9 +385,14 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         $user = $request->user()->load('municipality');
+        $unreadNotificationsCount = $user->unreadNotifications()->count();
 
         return response()->json([
             'user' => $this->serializeUser($user),
+            'unread_notifications_count' => $unreadNotificationsCount,
+            'inbox' => [
+                'unread_count' => $unreadNotificationsCount,
+            ],
         ]);
     }
 
