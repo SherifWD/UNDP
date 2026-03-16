@@ -310,15 +310,6 @@ class ReportingController extends MobileController
                                 'required' => true,
                                 'options_key' => 'yes_no',
                             ],
-                            [
-                                'key' => 'negative_impact_details',
-                                'label' => 'Environmental Impact Details',
-                                'type' => 'multiline_text',
-                                'required_when' => [
-                                    'field' => 'negative_environmental_impact',
-                                    'equals' => true,
-                                ],
-                            ],
                         ],
                     ],
                 ],
