@@ -1,10 +1,10 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import AppShell from '../components/AppShell.vue';
 import api from '../api';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const logs = ref([]);
 const loading = ref(false);
 const error = ref('');
@@ -78,6 +78,11 @@ const loadLogs = async (page = pagination.current_page) => {
         });
 
         logs.value = data.data || [];
+
+        if (selected.value?.id) {
+            selected.value = logs.value.find((log) => log.id === selected.value.id) || null;
+        }
+
         pagination.current_page = data.current_page || 1;
         pagination.last_page = data.last_page || 1;
         pagination.total = data.total || logs.value.length;
@@ -177,6 +182,17 @@ const deviceLabel = (log) => log.device_label || t('audit.unknownDevice');
 onMounted(async () => {
     await loadLogs(1);
 });
+
+watch(
+    () => locale.value,
+    async (newLocale, oldLocale) => {
+        if (newLocale === oldLocale) {
+            return;
+        }
+
+        await loadLogs(pagination.current_page);
+    },
+);
 </script>
 
 <template>

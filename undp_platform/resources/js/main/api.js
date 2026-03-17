@@ -1,4 +1,5 @@
 import axios from 'axios';
+import i18n from './i18n';
 
 const api = axios.create({
     baseURL: '/api',
@@ -9,7 +10,7 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem('undp_token');
-    const locale = localStorage.getItem('undp_locale') || 'en';
+    const locale = i18n.global.locale.value || localStorage.getItem('undp_locale') || 'en';
 
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
