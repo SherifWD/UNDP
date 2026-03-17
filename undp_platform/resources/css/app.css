@@ -1896,7 +1896,7 @@ pre {
     padding: 12px;
     display: grid;
     gap: 10px;
-    z-index: 20;
+    z-index: 999;
 }
 
 .tracky-filter-panel h4 {
