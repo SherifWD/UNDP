@@ -7,6 +7,7 @@ use App\Models\ExportTask;
 use App\Models\Submission;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\AuditLogPresenter;
 use App\Services\SubmissionAccessService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -100,9 +101,22 @@ class GenerateExportTaskJob implements ShouldQueue
         }
 
         if ($task->type === 'audit_logs') {
-            fputcsv($out, ['Log ID', 'Timestamp', 'Action', 'Actor', 'Role', 'Entity Type', 'Entity ID']);
+            fputcsv($out, [
+                'Log ID',
+                'Timestamp',
+                'Summary',
+                'Action',
+                'Module',
+                'Affected Record',
+                'Actor',
+                'Role',
+                'Page / Source',
+                'Entity Type',
+                'Entity ID',
+            ]);
 
             $query = AuditLog::query()->with('actor:id,name,role');
+            $presenter = app(AuditLogPresenter::class);
 
             if (! empty($filters['action'])) {
                 $query->where('action', 'like', '%'.$filters['action'].'%');
@@ -114,14 +128,20 @@ class GenerateExportTaskJob implements ShouldQueue
                 $query->whereDate('created_at', '<=', $filters['date_to']);
             }
 
-            $query->latest('id')->chunk(300, function ($rows) use ($out): void {
+            $query->latest('id')->chunk(300, function ($rows) use ($out, $presenter): void {
                 foreach ($rows as $row) {
+                    $presented = $presenter->present($row);
+
                     fputcsv($out, [
                         $row->id,
                         optional($row->created_at)->toDateTimeString(),
-                        $row->action,
+                        $presented['summary'] ?? '',
+                        $presented['action_label'] ?? $row->action,
+                        $presented['module_label'] ?? '',
+                        $presented['subject_label'] ?? '',
                         $row->actor?->name,
                         $row->actor?->role,
+                        $presented['page_label'] ?? '',
                         $row->entity_type,
                         $row->entity_id,
                     ]);

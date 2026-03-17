@@ -19,6 +19,15 @@ class AuditLogger
         ?User $actor = null,
     ): AuditLog {
         $request ??= request();
+        $requestContext = [];
+
+        if ($request) {
+            $requestContext = array_filter([
+                'request_path' => $request->path(),
+                'request_method' => $request->method(),
+                'route_name' => $request->route()?->getName(),
+            ], static fn (mixed $value): bool => $value !== null && $value !== '');
+        }
 
         return AuditLog::create([
             'actor_id' => $actor?->id ?? $request?->user()?->id,
@@ -27,7 +36,7 @@ class AuditLogger
             'entity_id' => $entityId === null ? null : (string) $entityId,
             'before' => $before,
             'after' => $after,
-            'metadata' => $metadata,
+            'metadata' => array_merge($requestContext, $metadata),
             'ip_address' => $request?->ip(),
             'user_agent' => $request?->userAgent(),
         ]);
@@ -40,8 +49,6 @@ class AuditLogger
             entityType: 'permission',
             entityId: $permission,
             metadata: [
-                'path' => $request->path(),
-                'method' => $request->method(),
                 'permission' => $permission,
             ],
             request: $request,

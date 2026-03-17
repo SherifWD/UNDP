@@ -4,11 +4,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Services\AuditLogPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AuditLogController extends Controller
 {
+    public function __construct(
+        private readonly AuditLogPresenter $auditLogPresenter,
+    ) {
+    }
+
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -80,7 +86,7 @@ class AuditLogController extends Controller
 
     private function serializeLog(AuditLog $log): array
     {
-        return [
+        return array_merge([
             'id' => $log->id,
             'timestamp' => optional($log->created_at)->toIso8601String(),
             'action' => $log->action,
@@ -96,6 +102,6 @@ class AuditLogController extends Controller
             'metadata' => $log->metadata,
             'ip_address' => $log->ip_address,
             'user_agent' => $log->user_agent,
-        ];
+        ], $this->auditLogPresenter->present($log));
     }
 }

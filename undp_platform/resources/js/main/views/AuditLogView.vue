@@ -132,11 +132,19 @@ const goToPage = async (page) => {
 };
 
 const moduleLabel = (log) => {
+    if (log.module_label) {
+        return log.module_label;
+    }
+
     const value = String(log.entity_type || '').replace(/_/g, ' ');
     return value ? value.charAt(0).toUpperCase() + value.slice(1) : t('common.system');
 };
 
 const referenceLabel = (log) => {
+    if (log.subject_label) {
+        return log.subject_label;
+    }
+
     const projectId = Number(log.metadata?.project_id || 0);
 
     if (projectId) {
@@ -155,13 +163,8 @@ const referenceLabel = (log) => {
 };
 
 const detailLabel = (log) => {
-    if (log.metadata?.status) {
-        return `${t('audit.statusPrefix')} ${String(log.metadata.status).replace(/_/g, ' ')}`;
-    }
-
-    const afterKeys = Object.keys(log.after || {});
-    if (afterKeys.length) {
-        return `${t('audit.updatedPrefix')} ${afterKeys.slice(0, 2).join(', ')}`;
+    if (log.summary) {
+        return log.summary;
     }
 
     return t('audit.actionCaptured');
@@ -169,12 +172,7 @@ const detailLabel = (log) => {
 
 const userLabel = (log) => log.actor?.name || t('common.system');
 
-const deviceLabel = (log) => {
-    const agent = String(log.user_agent || t('audit.unknownDevice'));
-    const browser = ['Chrome', 'Firefox', 'Safari', 'Edge', 'Opera', 'Brave'].find((item) => agent.includes(item)) || t('audit.browser');
-    const platform = ['Windows', 'macOS', 'Linux', 'Android', 'iPhone', 'iPad'].find((item) => agent.includes(item)) || t('audit.device');
-    return `${browser} - ${platform}`;
-};
+const deviceLabel = (log) => log.device_label || t('audit.unknownDevice');
 
 onMounted(async () => {
     await loadLogs(1);
@@ -244,7 +242,7 @@ onMounted(async () => {
                         <tr v-for="log in logs" :key="log.id" @click="selected = log">
                             <td>{{ log.timestamp ? new Date(log.timestamp).toLocaleString() : '-' }}</td>
                             <td>{{ userLabel(log) }}</td>
-                            <td>{{ String(log.action || '').replace(/\./g, ' ') }}</td>
+                            <td>{{ log.action_label || String(log.action || '').replace(/\./g, ' ') }}</td>
                             <td>{{ moduleLabel(log) }}</td>
                             <td>
                                 <button class="tracky-btn tracky-btn--ghost tracky-btn--link" type="button" @click.stop="selected = log">
@@ -288,23 +286,52 @@ onMounted(async () => {
                     <header class="tracky-project-modal__head">
                         <div>
                             <h3>{{ t('audit.detailTitle') }} #{{ selected.id }}</h3>
-                            <p>{{ referenceLabel(selected) }}</p>
+                            <p>{{ selected.summary || referenceLabel(selected) }}</p>
                         </div>
                         <button class="tracky-btn tracky-btn--ghost" type="button" @click="selected = null">{{ t('common.close') }}</button>
                     </header>
 
                     <div class="tracky-audit-detail-grid">
-                        <div class="tracky-project-section">
-                            <h4>{{ t('audit.before') }}</h4>
-                            <pre>{{ JSON.stringify(selected.before || {}, null, 2) }}</pre>
-                        </div>
-                        <div class="tracky-project-section">
-                            <h4>{{ t('audit.after') }}</h4>
-                            <pre>{{ JSON.stringify(selected.after || {}, null, 2) }}</pre>
+                        <div class="tracky-project-section tracky-audit-detail-grid__full">
+                            <h4>{{ t('audit.overview') }}</h4>
+                            <dl class="tracky-audit-detail-list">
+                                <div class="tracky-audit-detail-list__row" v-for="item in (selected.overview || [])" :key="item.label">
+                                    <dt>{{ item.label }}</dt>
+                                    <dd>{{ item.value }}</dd>
+                                </div>
+                            </dl>
                         </div>
                         <div class="tracky-project-section tracky-audit-detail-grid__full">
-                            <h4>{{ t('audit.metadata') }}</h4>
-                            <pre>{{ JSON.stringify(selected.metadata || {}, null, 2) }}</pre>
+                            <h4>{{ t('audit.changes') }}</h4>
+                            <div v-if="selected.changes?.length" class="tracky-audit-change-table-wrap">
+                                <table class="tracky-audit-change-table">
+                                    <thead>
+                                        <tr>
+                                            <th>{{ t('audit.field') }}</th>
+                                            <th>{{ t('audit.previousValue') }}</th>
+                                            <th>{{ t('audit.newValue') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="change in selected.changes" :key="`${change.field}-${change.before}-${change.after}`">
+                                            <td>{{ change.field }}</td>
+                                            <td>{{ change.before }}</td>
+                                            <td>{{ change.after }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p v-else class="tracky-subtle">{{ t('audit.noChanges') }}</p>
+                        </div>
+                        <div class="tracky-project-section tracky-audit-detail-grid__full">
+                            <h4>{{ t('audit.additionalContext') }}</h4>
+                            <dl v-if="selected.context?.length" class="tracky-audit-detail-list">
+                                <div class="tracky-audit-detail-list__row" v-for="item in selected.context" :key="item.label">
+                                    <dt>{{ item.label }}</dt>
+                                    <dd>{{ item.value }}</dd>
+                                </div>
+                            </dl>
+                            <p v-else class="tracky-subtle">{{ t('audit.noAdditionalContext') }}</p>
                         </div>
                     </div>
                 </article>

@@ -10,6 +10,7 @@ use App\Models\Submission;
 use App\Models\User;
 use App\Jobs\GenerateExportTaskJob;
 use App\Services\AuditLogger;
+use App\Services\AuditLogPresenter;
 use App\Services\SubmissionAccessService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
@@ -19,6 +20,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExportController extends Controller
 {
+    public function __construct(
+        private readonly AuditLogPresenter $auditLogPresenter,
+    ) {
+    }
+
     public function createTask(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -318,28 +324,39 @@ class ExportController extends Controller
         }
 
         $filename = 'audit-log-export-'.now()->format('Ymd_His').'.csv';
+        $presenter = $this->auditLogPresenter;
 
-        return response()->streamDownload(function () use ($query): void {
+        return response()->streamDownload(function () use ($query, $presenter): void {
             $out = fopen('php://output', 'wb');
 
             fputcsv($out, [
                 'Log ID',
                 'Timestamp',
+                'Summary',
                 'Action',
+                'Module',
+                'Affected Record',
                 'Actor',
                 'Role',
+                'Page / Source',
                 'Entity Type',
                 'Entity ID',
             ]);
 
-            $query->latest('id')->chunk(300, function ($rows) use ($out): void {
+            $query->latest('id')->chunk(300, function ($rows) use ($out, $presenter): void {
                 foreach ($rows as $row) {
+                    $presented = $presenter->present($row);
+
                     fputcsv($out, [
                         $row->id,
                         optional($row->created_at)->toDateTimeString(),
-                        $row->action,
+                        $presented['summary'] ?? '',
+                        $presented['action_label'] ?? $row->action,
+                        $presented['module_label'] ?? '',
+                        $presented['subject_label'] ?? '',
                         $row->actor?->name,
                         $row->actor?->role,
+                        $presented['page_label'] ?? '',
                         $row->entity_type,
                         $row->entity_id,
                     ]);
