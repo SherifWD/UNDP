@@ -535,6 +535,8 @@ class MobileApiTest extends TestCase
                 'Night shift introduced to accelerate progress',
             ],
             'actual_beneficiaries' => 123,
+            'latitude' => 23.456789,
+            'longitude' => 21.987654,
             'location_label' => 'Alkufraa Municipality, Southern Libya',
             'notes' => 'Community members expressed satisfaction with the new facility.',
             'confirm_accuracy' => true,
@@ -543,12 +545,23 @@ class MobileApiTest extends TestCase
         $submitResponse
             ->assertOk()
             ->assertJsonPath('data.submission.status', SubmissionStatus::SUBMITTED->value)
+            ->assertJsonPath('data.submission.latitude', 23.456789)
+            ->assertJsonPath('data.submission.longitude', 21.987654)
             ->assertJsonPath('data.submission.data.approximate_completion_percentage', 25);
 
         $this->assertDatabaseHas('submissions', [
             'id' => $submissionId,
             'status' => SubmissionStatus::SUBMITTED->value,
+            'latitude' => 23.456789,
+            'longitude' => 21.987654,
         ]);
+
+        $showResponse = $this->getJson('/api/mobile/submissions/'.$submissionId);
+
+        $showResponse
+            ->assertOk()
+            ->assertJsonPath('data.submission.latitude', 23.456789)
+            ->assertJsonPath('data.submission.longitude', 21.987654);
     }
 
     public function test_reporter_can_submit_using_assets_alias(): void

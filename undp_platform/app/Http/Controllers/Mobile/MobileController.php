@@ -150,6 +150,8 @@ abstract class MobileController extends Controller
 
         $payload['validation_comment'] = $submission->validation_comment;
         $payload['validated_at'] = optional($submission->validated_at)->toIso8601String();
+        $payload['latitude'] = $submission->latitude;
+        $payload['longitude'] = $submission->longitude;
         $payload['data'] = $form;
         $payload['data_labels'] = $labels;
         $payload['media_assets'] = $mediaAssets;
