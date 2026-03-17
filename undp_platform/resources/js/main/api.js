@@ -9,10 +9,13 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem('undp_token');
+    const locale = localStorage.getItem('undp_locale') || 'en';
 
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
+
+    config.headers['Accept-Language'] = locale;
 
     return config;
 });

@@ -81,6 +81,61 @@ class AuditLogApiTest extends TestCase
         ]);
     }
 
+    public function test_audit_log_show_returns_arabic_fields_when_locale_is_arabic(): void
+    {
+        $this->seed(RbacSeeder::class);
+
+        $auditor = User::factory()->create([
+            'name' => 'Audit Officer',
+            'role' => UserRole::AUDITOR->value,
+        ]);
+
+        Sanctum::actingAs($auditor);
+
+        $log = AuditLog::query()->create([
+            'actor_id' => $auditor->id,
+            'action' => 'submissions.status_changed',
+            'entity_type' => 'submissions',
+            'entity_id' => '15',
+            'before' => ['status' => 'under_review'],
+            'after' => ['status' => 'approved'],
+            'metadata' => [
+                'project_id' => 3,
+                'comment' => 'Approved after review.',
+                'request_path' => 'api/submissions/15/approve',
+                'request_method' => 'POST',
+            ],
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0 Safari/537.36',
+            'created_at' => now(),
+        ]);
+
+        $response = $this->getJson("/api/audit-logs/{$log->id}", [
+            'Accept-Language' => 'ar',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.action_label', 'تم تغيير الحالة')
+            ->assertJsonPath('data.module_label', 'التقارير')
+            ->assertJsonPath('data.subject_label', 'التقرير #15')
+            ->assertJsonPath(
+                'data.summary',
+                'Audit Officer غيّر حالة التقرير #15 من قيد المراجعة إلى معتمد. تعليق: Approved after review.'
+            );
+
+        $response->assertJsonFragment([
+            'label' => 'الوحدة المتأثرة',
+            'value' => 'التقارير',
+        ]);
+
+        $response->assertJsonFragment([
+            'field' => 'الحالة',
+            'before' => 'قيد المراجعة',
+            'after' => 'معتمد',
+        ]);
+    }
+
     public function test_audit_logger_merges_request_context_into_metadata(): void
     {
         $this->seed(RbacSeeder::class);
