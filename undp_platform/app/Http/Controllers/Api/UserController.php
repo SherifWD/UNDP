@@ -107,8 +107,13 @@ class UserController extends Controller
         $phoneData = PhoneNumber::normalize($validated['country_code'], $validated['phone']);
 
         if (User::where('phone_e164', $phoneData['phone_e164'])->exists()) {
+            $message = __('Phone number is already in use.');
+
             return response()->json([
-                'message' => __('Phone number is already in use.'),
+                'message' => $message,
+                'errors' => [
+                    'phone' => [$message],
+                ],
             ], 422);
         }
 
@@ -193,8 +198,13 @@ class UserController extends Controller
                 ->exists();
 
             if ($exists) {
+                $message = __('Phone number is already in use.');
+
                 return response()->json([
-                    'message' => __('Phone number is already in use.'),
+                    'message' => $message,
+                    'errors' => [
+                        'phone' => [$message],
+                    ],
                 ], 422);
             }
 

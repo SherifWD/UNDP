@@ -1092,15 +1092,15 @@ onBeforeUnmount(() => {
                     <ul class="stat-list stat-list--dense">
                         <li>
                             <span>{{ t('reportsPage.totalRequested') }}</span>
-                            <strong>{{ Number(fundingOverview.total_requested_amount || 0).toLocaleString() }}</strong>
+                            <strong>{{ fundingOverview.total_requested_amount_label || Number(fundingOverview.total_requested_amount || 0).toLocaleString() }}</strong>
                         </li>
                         <li>
                             <span>{{ t('reportsPage.pendingAmount') }}</span>
-                            <strong>{{ Number(fundingOverview.pending_requested_amount || 0).toLocaleString() }}</strong>
+                            <strong>{{ fundingOverview.pending_requested_amount_label || Number(fundingOverview.pending_requested_amount || 0).toLocaleString() }}</strong>
                         </li>
                         <li>
                             <span>{{ t('reportsPage.approvedAmount') }}</span>
-                            <strong>{{ Number(fundingOverview.approved_requested_amount || 0).toLocaleString() }}</strong>
+                            <strong>{{ fundingOverview.approved_requested_amount_label || Number(fundingOverview.approved_requested_amount || 0).toLocaleString() }}</strong>
                         </li>
                         <li>
                             <span>{{ t('reportsPage.approvalRate') }}</span>

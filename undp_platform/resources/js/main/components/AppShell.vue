@@ -148,7 +148,6 @@ const iconPath = (name) => NAV_ICON_PATHS[name] || NAV_ICON_PATHS.dashboard;
                 <div class="shell__profile-avatar">{{ firstName.charAt(0).toUpperCase() }}</div>
                 <div class="shell__profile-meta">
                     <p class="shell__profile-name" :title="auth.user?.name || t('common.user')">{{ auth.user?.name || t('common.user') }}</p>
-                    <p class="shell__profile-email" :title="auth.user?.email || auth.user?.phone_e164 || ''">{{ auth.user?.email || auth.user?.phone_e164 || '' }}</p>
                 </div>
                 <button class="shell__logout-btn" type="button" @click="logout" :aria-label="t('nav.logout')">
                     <span class="shell__logout-icon" aria-hidden="true" />

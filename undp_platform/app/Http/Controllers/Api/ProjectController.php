@@ -341,6 +341,7 @@ class ProjectController extends Controller
             'soft_components' => ['sometimes', 'nullable', 'array'],
             'soft_components.*' => ['string', 'max:500'],
             'funding_budget' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'funding_currency' => ['sometimes', 'nullable', 'string', 'size:3'],
             'funding_sources' => ['sometimes', 'nullable', 'array'],
             'funding_sources.*' => ['string', 'max:255'],
             'funding_types' => ['sometimes', 'nullable', 'array'],
@@ -624,6 +625,7 @@ class ProjectController extends Controller
             'objectives' => $meta['objectives'],
             'hard_components' => $meta['hard_components'],
             'soft_components' => $meta['soft_components'],
+            'funding_currency' => $meta['funding_currency'],
             'funding_budget' => $meta['funding_budget'],
             'funding_budget_label' => $meta['funding_budget_label'],
             'funding_sources' => $meta['funding_sources'],
@@ -631,7 +633,7 @@ class ProjectController extends Controller
             'contacts' => $meta['contacts'],
             'created_by_label' => $meta['created_by_label'],
             'updated_by_label' => $meta['updated_by_label'],
-            'funding_requests_summary' => $this->serializeFundingRequestSummary($project),
+            'funding_requests_summary' => $this->serializeFundingRequestSummary($project, $meta['funding_currency']),
             'assigned_reporters_count' => $assignedReportersCount,
             'latitude' => $project->latitude,
             'longitude' => $project->longitude,
@@ -668,7 +670,7 @@ class ProjectController extends Controller
         return $payload;
     }
 
-    private function serializeFundingRequestSummary(Project $project): ?array
+    private function serializeFundingRequestSummary(Project $project, string $defaultCurrency): ?array
     {
         $attributes = $project->getAttributes();
 
@@ -687,6 +689,8 @@ class ProjectController extends Controller
             'approved_requests' => (int) ($project->funding_requests_approved_count ?? 0),
             'declined_requests' => (int) ($project->funding_requests_declined_count ?? 0),
             'total_requested_amount' => round((float) ($project->funding_requested_total_amount ?? 0), 2),
+            'currency' => $defaultCurrency,
+            'total_requested_amount_label' => $defaultCurrency.' '.$this->formatMoney((float) ($project->funding_requested_total_amount ?? 0)),
             'latest_requested_at' => $latestRequestedAt
                 ? Carbon::parse((string) $latestRequestedAt)->toIso8601String()
                 : null,
@@ -714,6 +718,7 @@ class ProjectController extends Controller
         $durationMonths = $this->durationMonths($startDate, $endDate)
             ?? max(1, (int) ($stored['duration_months'] ?? 3));
         $fundingBudget = (float) ($stored['funding_budget'] ?? 0);
+        $fundingCurrency = $this->normalizeCurrencyCode($stored['funding_currency'] ?? 'USD');
 
         return [
             'code' => (string) ($stored['code'] ?? $this->defaultProjectCode($project)),
@@ -736,8 +741,9 @@ class ProjectController extends Controller
             'objectives' => $this->normalizeStringList($stored['objectives'] ?? []),
             'hard_components' => $this->normalizeStringList($stored['hard_components'] ?? []),
             'soft_components' => $this->normalizeStringList($stored['soft_components'] ?? []),
+            'funding_currency' => $fundingCurrency,
             'funding_budget' => $fundingBudget,
-            'funding_budget_label' => $fundingBudget > 0 ? 'USD '.number_format($fundingBudget, 0) : 'USD 0',
+            'funding_budget_label' => $fundingCurrency.' '.$this->formatMoney($fundingBudget),
             'funding_sources' => $this->normalizeStringList($stored['funding_sources'] ?? $stored['donors'] ?? []),
             'funding_types' => $this->normalizeStringList($stored['funding_types'] ?? []),
             'contacts' => $this->normalizeStringList($stored['contacts'] ?? []),
@@ -792,6 +798,7 @@ class ProjectController extends Controller
             'objectives' => $this->normalizeStringList($value('objectives', $existing['objectives'] ?? [])),
             'hard_components' => $this->normalizeStringList($value('hard_components', $existing['hard_components'] ?? [])),
             'soft_components' => $this->normalizeStringList($value('soft_components', $existing['soft_components'] ?? [])),
+            'funding_currency' => $this->normalizeCurrencyCode($value('funding_currency', $existing['funding_currency'] ?? 'USD')),
             'funding_budget' => (float) ($value('funding_budget', $existing['funding_budget'] ?? 0) ?? 0),
             'funding_sources' => $this->normalizeStringList($value('funding_sources', $existing['funding_sources'] ?? $existing['donors'] ?? [])),
             'donors' => $this->normalizeStringList($value('funding_sources', $existing['donors'] ?? $existing['funding_sources'] ?? [])),
@@ -1000,5 +1007,19 @@ class ProjectController extends Controller
             ->filter(fn (string $item): bool => $item !== '')
             ->values()
             ->all();
+    }
+
+    private function normalizeCurrencyCode(?string $value): string
+    {
+        $currency = strtoupper(trim((string) $value));
+
+        return $currency !== '' ? $currency : 'USD';
+    }
+
+    private function formatMoney(float $amount): string
+    {
+        $precision = fmod($amount, 1.0) === 0.0 ? 0 : 2;
+
+        return number_format($amount, $precision, '.', ',');
     }
 }

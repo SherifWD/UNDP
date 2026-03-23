@@ -126,7 +126,7 @@ onBeforeUnmount(() => {
                 <p>{{ t('otp.subtitle') }} <strong>{{ maskedPhone }}</strong></p>
             </div>
 
-            <div class="otp-grid">
+            <div class="otp-grid" dir="ltr">
                 <input
                     v-for="(_, index) in digits"
                     :key="index"
@@ -137,6 +137,7 @@ onBeforeUnmount(() => {
                     autocomplete="one-time-code"
                     name="otp_code"
                     maxlength="1"
+                    dir="ltr"
                     :value="digits[index]"
                     @input="handleInput(index, $event)"
                     @keydown="handleKeydown(index, $event)"

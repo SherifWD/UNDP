@@ -36,6 +36,7 @@ class DashboardController extends Controller
             'municipality_id' => ['nullable', 'integer', 'exists:municipalities,id'],
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'status' => ['nullable', 'string', 'in:'.implode(',', SubmissionStatus::values())],
+            'donor_user_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
 
         $query = $this->buildScopedSubmissionQuery($request, $validated);
@@ -657,7 +658,7 @@ class DashboardController extends Controller
             return null;
         }
 
-        $query = FundingRequest::query();
+        $query = FundingRequest::query()->with('donor:id,name');
 
         if (
             ! $user->hasPermission('funding_requests.view.all')
@@ -684,6 +685,36 @@ class DashboardController extends Controller
             $query->whereDate('created_at', '<=', $filters['date_to']);
         }
 
+        $donorOptions = (clone $query)
+            ->get()
+            ->groupBy(fn (FundingRequest $row) => (int) $row->donor_user_id)
+            ->map(function ($rows): array {
+                /** @var FundingRequest $sample */
+                $sample = $rows->first();
+                $approvedCurrencyTotals = $this->fundingCurrencyTotals(
+                    $rows->where('status', FundingRequestStatus::APPROVED->value)->all(),
+                );
+                $totalCurrencyTotals = $this->fundingCurrencyTotals($rows->all());
+
+                return [
+                    'id' => (int) ($sample?->donor_user_id ?? 0),
+                    'name' => $sample?->donor?->name ?? 'Unknown donor',
+                    'approved_currency_totals' => $approvedCurrencyTotals,
+                    'approved_requested_amount' => round((float) $rows->where('status', FundingRequestStatus::APPROVED->value)->sum('amount'), 2),
+                    'approved_requested_amount_label' => $this->formatCurrencyTotals($approvedCurrencyTotals),
+                    'total_currency_totals' => $totalCurrencyTotals,
+                    'total_requested_amount' => round((float) $rows->sum('amount'), 2),
+                    'total_requested_amount_label' => $this->formatCurrencyTotals($totalCurrencyTotals),
+                ];
+            })
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
+
+        if (! empty($filters['donor_user_id'])) {
+            $query->where('donor_user_id', $filters['donor_user_id']);
+        }
+
         $total = (clone $query)->count();
         $pending = (clone $query)->where('status', FundingRequestStatus::PENDING->value)->count();
         $approved = (clone $query)->where('status', FundingRequestStatus::APPROVED->value)->count();
@@ -692,6 +723,17 @@ class DashboardController extends Controller
         $pendingAmount = round((float) (clone $query)->where('status', FundingRequestStatus::PENDING->value)->sum('amount'), 2);
         $approvedAmount = round((float) (clone $query)->where('status', FundingRequestStatus::APPROVED->value)->sum('amount'), 2);
         $declinedAmount = round((float) (clone $query)->where('status', FundingRequestStatus::DECLINED->value)->sum('amount'), 2);
+        $allRows = (clone $query)->get(['amount', 'currency', 'status']);
+        $totalCurrencyTotals = $this->fundingCurrencyTotals($allRows->all());
+        $pendingCurrencyTotals = $this->fundingCurrencyTotals(
+            $allRows->where('status', FundingRequestStatus::PENDING->value)->all(),
+        );
+        $approvedCurrencyTotals = $this->fundingCurrencyTotals(
+            $allRows->where('status', FundingRequestStatus::APPROVED->value)->all(),
+        );
+        $declinedCurrencyTotals = $this->fundingCurrencyTotals(
+            $allRows->where('status', FundingRequestStatus::DECLINED->value)->all(),
+        );
 
         return [
             'total_requests' => $total,
@@ -699,11 +741,21 @@ class DashboardController extends Controller
             'approved_requests' => $approved,
             'declined_requests' => $declined,
             'total_requested_amount' => $totalAmount,
+            'total_requested_amount_label' => $this->formatCurrencyTotals($totalCurrencyTotals),
+            'total_currency_totals' => $totalCurrencyTotals,
             'pending_requested_amount' => $pendingAmount,
+            'pending_requested_amount_label' => $this->formatCurrencyTotals($pendingCurrencyTotals),
+            'pending_currency_totals' => $pendingCurrencyTotals,
             'approved_requested_amount' => $approvedAmount,
+            'approved_requested_amount_label' => $this->formatCurrencyTotals($approvedCurrencyTotals),
+            'approved_currency_totals' => $approvedCurrencyTotals,
             'declined_requested_amount' => $declinedAmount,
+            'declined_requested_amount_label' => $this->formatCurrencyTotals($declinedCurrencyTotals),
+            'declined_currency_totals' => $declinedCurrencyTotals,
             'approval_rate_percent' => $total > 0 ? round(($approved / $total) * 100, 1) : 0.0,
             'pending_share_percent' => $total > 0 ? round(($pending / $total) * 100, 1) : 0.0,
+            'selected_donor_user_id' => ! empty($filters['donor_user_id']) ? (int) $filters['donor_user_id'] : null,
+            'donor_options' => $donorOptions,
             'status_breakdown' => [
                 FundingRequestStatus::PENDING->value => $pending,
                 FundingRequestStatus::APPROVED->value => $approved,
@@ -724,6 +776,41 @@ class DashboardController extends Controller
                 ];
             })->filter(fn (array $row): bool => $row['count'] > 0)->values()->all(),
         ];
+    }
+
+    private function fundingCurrencyTotals(array $rows): array
+    {
+        return collect($rows)
+            ->groupBy(fn ($row): string => strtoupper((string) (data_get($row, 'currency') ?: 'USD')))
+            ->map(function ($group, string $currency): array {
+                $amount = round((float) $group->sum(fn ($item) => (float) data_get($item, 'amount', 0)), 2);
+
+                return [
+                    'currency' => $currency,
+                    'amount' => $amount,
+                    'label' => $currency.' '.$this->formatMoney($amount),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function formatCurrencyTotals(array $totals): string
+    {
+        if ($totals === []) {
+            return '0';
+        }
+
+        return collect($totals)
+            ->map(fn (array $row): string => (string) ($row['label'] ?? (($row['currency'] ?? 'USD').' '.$this->formatMoney((float) ($row['amount'] ?? 0)))))
+            ->implode(' + ');
+    }
+
+    private function formatMoney(float $amount): string
+    {
+        $precision = fmod($amount, 1.0) === 0.0 ? 0 : 2;
+
+        return number_format($amount, $precision, '.', ',');
     }
 
     private function submissionStatusLabel(string $status): string

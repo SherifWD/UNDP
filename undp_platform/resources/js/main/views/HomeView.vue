@@ -15,9 +15,14 @@ const loading = ref(false);
 const error = ref('');
 
 const kpis = ref({});
+const fundingOverview = ref(null);
+const beneficiaryMetrics = ref({});
 const projects = ref([]);
+const projectOptions = ref([]);
 const municipalities = ref([]);
 const mapMarkers = ref([]);
+const beneficiaryCustomOpen = ref(false);
+const beneficiaryCustomError = ref('');
 
 const selectedProjectId = ref(null);
 const mapRef = ref(null);
@@ -36,6 +41,16 @@ const filters = reactive({
     area: '',
 });
 
+const summaryFilters = reactive({
+    project_id: '',
+    donor_user_id: '',
+    beneficiary_period: 'all',
+    beneficiary_custom_from: '',
+    beneficiary_custom_to: '',
+    beneficiary_applied_from: '',
+    beneficiary_applied_to: '',
+});
+
 const canOpenProjectSubmissions = computed(() => (
     auth.hasPermission('submissions.view.own')
     || auth.hasPermission('submissions.view.municipality')
@@ -49,11 +64,77 @@ const greetingName = computed(() => {
     return String(fullName).split(' ')[0];
 });
 
+const formatMoney = (value) => {
+    const amount = Number(value || 0);
+    const hasDecimals = Math.abs(amount % 1) > 0;
+
+    return new Intl.NumberFormat(undefined, {
+        minimumFractionDigits: hasDecimals ? 2 : 0,
+        maximumFractionDigits: hasDecimals ? 2 : 0,
+    }).format(amount);
+};
+
+const roundNumber = (value) => Math.round(Number(value || 0) * 100) / 100;
+
+const formatCurrencyLabel = (currency, amount) => `${String(currency || 'USD').toUpperCase()} ${formatMoney(amount)}`;
+
+const formatCurrencyTotals = (totals, fallbackCurrency = 'USD') => {
+    if (!Array.isArray(totals) || !totals.length) {
+        return formatCurrencyLabel(fallbackCurrency, 0);
+    }
+
+    return totals
+        .map((row) => row.label || formatCurrencyLabel(row.currency, row.amount))
+        .join(' + ');
+};
+
+const toDateInputValue = (date) => {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+};
+
+const subtractDays = (days) => {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    return toDateInputValue(date);
+};
+
 const totalReports = computed(() => Number(kpis.value.total_submissions || 0));
 const approvedCount = computed(() => Number(kpis.value.approved || 0));
 const underReviewCount = computed(() => Number(kpis.value.under_review || 0));
 const rejectedCount = computed(() => Number(kpis.value.rejected || 0));
 const reworkCount = computed(() => Number(kpis.value.rework_requested || 0));
+const beneficiaryTotal = computed(() => Number(beneficiaryMetrics.value.total_actual_beneficiaries || 0));
+const summaryProject = computed(() => {
+    const projectId = Number(summaryFilters.project_id || 0);
+
+    if (!projectId) {
+        return null;
+    }
+
+    return projectOptions.value.find((item) => Number(item.id) === projectId) || null;
+});
+const summaryAreaOptions = computed(() => {
+    const rows = new Map();
+
+    projectOptions.value.forEach((project) => {
+        const municipalityId = Number(project.municipality?.id || 0);
+        if (!municipalityId || rows.has(municipalityId)) {
+            return;
+        }
+
+        rows.set(municipalityId, {
+            id: municipalityId,
+            name: project.municipality?.name || `#${municipalityId}`,
+        });
+    });
+
+    return [...rows.values()].sort((a, b) => a.name.localeCompare(b.name));
+});
+const fundingDonorOptions = computed(() => fundingOverview.value?.donor_options || []);
 
 const donutSegments = computed(() => {
     const parts = [
@@ -79,16 +160,138 @@ const donutSegments = computed(() => {
     return `conic-gradient(${stops.join(', ')})`;
 });
 
-const beneficiaryTotal = computed(() => Math.max(totalReports.value * 120, 0));
+const beneficiaryBars = computed(() => {
+    const weights = [42, 28, 12, 18];
 
-const fundingTarget = 14000000;
-const fundingCurrent = computed(() => {
-    if (totalReports.value <= 0) return 0;
-    const ratio = Math.max(0.18, Math.min(0.88, approvedCount.value / totalReports.value || 0));
-    return Math.round(fundingTarget * ratio);
+    return weights.map((width) => ({
+        width: `${width}%`,
+    }));
 });
 
-const fundingPercent = computed(() => ((fundingCurrent.value / fundingTarget) * 100).toFixed(1));
+const budgetCurrencyTotals = computed(() => {
+    const totals = new Map();
+
+    projectOptions.value.forEach((project) => {
+        const currency = String(project.funding_currency || 'USD').toUpperCase();
+        const amount = Number(project.funding_budget || 0);
+
+        totals.set(currency, roundNumber((totals.get(currency) || 0) + amount));
+    });
+
+    return [...totals.entries()].map(([currency, amount]) => ({
+        currency,
+        amount,
+        label: formatCurrencyLabel(currency, amount),
+    }));
+});
+
+const fundingTargetAmount = computed(() => {
+    if (summaryProject.value) {
+        return Number(summaryProject.value.funding_budget || 0);
+    }
+
+    if (budgetCurrencyTotals.value.length === 1) {
+        return Number(budgetCurrencyTotals.value[0].amount || 0);
+    }
+
+    return 0;
+});
+
+const fundingTargetCurrency = computed(() => {
+    if (summaryProject.value) {
+        return String(summaryProject.value.funding_currency || 'USD').toUpperCase();
+    }
+
+    if (budgetCurrencyTotals.value.length === 1) {
+        return budgetCurrencyTotals.value[0].currency;
+    }
+
+    return '';
+});
+
+const fundingTargetLabel = computed(() => {
+    if (summaryProject.value) {
+        return summaryProject.value.funding_budget_label || formatCurrencyLabel(summaryProject.value.funding_currency, summaryProject.value.funding_budget);
+    }
+
+    return formatCurrencyTotals(budgetCurrencyTotals.value);
+});
+
+const fundingCurrentAmount = computed(() => {
+    const currentTotals = fundingOverview.value?.approved_currency_totals || [];
+
+    if (!fundingTargetCurrency.value) {
+        return currentTotals.length === 1 ? Number(currentTotals[0].amount || 0) : 0;
+    }
+
+    const matching = currentTotals.find((row) => String(row.currency).toUpperCase() === fundingTargetCurrency.value);
+    return Number(matching?.amount || 0);
+});
+
+const fundingCurrentLabel = computed(() => {
+    const totals = fundingOverview.value?.approved_currency_totals || [];
+
+    if (fundingTargetCurrency.value) {
+        const matching = totals.find((row) => String(row.currency).toUpperCase() === fundingTargetCurrency.value);
+        if (matching) {
+            return matching.label || formatCurrencyLabel(matching.currency, matching.amount);
+        }
+    }
+
+    return fundingOverview.value?.approved_requested_amount_label || formatCurrencyTotals(totals);
+});
+
+const fundingPercent = computed(() => {
+    if (fundingTargetAmount.value <= 0) {
+        return '0.0';
+    }
+
+    return ((fundingCurrentAmount.value / fundingTargetAmount.value) * 100).toFixed(1);
+});
+
+const fundingProgressText = computed(() => {
+    if (!summaryProject.value && budgetCurrencyTotals.value.length > 1) {
+        return t('dashboard.selectProjectForFunding');
+    }
+
+    if (fundingTargetAmount.value <= 0) {
+        return t('dashboard.noFundingTarget');
+    }
+
+    return t('dashboard.fundingProgressLabel', { percent: fundingPercent.value });
+});
+
+const beneficiaryDateParams = computed(() => {
+    if (summaryFilters.beneficiary_period === 'week') {
+        return {
+            date_from: subtractDays(6),
+            date_to: toDateInputValue(new Date()),
+        };
+    }
+
+    if (summaryFilters.beneficiary_period === 'month') {
+        return {
+            date_from: subtractDays(29),
+            date_to: toDateInputValue(new Date()),
+        };
+    }
+
+    if (summaryFilters.beneficiary_period === 'year') {
+        return {
+            date_from: subtractDays(364),
+            date_to: toDateInputValue(new Date()),
+        };
+    }
+
+    if (summaryFilters.beneficiary_period === 'custom') {
+        return {
+            date_from: summaryFilters.beneficiary_applied_from || undefined,
+            date_to: summaryFilters.beneficiary_applied_to || undefined,
+        };
+    }
+
+    return {};
+});
 
 const projectStatsById = computed(() => {
     const rows = {};
@@ -169,7 +372,7 @@ const shortProjectDescription = (description) => {
 const filteredProjects = computed(() => {
     const search = filters.search.trim().toLowerCase();
     const selectedMunicipality = Number(filters.municipality_id || 0);
-    const selectedProjectIdFromFilter = Number(filters.area || 0);
+    const selectedAreaId = Number(filters.area || 0);
 
     return projects.value
         .filter((project) => {
@@ -177,7 +380,7 @@ const filteredProjects = computed(() => {
                 return false;
             }
 
-            if (selectedProjectIdFromFilter && Number(project.id) !== selectedProjectIdFromFilter) {
+            if (selectedAreaId && Number(project.municipality?.id || 0) !== selectedAreaId) {
                 return false;
             }
 
@@ -246,6 +449,69 @@ const selectProject = (project) => {
 
 const closeProjectDetails = () => {
     selectedProjectId.value = null;
+};
+
+const handleSummaryProjectChange = async () => {
+    summaryFilters.donor_user_id = '';
+    await loadDashboard();
+};
+
+const handleMunicipalityChange = async () => {
+    filters.area = '';
+    summaryFilters.project_id = '';
+    summaryFilters.donor_user_id = '';
+    await loadDashboard();
+};
+
+const handleBeneficiaryPeriodChange = async () => {
+    beneficiaryCustomError.value = '';
+
+    if (summaryFilters.beneficiary_period === 'custom') {
+        beneficiaryCustomOpen.value = true;
+
+        if (!summaryFilters.beneficiary_custom_from) {
+            summaryFilters.beneficiary_custom_from = summaryFilters.beneficiary_applied_from || subtractDays(29);
+        }
+
+        if (!summaryFilters.beneficiary_custom_to) {
+            summaryFilters.beneficiary_custom_to = summaryFilters.beneficiary_applied_to || toDateInputValue(new Date());
+        }
+
+        return;
+    }
+
+    beneficiaryCustomOpen.value = false;
+    await loadDashboard();
+};
+
+const applyBeneficiaryCustomRange = async () => {
+    if (!summaryFilters.beneficiary_custom_from || !summaryFilters.beneficiary_custom_to) {
+        beneficiaryCustomError.value = t('dashboard.customDateRequired');
+        return;
+    }
+
+    if (summaryFilters.beneficiary_custom_from > summaryFilters.beneficiary_custom_to) {
+        beneficiaryCustomError.value = t('dashboard.customDateOrderError');
+        return;
+    }
+
+    beneficiaryCustomError.value = '';
+    summaryFilters.beneficiary_applied_from = summaryFilters.beneficiary_custom_from;
+    summaryFilters.beneficiary_applied_to = summaryFilters.beneficiary_custom_to;
+    beneficiaryCustomOpen.value = false;
+    await loadDashboard();
+};
+
+const cancelBeneficiaryCustomRange = () => {
+    beneficiaryCustomError.value = '';
+    beneficiaryCustomOpen.value = false;
+
+    if (!summaryFilters.beneficiary_applied_from || !summaryFilters.beneficiary_applied_to) {
+        summaryFilters.beneficiary_period = 'all';
+    } else {
+        summaryFilters.beneficiary_custom_from = summaryFilters.beneficiary_applied_from;
+        summaryFilters.beneficiary_custom_to = summaryFilters.beneficiary_applied_to;
+    }
 };
 
 const applyFilterPanel = async () => {
@@ -380,16 +646,31 @@ const loadDashboard = async () => {
 
     try {
         const municipalityId = selectedMunicipalityParam();
+        const selectedProjectId = summaryFilters.project_id ? Number(summaryFilters.project_id) : undefined;
         const mapParams = {
             municipality_id: municipalityId,
             project_status: filters.status || undefined,
-            project_id: filters.area || undefined,
             cluster: false,
             include_submissions: false,
         };
+        const projectScopeParams = {
+            municipality_id: municipalityId,
+            project_id: selectedProjectId,
+        };
+        const fundingScopeParams = {
+            ...projectScopeParams,
+            donor_user_id: summaryFilters.donor_user_id ? Number(summaryFilters.donor_user_id) : undefined,
+        };
 
         const results = await Promise.allSettled([
-            api.get('/dashboard/kpis', { params: { municipality_id: municipalityId } }),
+            api.get('/dashboard/kpis', { params: projectScopeParams }),
+            api.get('/dashboard/kpis', { params: fundingScopeParams }),
+            api.get('/dashboard/kpis', {
+                params: {
+                    ...projectScopeParams,
+                    ...beneficiaryDateParams.value,
+                },
+            }),
             api.get('/dashboard/map', { params: mapParams }),
             api.get('/projects', {
                 params: {
@@ -398,15 +679,34 @@ const loadDashboard = async () => {
                     with_stats: true,
                 },
             }),
+            api.get('/projects', {
+                params: {
+                    municipality_id: municipalityId,
+                },
+            }),
         ]);
 
-        const [kpiResult, mapResult, projectResult] = results;
+        const [kpiResult, fundingResult, beneficiaryResult, mapResult, projectResult, projectOptionsResult] = results;
         const partialErrors = [];
 
         if (kpiResult.status === 'fulfilled') {
             kpis.value = kpiResult.value.data.kpis || {};
         } else {
             partialErrors.push(kpiResult.reason?.response?.data?.message || 'KPI data is unavailable.');
+        }
+
+        if (fundingResult.status === 'fulfilled') {
+            fundingOverview.value = fundingResult.value.data.funding_overview || null;
+        } else {
+            fundingOverview.value = null;
+            partialErrors.push(fundingResult.reason?.response?.data?.message || 'Funding data is unavailable.');
+        }
+
+        if (beneficiaryResult.status === 'fulfilled') {
+            beneficiaryMetrics.value = beneficiaryResult.value.data.kpis || {};
+        } else {
+            beneficiaryMetrics.value = {};
+            partialErrors.push(beneficiaryResult.reason?.response?.data?.message || 'Beneficiary data is unavailable.');
         }
 
         if (mapResult.status === 'fulfilled') {
@@ -421,6 +721,18 @@ const loadDashboard = async () => {
         } else {
             projects.value = [];
             partialErrors.push(projectResult.reason?.response?.data?.message || 'Projects are unavailable.');
+        }
+
+        if (projectOptionsResult.status === 'fulfilled') {
+            projectOptions.value = projectOptionsResult.value.data.data || [];
+
+            if (summaryFilters.project_id && !projectOptions.value.some((row) => Number(row.id) === Number(summaryFilters.project_id))) {
+                summaryFilters.project_id = '';
+                summaryFilters.donor_user_id = '';
+            }
+        } else {
+            projectOptions.value = [];
+            partialErrors.push(projectOptionsResult.reason?.response?.data?.message || 'Project filters are unavailable.');
         }
 
         await initMap();
@@ -499,8 +811,11 @@ onBeforeUnmount(() => {
                 <div class="tracky-reports__block">
                     <div class="tracky-reports__head">
                         <h3>{{ t('dashboard.reports') }}</h3>
-                        <select>
-                            <option>{{ t('dashboard.allProjects') }}</option>
+                        <select v-model="summaryFilters.project_id" @change="handleSummaryProjectChange">
+                            <option value="">{{ t('dashboard.allProjects') }}</option>
+                            <option v-for="project in projectOptions" :key="project.id" :value="project.id">
+                                {{ project.name }}
+                            </option>
                         </select>
                     </div>
 
@@ -523,15 +838,18 @@ onBeforeUnmount(() => {
                 <div class="tracky-reports__block">
                     <div class="tracky-reports__head">
                         <h3>{{ t('dashboard.fundingProgress') }}</h3>
-                        <select>
-                            <option>{{ t('dashboard.allSources') }}</option>
+                        <select v-model="summaryFilters.donor_user_id" @change="loadDashboard">
+                            <option value="">{{ t('dashboard.allSources') }}</option>
+                            <option v-for="donor in fundingDonorOptions" :key="donor.id" :value="donor.id">
+                                {{ donor.name }}
+                            </option>
                         </select>
                     </div>
-                    <p class="tracky-figure">${{ Math.round(fundingCurrent / 1000000) }}M/${{ Math.round(fundingTarget / 1000000) }}M</p>
+                    <p class="tracky-figure tracky-figure--compact">{{ fundingCurrentLabel }} / {{ fundingTargetLabel }}</p>
                     <div class="tracky-progress">
                         <div class="tracky-progress__bar" :style="{ width: `${fundingPercent}%` }" />
                     </div>
-                    <p class="tracky-subtle">{{ t('dashboard.fundingProgressLabel', { percent: fundingPercent }) }}</p>
+                    <p class="tracky-subtle">{{ fundingProgressText }}</p>
                 </div>
 
                 <div class="tracky-divider" />
@@ -539,16 +857,38 @@ onBeforeUnmount(() => {
                 <div class="tracky-reports__block">
                     <div class="tracky-reports__head">
                         <h3>{{ t('dashboard.beneficiariesOverview') }}</h3>
-                        <select>
-                            <option>{{ t('dashboard.allTime') }}</option>
-                        </select>
+                        <div class="tracky-popup-anchor">
+                            <select v-model="summaryFilters.beneficiary_period" @change="handleBeneficiaryPeriodChange">
+                                <option value="all">{{ t('dashboard.allTime') }}</option>
+                                <option value="week">{{ t('dashboard.week') }}</option>
+                                <option value="month">{{ t('dashboard.month') }}</option>
+                                <option value="year">{{ t('dashboard.year') }}</option>
+                                <option value="custom">{{ t('dashboard.customRange') }}</option>
+                            </select>
+
+                            <div class="tracky-mini-popup" v-if="beneficiaryCustomOpen">
+                                <label class="field">
+                                    <span>{{ t('common.dateFrom') }}</span>
+                                    <input v-model="summaryFilters.beneficiary_custom_from" type="date">
+                                </label>
+                                <label class="field">
+                                    <span>{{ t('common.dateTo') }}</span>
+                                    <input v-model="summaryFilters.beneficiary_custom_to" type="date">
+                                </label>
+                                <p class="field-error" v-if="beneficiaryCustomError">{{ beneficiaryCustomError }}</p>
+                                <div class="tracky-mini-popup__actions">
+                                    <button class="tracky-btn tracky-btn--primary" type="button" @click="applyBeneficiaryCustomRange">{{ t('dashboard.apply') }}</button>
+                                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="cancelBeneficiaryCustomRange">{{ t('common.cancel') }}</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <p class="tracky-figure">{{ beneficiaryTotal.toLocaleString() }}</p>
                     <div class="tracky-beneficiary-bars">
-                        <span style="width: 42%; background:#2B8AF0" />
-                        <span style="width: 28%; background:#233AA8" />
-                        <span style="width: 12%; background:#EA6A35" />
-                        <span style="width: 18%; background:#7F1A8E" />
+                        <span :style="{ width: beneficiaryBars[0].width, background:'#2B8AF0' }" />
+                        <span :style="{ width: beneficiaryBars[1].width, background:'#233AA8' }" />
+                        <span :style="{ width: beneficiaryBars[2].width, background:'#EA6A35' }" />
+                        <span :style="{ width: beneficiaryBars[3].width, background:'#7F1A8E' }" />
                     </div>
                     <div class="tracky-beneficiary-legend">
                         <span><i style="background:#2B8AF0" />{{ t('dashboard.boys') }}</span>
@@ -564,7 +904,7 @@ onBeforeUnmount(() => {
                     <div class="tracky-map-board__toolbar">
                         <div class="tracky-map-controls">
                             <label>{{ t('dashboard.municipality') }}</label>
-                            <select v-model="filters.municipality_id" @change="loadDashboard">
+                            <select v-model="filters.municipality_id" @change="handleMunicipalityChange">
                                 <option value="">{{ t('dashboard.allMunicipalities') }}</option>
                                 <option v-for="m in municipalities" :key="m.id" :value="m.id">{{ m.name }}</option>
                             </select>
@@ -585,7 +925,7 @@ onBeforeUnmount(() => {
                                     </select>
                                     <select v-model="filters.area">
                                         <option value="">{{ t('dashboard.selectArea') }}</option>
-                                        <option v-for="project in projects" :key="project.id" :value="project.id">{{ project.name }}</option>
+                                        <option v-for="area in summaryAreaOptions" :key="area.id" :value="area.id">{{ area.name }}</option>
                                     </select>
                                     <select v-model="filters.status">
                                         <option value="">{{ t('dashboard.allStatus') }}</option>

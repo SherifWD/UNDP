@@ -91,4 +91,31 @@ class UserRoleScopeTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors(['municipality_id']);
     }
+
+    public function test_duplicate_phone_number_returns_field_level_validation_error(): void
+    {
+        $admin = User::factory()->create([
+            'role' => UserRole::UNDP_ADMIN->value,
+        ]);
+
+        User::factory()->create([
+            'country_code' => '+218',
+            'phone' => '910009999',
+            'phone_e164' => '+218910009999',
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/users', [
+            'name' => 'Duplicate Phone',
+            'country_code' => '+218',
+            'phone' => '910009999',
+            'role' => UserRole::PARTNER_DONOR_VIEWER->value,
+        ]);
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['phone'])
+            ->assertJsonPath('message', 'Phone number is already in use.');
+    }
 }

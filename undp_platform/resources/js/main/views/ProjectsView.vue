@@ -55,6 +55,7 @@ const projectFundingRequestsLoading = ref(false);
 const fundingReviewNotes = reactive({});
 const fundingRequestForm = reactive({
     amount: '',
+    currency: 'USD',
     reason: '',
 });
 
@@ -108,6 +109,7 @@ const projectForm = reactive({
     objectives_text: '',
     hard_components_text: '',
     soft_components_text: '',
+    funding_currency: 'USD',
     funding_budget: '',
     funding_sources_text: '',
     funding_types_text: '',
@@ -296,7 +298,8 @@ const applyFallbackOptionSets = () => {
 const projectReference = (project) => project?.code || `PRJ-${String(project?.id || '').padStart(3, '0')}`;
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : '-');
 const formatDateTime = (value) => (value ? new Date(value).toLocaleString() : '-');
-const formatCurrency = (value) => `USD ${Number(value || 0).toLocaleString()}`;
+const formatCurrency = (value, currency = 'USD') => `${String(currency || 'USD').toUpperCase()} ${Number(value || 0).toLocaleString()}`;
+const currencyOptions = ['USD', 'EUR', 'LYD'];
 const projectOptionLabel = (value) => {
     const normalized = String(value || '').trim();
     if (!normalized) {
@@ -359,6 +362,7 @@ const openFundingRequestModal = (project) => {
     fundingRequestTargetProject.value = project;
     fundingRequestError.value = '';
     fundingRequestForm.amount = '';
+    fundingRequestForm.currency = String(project?.funding_currency || 'USD').toUpperCase();
     fundingRequestForm.reason = '';
     fundingRequestModalOpen.value = true;
 };
@@ -368,6 +372,7 @@ const closeFundingRequestModal = () => {
     fundingRequestTargetProject.value = null;
     fundingRequestError.value = '';
     fundingRequestForm.amount = '';
+    fundingRequestForm.currency = 'USD';
     fundingRequestForm.reason = '';
 };
 
@@ -418,6 +423,7 @@ const submitFundingRequest = async () => {
         await api.post('/funding-requests', {
             project_id: fundingRequestTargetProject.value.id,
             amount,
+            currency: fundingRequestForm.currency || 'USD',
             reason: fundingRequestForm.reason || null,
         });
 
@@ -606,6 +612,7 @@ const resetProjectForm = () => {
         objectives_text: '',
         hard_components_text: '',
         soft_components_text: '',
+        funding_currency: 'USD',
         funding_budget: '',
         funding_sources_text: '',
         funding_types_text: '',
@@ -649,6 +656,7 @@ const populateProjectForm = (project) => {
         objectives_text: arrayToLines(project.objectives),
         hard_components_text: arrayToLines(project.hard_components),
         soft_components_text: arrayToLines(project.soft_components),
+        funding_currency: project.funding_currency || 'USD',
         funding_budget: project.funding_budget ?? '',
         funding_sources_text: arrayToLines(project.funding_sources),
         funding_types_text: arrayToLines(project.funding_types),
@@ -792,6 +800,7 @@ const saveProject = async () => {
         objectives: linesToArray(projectForm.objectives_text),
         hard_components: linesToArray(projectForm.hard_components_text),
         soft_components: linesToArray(projectForm.soft_components_text),
+        funding_currency: projectForm.funding_currency || 'USD',
         funding_budget: projectForm.funding_budget === '' ? null : Number(projectForm.funding_budget),
         funding_sources: linesToArray(projectForm.funding_sources_text),
         funding_types: linesToArray(projectForm.funding_types_text),
@@ -1211,7 +1220,7 @@ onBeforeUnmount(() => {
                             </td>
                             <td v-if="canViewFundingRequests">
                                 <template v-if="project.funding_requests_summary">
-                                    <strong>{{ formatCurrency(project.funding_requests_summary.total_requested_amount) }}</strong>
+                                    <strong>{{ project.funding_requests_summary.total_requested_amount_label || formatCurrency(project.funding_requests_summary.total_requested_amount, project.funding_requests_summary.currency || project.funding_currency) }}</strong>
                                     <p>
                                         {{ t('projectsPage.requestsSummary', { count: project.funding_requests_summary.total_requests || 0 }) }}
                                         <span v-if="project.funding_requests_summary.pending_requests">
@@ -1469,7 +1478,7 @@ onBeforeUnmount(() => {
                                 >
                                     <article class="tracky-project-funding-summary__card">
                                         <span>{{ t('projectsPage.totalRequested') }}</span>
-                                        <strong>{{ formatCurrency(projectDetails.funding_requests_summary.total_requested_amount) }}</strong>
+                                        <strong>{{ projectDetails.funding_requests_summary.total_requested_amount_label || formatCurrency(projectDetails.funding_requests_summary.total_requested_amount, projectDetails.funding_requests_summary.currency || projectDetails.funding_currency) }}</strong>
                                     </article>
                                     <article class="tracky-project-funding-summary__card">
                                         <span>{{ t('projectsPage.totalRequests') }}</span>
@@ -1734,10 +1743,18 @@ onBeforeUnmount(() => {
                                 </label>
                             </div>
 
-                            <label class="field">
-                                {{ t('projectsPage.totalApprovedBudget') }}
-                                <input v-model="projectForm.funding_budget" type="number" min="0" step="1">
-                            </label>
+                            <div class="tracky-editor-grid">
+                                <label class="field">
+                                    {{ t('projectsPage.totalApprovedBudget') }}
+                                    <input v-model="projectForm.funding_budget" type="number" min="0" step="1">
+                                </label>
+                                <label class="field">
+                                    {{ t('common.currency') }}
+                                    <select v-model="projectForm.funding_currency">
+                                        <option v-for="currency in currencyOptions" :key="currency" :value="currency">{{ currency }}</option>
+                                    </select>
+                                </label>
+                            </div>
 
                             <div class="tracky-editor-grid">
                                 <label class="field">
@@ -1806,8 +1823,15 @@ onBeforeUnmount(() => {
                     <p class="field-error" v-if="fundingRequestError">{{ fundingRequestError }}</p>
 
                     <label class="field">
-                        {{ t('projectsPage.fundingAmountUsd') }}
+                        {{ t('projectsPage.fundingAmount') }}
                         <input v-model="fundingRequestForm.amount" type="number" min="1" step="0.01" :placeholder="t('projectsPage.fundingAmountPlaceholder')">
+                    </label>
+
+                    <label class="field">
+                        {{ t('common.currency') }}
+                        <select v-model="fundingRequestForm.currency">
+                            <option v-for="currency in currencyOptions" :key="`fund-${currency}`" :value="currency">{{ currency }}</option>
+                        </select>
                     </label>
 
                     <label class="field">

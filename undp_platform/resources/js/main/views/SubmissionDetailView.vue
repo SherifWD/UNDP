@@ -39,6 +39,7 @@ const actionForm = reactive({
 });
 
 const canValidate = computed(() => auth.hasPermission('submissions.validate'));
+const isApproved = computed(() => submission.value?.status === 'approved');
 
 const actionLabel = computed(() => {
     if (actionModal.action === 'approve') return t('submissionDetail.approve');
@@ -146,6 +147,10 @@ const loadReasons = async () => {
 };
 
 const openActionModal = (action) => {
+    if (isApproved.value) {
+        return;
+    }
+
     actionModal.visible = true;
     actionModal.action = action;
     actionForm.reason_code = '';
@@ -245,7 +250,11 @@ onMounted(async () => {
                 <div class="split-grid split-grid--wide">
                     <div class="detail-block sticky-block">
                         <h3>#{{ submission.id }} - {{ submission.title }}</h3>
-                        <p><strong>{{ t('common.status') }}:</strong> {{ submission.status_label }}</p>
+                        <p>
+                            <strong>{{ t('common.status') }}:</strong>
+                            {{ submission.status_label }}
+                            <span v-if="isApproved" class="status-pill status-pill--active">{{ t('statusLabels.approved') }}</span>
+                        </p>
                         <p><strong>{{ t('common.project') }}:</strong> {{ submission.project?.name }}</p>
                         <p><strong>{{ t('common.municipality') }}:</strong> {{ submission.municipality?.name }}</p>
                         <p><strong>{{ t('validation.reporter') }}:</strong> {{ submission.reporter?.name }}</p>
@@ -253,9 +262,9 @@ onMounted(async () => {
                         <p><strong>{{ t('submissionDetail.validationComment') }}:</strong> {{ submission.validation_comment || '-' }}</p>
 
                         <div class="inline-group" v-if="canValidate">
-                            <button class="btn btn--primary" @click="openActionModal('approve')">{{ t('submissionDetail.approve') }}</button>
-                            <button class="btn btn--warn" @click="openActionModal('rework')">{{ t('submissionDetail.rework') }}</button>
-                            <button class="btn btn--danger" @click="openActionModal('reject')">{{ t('submissionDetail.reject') }}</button>
+                            <button class="btn btn--primary" :disabled="isApproved" @click="openActionModal('approve')">{{ t('submissionDetail.approve') }}</button>
+                            <button class="btn btn--warn" :disabled="isApproved" @click="openActionModal('rework')">{{ t('submissionDetail.rework') }}</button>
+                            <button class="btn btn--danger" :disabled="isApproved" @click="openActionModal('reject')">{{ t('submissionDetail.reject') }}</button>
                         </div>
                     </div>
 

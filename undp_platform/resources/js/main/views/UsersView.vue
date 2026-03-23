@@ -13,6 +13,8 @@ const roles = ref([]);
 const municipalities = ref([]);
 const loading = ref(false);
 const error = ref('');
+const createFormError = ref('');
+const editFormError = ref('');
 
 const createModalOpen = ref(false);
 const permissionsModalOpen = ref(false);
@@ -26,6 +28,15 @@ const pagination = reactive({
     last_page: 1,
     per_page: 10,
     total: 0,
+});
+
+const filters = reactive({
+    search: '',
+    role: '',
+    status: '',
+    municipality_id: '',
+    sort_by: 'created_at',
+    sort_dir: 'desc',
 });
 
 const createForm = reactive({
@@ -219,6 +230,12 @@ const loadUsers = async (page = pagination.current_page) => {
             params: {
                 page,
                 per_page: pagination.per_page,
+                search: filters.search || undefined,
+                role: filters.role || undefined,
+                status: filters.status || undefined,
+                municipality_id: filters.municipality_id || undefined,
+                sort_by: filters.sort_by || undefined,
+                sort_dir: filters.sort_dir || undefined,
             },
         });
 
@@ -249,6 +266,7 @@ const resetCreateForm = () => {
         organization: '',
     });
     resetValidationState(createErrors);
+    createFormError.value = '';
 };
 
 const openCreateModal = () => {
@@ -259,10 +277,12 @@ const openCreateModal = () => {
 
 const closeCreateModal = () => {
     createModalOpen.value = false;
+    createFormError.value = '';
 };
 
 const createUser = async () => {
     resetValidationState(createErrors);
+    createFormError.value = '';
 
     try {
         await api.post('/users', {
@@ -281,8 +301,13 @@ const createUser = async () => {
     } catch (err) {
         if (err.response?.status === 422) {
             applyValidationErrors(createErrors, err);
+            createFormError.value = Object.keys(err.response?.data?.errors || {}).length
+                ? ''
+                : (err.response?.data?.message || t('usersPage.unableToCreate'));
+            return;
         }
-        error.value = err.response?.data?.message || t('usersPage.unableToCreate');
+
+        createFormError.value = err.response?.data?.message || t('usersPage.unableToCreate');
     }
 };
 
@@ -290,6 +315,7 @@ const openPermissionsModal = (user) => {
     selectedUser.value = user;
     error.value = '';
     resetValidationState(editErrors);
+    editFormError.value = '';
 
     Object.assign(editForm, {
         name: user.name || '',
@@ -308,6 +334,7 @@ const closePermissionsModal = () => {
     permissionsModalOpen.value = false;
     selectedUser.value = null;
     resetValidationState(editErrors);
+    editFormError.value = '';
 };
 
 const savePermissions = async () => {
@@ -316,6 +343,7 @@ const savePermissions = async () => {
     }
 
     resetValidationState(editErrors);
+    editFormError.value = '';
 
     try {
         await api.put(`/users/${selectedUser.value.id}`, {
@@ -335,9 +363,31 @@ const savePermissions = async () => {
     } catch (err) {
         if (err.response?.status === 422) {
             applyValidationErrors(editErrors, err);
+            editFormError.value = Object.keys(err.response?.data?.errors || {}).length
+                ? ''
+                : (err.response?.data?.message || t('usersPage.unableToUpdate'));
+            return;
         }
-        error.value = err.response?.data?.message || t('usersPage.unableToUpdate');
+
+        editFormError.value = err.response?.data?.message || t('usersPage.unableToUpdate');
     }
+};
+
+const applyFilters = async () => {
+    await loadUsers(1);
+};
+
+const resetFilters = async () => {
+    Object.assign(filters, {
+        search: '',
+        role: '',
+        status: '',
+        municipality_id: '',
+        sort_by: 'created_at',
+        sort_dir: 'desc',
+    });
+
+    await loadUsers(1);
 };
 
 const openStatusModal = (user) => {
@@ -439,6 +489,48 @@ onMounted(async () => {
                 </div>
             </section>
 
+            <section class="tracky-card tracky-projects__toolbar tracky-compact-toolbar">
+                <div class="tracky-projects__filters">
+                    <div class="tracky-projects__search-wrap">
+                        <input v-model="filters.search" :placeholder="t('common.search')">
+                    </div>
+
+                    <select v-model="filters.role">
+                        <option value="">{{ t('reportsPage.allRoles') }}</option>
+                        <option v-for="role in roles" :key="role.value" :value="role.value">{{ roleLabel(role.value) }}</option>
+                    </select>
+
+                    <select v-model="filters.status">
+                        <option value="">{{ t('reportsPage.allStatuses') }}</option>
+                        <option value="active">{{ t('common.active') }}</option>
+                        <option value="disabled">{{ t('common.disabled') }}</option>
+                    </select>
+
+                    <select v-model="filters.municipality_id">
+                        <option value="">{{ t('reportsPage.allMunicipalities') }}</option>
+                        <option v-for="municipality in municipalities" :key="municipality.id" :value="municipality.id">
+                            {{ municipality.name }}
+                        </option>
+                    </select>
+
+                    <select v-model="filters.sort_by">
+                        <option value="created_at">{{ t('reportsPage.createdAt') }}</option>
+                        <option value="last_login_at">{{ t('reportsPage.lastLogin') }}</option>
+                        <option value="name">{{ t('common.name') }}</option>
+                        <option value="role">{{ t('common.role') }}</option>
+                        <option value="status">{{ t('common.status') }}</option>
+                    </select>
+
+                    <select v-model="filters.sort_dir">
+                        <option value="desc">{{ t('reportsPage.descending') }}</option>
+                        <option value="asc">{{ t('reportsPage.ascending') }}</option>
+                    </select>
+
+                    <button class="tracky-btn tracky-btn--primary" type="button" @click="applyFilters">{{ t('common.apply') }}</button>
+                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="resetFilters">{{ t('common.reset') }}</button>
+                </div>
+            </section>
+
             <section class="tracky-card tracky-users-table-card">
                 <div class="tracky-projects__empty" v-if="loading">{{ t('common.loadingUsers') }}</div>
 
@@ -530,6 +622,8 @@ onMounted(async () => {
                     </header>
 
                     <div class="tracky-user-modal__body">
+                        <p class="field-error" v-if="editFormError">{{ editFormError }}</p>
+
                         <label class="field">
                             {{ t('usersPage.username') }}
                             <input v-model="editForm.name" type="text" placeholder="e.g. johndoe">
@@ -601,6 +695,8 @@ onMounted(async () => {
                     </header>
 
                     <div class="tracky-user-modal__body">
+                        <p class="field-error" v-if="createFormError">{{ createFormError }}</p>
+
                         <label class="field">
                             {{ t('usersPage.fullName') }}
                             <input v-model="createForm.name" type="text" placeholder="e.g. John Doe">

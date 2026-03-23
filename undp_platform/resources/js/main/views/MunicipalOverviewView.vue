@@ -219,17 +219,21 @@ onBeforeUnmount(() => {
 
             <p class="field-error" v-if="error">{{ error }}</p>
 
-            <div class="toolbar">
-                <select v-if="canChooseMunicipality" v-model="filters.municipality_id">
-                    <option value="">{{ t('municipalOverview.selectMunicipality') }}</option>
-                    <option v-for="municipality in municipalities" :key="municipality.id" :value="municipality.id">
-                        {{ municipality.name }}
-                    </option>
-                </select>
-                <input v-model="filters.search" :placeholder="t('municipalOverview.searchPlaceholder')">
-                <button class="btn btn--primary" @click="applyFilters">{{ t('common.apply') }}</button>
-                <button class="btn btn--ghost" @click="resetFilters">{{ t('common.reset') }}</button>
-            </div>
+            <section class="tracky-card tracky-projects__toolbar tracky-compact-toolbar">
+                <div class="tracky-projects__filters">
+                    <select v-if="canChooseMunicipality" v-model="filters.municipality_id">
+                        <option value="">{{ t('municipalOverview.selectMunicipality') }}</option>
+                        <option v-for="municipality in municipalities" :key="municipality.id" :value="municipality.id">
+                            {{ municipality.name }}
+                        </option>
+                    </select>
+                    <div class="tracky-projects__search-wrap">
+                        <input v-model="filters.search" :placeholder="t('municipalOverview.searchPlaceholder')">
+                    </div>
+                    <button class="tracky-btn tracky-btn--primary" type="button" @click="applyFilters">{{ t('common.apply') }}</button>
+                    <button class="tracky-btn tracky-btn--ghost" type="button" @click="resetFilters">{{ t('common.reset') }}</button>
+                </div>
+            </section>
 
             <div class="chips-row" v-if="activeFilterChips.length">
                 <span class="filter-chip" v-for="chip in activeFilterChips" :key="chip">{{ chip }}</span>

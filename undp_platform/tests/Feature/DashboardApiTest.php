@@ -523,4 +523,59 @@ class DashboardApiTest extends TestCase
             ->assertJsonPath('municipality_breakdown.0.approval_rate_percent', 100)
             ->assertJsonPath('project_breakdown.0.approval_rate_percent', 100);
     }
+
+    public function test_funding_overview_can_be_filtered_by_donor_and_exposes_donor_options(): void
+    {
+        $municipality = Municipality::query()->create([
+            'name_en' => 'Sabha',
+            'name_ar' => 'سبها',
+            'code' => 'SAB',
+        ]);
+
+        $project = Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Water Point',
+            'name_ar' => 'نقطة مياه',
+            'status' => 'active',
+        ]);
+
+        $donorA = User::factory()->create([
+            'role' => UserRole::PARTNER_DONOR_VIEWER->value,
+        ]);
+
+        $donorB = User::factory()->create([
+            'role' => UserRole::PARTNER_DONOR_VIEWER->value,
+        ]);
+
+        FundingRequest::query()->create([
+            'project_id' => $project->id,
+            'donor_user_id' => $donorA->id,
+            'amount' => 1200,
+            'currency' => 'USD',
+            'status' => FundingRequestStatus::APPROVED->value,
+        ]);
+
+        FundingRequest::query()->create([
+            'project_id' => $project->id,
+            'donor_user_id' => $donorB->id,
+            'amount' => 900,
+            'currency' => 'EUR',
+            'status' => FundingRequestStatus::APPROVED->value,
+        ]);
+
+        $admin = User::factory()->create([
+            'role' => UserRole::UNDP_ADMIN->value,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->getJson("/api/dashboard/kpis?project_id={$project->id}&donor_user_id={$donorB->id}");
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('funding_overview.total_requests', 1)
+            ->assertJsonPath('funding_overview.approved_requested_amount', 900)
+            ->assertJsonPath('funding_overview.approved_requested_amount_label', 'EUR 900')
+            ->assertJsonCount(2, 'funding_overview.donor_options');
+    }
 }
