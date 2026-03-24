@@ -646,7 +646,7 @@ const loadDashboard = async () => {
 
     try {
         const municipalityId = selectedMunicipalityParam();
-        const selectedProjectId = summaryFilters.project_id ? Number(summaryFilters.project_id) : undefined;
+        const summaryProjectId = summaryFilters.project_id ? Number(summaryFilters.project_id) : undefined;
         const mapParams = {
             municipality_id: municipalityId,
             project_status: filters.status || undefined,
@@ -655,7 +655,7 @@ const loadDashboard = async () => {
         };
         const projectScopeParams = {
             municipality_id: municipalityId,
-            project_id: selectedProjectId,
+            project_id: summaryProjectId,
         };
         const fundingScopeParams = {
             ...projectScopeParams,

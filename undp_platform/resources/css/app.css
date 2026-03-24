@@ -29,29 +29,49 @@
     box-sizing: border-box;
 }
 
-html:lang(ar) {
+html:lang(ar),
+html[dir='rtl'] {
     --font-ui: 'Somar Sans', 'Cairo', 'Manrope', sans-serif;
     --font-display: 'Somar Sans', 'Cairo', 'Manrope', sans-serif;
+    font-synthesis: none;
 }
 
 html:lang(ar) body,
-html:lang(ar) button,
-html:lang(ar) input,
-html:lang(ar) select,
-html:lang(ar) textarea,
-html:lang(ar) option,
-html:lang(ar) p,
-html:lang(ar) span,
-html:lang(ar) strong,
-html:lang(ar) small,
-html:lang(ar) label,
+html[dir='rtl'] body {
+    font-family: var(--font-ui);
+}
+
+html:lang(ar) body *,
+html[dir='rtl'] body * {
+    font-family: inherit;
+    font-style: normal !important;
+    font-synthesis: none;
+}
+
 html:lang(ar) h1,
 html:lang(ar) h2,
 html:lang(ar) h3,
 html:lang(ar) h4,
 html:lang(ar) h5,
-html:lang(ar) h6 {
-    font-style: normal;
+html:lang(ar) h6,
+html[dir='rtl'] h1,
+html[dir='rtl'] h2,
+html[dir='rtl'] h3,
+html[dir='rtl'] h4,
+html[dir='rtl'] h5,
+html[dir='rtl'] h6 {
+    font-family: var(--font-display);
+}
+
+html:lang(ar) code,
+html:lang(ar) pre,
+html:lang(ar) kbd,
+html:lang(ar) samp,
+html[dir='rtl'] code,
+html[dir='rtl'] pre,
+html[dir='rtl'] kbd,
+html[dir='rtl'] samp {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
 }
 
 html,
@@ -1317,27 +1337,29 @@ pre {
 }
 
 .shell__profile {
-    margin: 12px;
-    border: 1px solid var(--tracky-border);
+    margin: 0 16px;
+    border: 1px solid rgba(162, 191, 255, 0.4);
     border-radius: 12px;
-    min-height: 44px;
-    padding: 8px 10px;
-    background: linear-gradient(135deg, #eef2ff 0%, #e6f5ef 100%);
+    min-height: 42px;
+    height: 42px;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    background: linear-gradient(135deg, rgba(238, 242, 255, 0.98) 0%, rgba(230, 245, 239, 0.98) 100%);
     display: grid;
-    grid-template-columns: 28px minmax(0, 1fr) 24px;
+    grid-template-columns: 24px minmax(0, 1fr) 22px;
     gap: 8px;
     align-items: center;
 }
 
 .shell__profile-avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 9px;
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
     background: rgba(23, 39, 223, 0.12);
     display: grid;
     place-items: center;
     font-weight: 700;
-    font-size: 0.76rem;
+    font-size: 0.72rem;
 }
 
 .shell__profile-meta {
@@ -1349,7 +1371,7 @@ pre {
 
 .shell__profile-name {
     margin: 0;
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     font-weight: 700;
     line-height: 1;
     max-width: 100%;
@@ -1369,9 +1391,9 @@ pre {
 }
 
 .shell__logout-btn {
-    width: 24px;
-    height: 24px;
-    border-radius: 7px;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
     border: 1px solid var(--tracky-border);
     background: #fff;
     color: var(--tracky-muted);
