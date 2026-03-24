@@ -77,10 +77,12 @@ trait HelpersTrait
 
   public function successResponse($data = [], $msg = "", $status = 200, array $extra = []): JsonResponse
   {
+    $translatedMessage = $this->translateResponseMessage($msg);
+
     return response()->json([
       'result' => true,
-      'message' => $msg,
-      'msg' => $msg,
+      'message' => $translatedMessage,
+      'msg' => $translatedMessage,
       'data' => $this->normalizeResponseData($data),
       ...$extra,
     ], $status);
@@ -88,10 +90,12 @@ trait HelpersTrait
 
   public function errorResponse($msg = "", $status = 200, $data = [], array $extra = []): JsonResponse
   {
+    $translatedMessage = $this->translateResponseMessage($msg);
+
     return response()->json([
       'result' => false,
-      'message' => $msg,
-      'msg' => $msg,
+      'message' => $translatedMessage,
+      'msg' => $translatedMessage,
       'data' => $this->normalizeResponseData($data),
       ...$extra,
     ], $status);
@@ -125,6 +129,8 @@ trait HelpersTrait
     }
 
     if ($this->isApiPayloadWrapped($payload)) {
+      $payload = $this->translatePayloadMessages($payload);
+
       if (! array_key_exists('message', $payload)) {
         $payload['message'] = is_string($payload['msg']) ? $payload['msg'] : '';
       }
@@ -142,6 +148,8 @@ trait HelpersTrait
       $message = $payload['message'];
     }
 
+    $payload = $this->translatePayloadMessages($payload);
+
     return [
       ...$payload,
       ...$this->formatApiPayload(
@@ -154,10 +162,12 @@ trait HelpersTrait
 
   protected function formatApiPayload(bool $result, string $message, $data): array
   {
+    $translatedMessage = $this->translateResponseMessage($message);
+
     return [
       'result' => $result,
-      'message' => $message,
-      'msg' => $message,
+      'message' => $translatedMessage,
+      'msg' => $translatedMessage,
       'data' => $this->normalizeResponseData($data),
     ];
   }
@@ -188,13 +198,68 @@ trait HelpersTrait
 
   public function returnValidationError($validator, $code = "E001")
   {
+    $errors = $this->translateValidationErrors($validator->errors()->toArray());
+
     return $this->returnError(
       $code,
       $validator->errors()->first(),
-      ['errors' => $validator->errors()->toArray()],
+      ['errors' => $errors],
       422,
-      ['errors' => $validator->errors()->toArray()],
+      ['errors' => $errors],
     );
+  }
+
+  protected function translatePayloadMessages(array $payload): array
+  {
+    $message = '';
+
+    if (isset($payload['message']) && is_string($payload['message']) && trim($payload['message']) !== '') {
+      $message = $payload['message'];
+    } elseif (isset($payload['msg']) && is_string($payload['msg']) && trim($payload['msg']) !== '') {
+      $message = $payload['msg'];
+    }
+
+    if ($message !== '' || array_key_exists('message', $payload) || array_key_exists('msg', $payload)) {
+      $translatedMessage = $this->translateResponseMessage($message);
+      $payload['message'] = $translatedMessage;
+      $payload['msg'] = $translatedMessage;
+    }
+
+    if (isset($payload['errors']) && is_array($payload['errors'])) {
+      $payload['errors'] = $this->translateValidationErrors($payload['errors']);
+    }
+
+    if (isset($payload['data']) && is_array($payload['data']) && isset($payload['data']['errors']) && is_array($payload['data']['errors'])) {
+      $payload['data']['errors'] = $this->translateValidationErrors($payload['data']['errors']);
+    }
+
+    return $payload;
+  }
+
+  protected function translateValidationErrors(array $errors): array
+  {
+    return collect($errors)
+      ->map(function ($value) {
+        if (is_array($value)) {
+          return $this->translateValidationErrors($value);
+        }
+
+        if (is_string($value)) {
+          return $this->translateResponseMessage($value);
+        }
+
+        return $value;
+      })
+      ->all();
+  }
+
+  protected function translateResponseMessage($message): string
+  {
+    if (! is_string($message) || trim($message) === '') {
+      return '';
+    }
+
+    return __($message);
   }
 
 

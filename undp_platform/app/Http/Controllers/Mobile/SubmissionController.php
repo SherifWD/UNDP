@@ -973,7 +973,9 @@ class SubmissionController extends MobileController
         $diskConfig = config("filesystems.disks.{$disk}");
 
         if (! is_array($diskConfig)) {
-            throw new \RuntimeException("Media direct upload disk [{$disk}] is not configured.");
+            throw new \RuntimeException(__('Media direct upload disk [:disk] is not configured.', [
+                'disk' => $disk,
+            ]));
         }
 
         $bucket = ($diskConfig['driver'] ?? null) === 's3'
@@ -1008,9 +1010,9 @@ class SubmissionController extends MobileController
                 );
 
                 if (! is_string($storedPath) || trim($storedPath) === '') {
-                    throw new \RuntimeException(
-                        "Unable to store uploaded assets on disk [{$disk}]. Configure MEDIA_DIRECT_UPLOAD_DISK or MEDIA_DISK correctly.",
-                    );
+                    throw new \RuntimeException(__('Unable to store uploaded assets on disk [:disk]. Configure MEDIA_DIRECT_UPLOAD_DISK or MEDIA_DISK correctly.', [
+                        'disk' => $disk,
+                    ]));
                 }
 
                 $label = trim((string) pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
@@ -1079,7 +1081,9 @@ class SubmissionController extends MobileController
             }
 
             throw new \RuntimeException(
-                "Unable to store uploaded assets on disk [{$disk}]. Configure MEDIA_DIRECT_UPLOAD_DISK or MEDIA_DISK correctly.",
+                __('Unable to store uploaded assets on disk [:disk]. Configure MEDIA_DIRECT_UPLOAD_DISK or MEDIA_DISK correctly.', [
+                    'disk' => $disk,
+                ]),
                 previous: $exception,
             );
         }

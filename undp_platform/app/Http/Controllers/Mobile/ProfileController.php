@@ -17,10 +17,10 @@ class ProfileController extends MobileController
         return $this->successResponse([
             'profile' => $this->serializeProfile($request->user()),
             'available_genders' => [
-                ['value' => 'male', 'label' => 'Man'],
-                ['value' => 'female', 'label' => 'Woman'],
-                ['value' => 'other', 'label' => 'Other'],
-                ['value' => 'prefer_not_to_say', 'label' => 'Prefer not to say'],
+                ['value' => 'male', 'label' => __('Man')],
+                ['value' => 'female', 'label' => __('Woman')],
+                ['value' => 'other', 'label' => __('Other')],
+                ['value' => 'prefer_not_to_say', 'label' => __('Prefer not to say')],
             ],
         ]);
     }
@@ -92,10 +92,10 @@ class ProfileController extends MobileController
             'role_label' => ucwords(str_replace('_', ' ', $user->role)),
             'gender' => $user->gender,
             'gender_label' => match ($user->gender) {
-                'male' => 'Man',
-                'female' => 'Woman',
-                'other' => 'Other',
-                'prefer_not_to_say' => 'Prefer not to say',
+                'male' => __('Man'),
+                'female' => __('Woman'),
+                'other' => __('Other'),
+                'prefer_not_to_say' => __('Prefer not to say'),
                 default => null,
             },
             'preferred_locale' => $user->preferred_locale,

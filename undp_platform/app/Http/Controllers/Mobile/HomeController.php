@@ -90,7 +90,7 @@ class HomeController extends MobileController
         return $this->successResponse([
             'presence' => [
                 'is_online' => true,
-                'label' => 'Online',
+                'label' => __('Online'),
             ],
             'current_municipality' => $user->municipality ? [
                 'id' => $user->municipality->id,

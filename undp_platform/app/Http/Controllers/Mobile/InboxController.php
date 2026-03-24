@@ -95,10 +95,16 @@ class InboxController extends MobileController
         return [
             'id' => $notification->id,
             'type' => class_basename($notification->type),
-            'title' => $data['title'] ?? 'Update',
+            'title' => $data['title'] ?? __('Update'),
             'message' => $status
-                ? sprintf('%s is now %s', $data['title'] ?? 'Submission', $this->mobileSubmissionStatusLabel($status))
-                : ($data['title'] ?? 'Notification'),
+                ? __(
+                    ':title is now :status',
+                    [
+                        'title' => $data['title'] ?? __('Submission'),
+                        'status' => $this->mobileSubmissionStatusLabel($status),
+                    ],
+                )
+                : ($data['title'] ?? __('Notification')),
             'submission_id' => $data['submission_id'] ?? null,
             'project_name' => $data['project_name'] ?? null,
             'status' => $status,

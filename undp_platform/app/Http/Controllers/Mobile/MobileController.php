@@ -297,6 +297,14 @@ abstract class MobileController extends Controller
             return null;
         }
 
+        if (app()->getLocale() === 'ar') {
+            $arabicLabel = data_get(config('mobile.reporting', []), "{$group}_ar.{$value}");
+
+            if (is_string($arabicLabel) && trim($arabicLabel) !== '') {
+                return $arabicLabel;
+            }
+        }
+
         return data_get(config('mobile.reporting', []), "{$group}.{$value}");
     }
 
@@ -306,7 +314,7 @@ abstract class MobileController extends Controller
             return null;
         }
 
-        return $value ? 'Yes' : 'No';
+        return $value ? __('Yes') : __('No');
     }
 
     protected function canEditSubmission(Submission $submission): bool
@@ -330,14 +338,14 @@ abstract class MobileController extends Controller
     protected function mobileSubmissionStatusLabel(string $status): string
     {
         return match ($status) {
-            SubmissionStatus::REWORK_REQUESTED->value => 'Sent Back',
-            SubmissionStatus::UNDER_REVIEW->value => 'Under Review',
-            SubmissionStatus::SUBMITTED->value => 'Submitted',
-            SubmissionStatus::APPROVED->value => 'Approved',
-            SubmissionStatus::REJECTED->value => 'Rejected',
-            SubmissionStatus::DRAFT->value => 'Draft',
-            SubmissionStatus::QUEUED->value => 'Queued',
-            default => ucfirst(str_replace('_', ' ', $status)),
+            SubmissionStatus::REWORK_REQUESTED->value => __('Sent Back'),
+            SubmissionStatus::UNDER_REVIEW->value => __('Under Review'),
+            SubmissionStatus::SUBMITTED->value => __('Submitted'),
+            SubmissionStatus::APPROVED->value => __('Approved'),
+            SubmissionStatus::REJECTED->value => __('Rejected'),
+            SubmissionStatus::DRAFT->value => __('Draft'),
+            SubmissionStatus::QUEUED->value => __('Queued'),
+            default => __(ucfirst(str_replace('_', ' ', $status))),
         };
     }
 
@@ -384,11 +392,11 @@ abstract class MobileController extends Controller
     protected function projectExecutionStatusLabel(string $status): string
     {
         return match ($status) {
-            'planned' => 'Planned',
-            'in_progress' => 'In Progress',
-            'completed' => 'Completed',
-            'not_started' => 'Not Started',
-            default => ucfirst(str_replace('_', ' ', $status)),
+            'planned' => __('Planned'),
+            'in_progress' => __('In Progress'),
+            'completed' => __('Completed'),
+            'not_started' => __('Not Started'),
+            default => __(ucfirst(str_replace('_', ' ', $status))),
         };
     }
 
@@ -407,7 +415,9 @@ abstract class MobileController extends Controller
 
     protected function durationLabel(int $months): string
     {
-        return $months === 1 ? '1 Month' : sprintf('%d Months', $months);
+        return $months === 1
+            ? __('1 Month')
+            : __(':count Months', ['count' => $months]);
     }
 
     protected function formatMonthYear(?string $date): ?string

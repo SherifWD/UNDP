@@ -1356,4 +1356,51 @@ class MobileApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.notification.is_read', true);
     }
+
+    public function test_mobile_api_messages_follow_preferred_locale_header(): void
+    {
+        $reporter = User::factory()->create([
+            'role' => UserRole::REPORTER->value,
+            'status' => 'active',
+            'preferred_locale' => 'en',
+        ]);
+
+        Sanctum::actingAs($reporter);
+
+        $arabicSuccess = $this->withHeaders([
+            'preferred_locale' => 'ar',
+        ])->patchJson('/api/mobile/inbox/read-all');
+
+        $arabicSuccess
+            ->assertOk()
+            ->assertJsonPath('message', 'تم تعليم جميع الإشعارات كمقروءة.')
+            ->assertJsonPath('msg', 'تم تعليم جميع الإشعارات كمقروءة.');
+
+        $englishSuccess = $this->withHeaders([
+            'preferred_locale' => 'en',
+        ])->patchJson('/api/mobile/inbox/read-all');
+
+        $englishSuccess
+            ->assertOk()
+            ->assertJsonPath('message', 'All notifications marked as read.')
+            ->assertJsonPath('msg', 'All notifications marked as read.');
+
+        $arabicValidation = $this->withHeaders([
+            'preferred_locale' => 'ar',
+        ])->getJson('/api/mobile/inbox?per_page=0');
+
+        $arabicValidation
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'يجب ألا تقل قيمة عدد العناصر في الصفحة عن 1.')
+            ->assertJsonPath('msg', 'يجب ألا تقل قيمة عدد العناصر في الصفحة عن 1.');
+
+        $englishValidation = $this->withHeaders([
+            'preferred_locale' => 'en',
+        ])->getJson('/api/mobile/inbox?per_page=0');
+
+        $englishValidation
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'The per page field must be at least 1.')
+            ->assertJsonPath('msg', 'The per page field must be at least 1.');
+    }
 }
