@@ -1373,6 +1373,8 @@ class MobileApiTest extends TestCase
 
         $arabicSuccess
             ->assertOk()
+            ->assertHeader('Content-Language', 'ar')
+            ->assertHeader('X-Resolved-Locale', 'ar')
             ->assertJsonPath('message', 'تم تعليم جميع الإشعارات كمقروءة.')
             ->assertJsonPath('msg', 'تم تعليم جميع الإشعارات كمقروءة.');
 
@@ -1382,24 +1384,41 @@ class MobileApiTest extends TestCase
 
         $englishSuccess
             ->assertOk()
+            ->assertHeader('Content-Language', 'en')
+            ->assertHeader('X-Resolved-Locale', 'en')
+            ->assertJsonPath('message', 'All notifications marked as read.')
+            ->assertJsonPath('msg', 'All notifications marked as read.');
+
+        $englishDashedHeader = $this->withHeaders([
+            'Preferred-Locale' => 'en',
+        ])->patchJson('/api/mobile/inbox/read-all');
+
+        $englishDashedHeader
+            ->assertOk()
+            ->assertHeader('Content-Language', 'en')
+            ->assertHeader('X-Resolved-Locale', 'en')
             ->assertJsonPath('message', 'All notifications marked as read.')
             ->assertJsonPath('msg', 'All notifications marked as read.');
 
         $arabicValidation = $this->withHeaders([
-            'preferred_locale' => 'ar',
+            'Preferred-Locale' => 'ar',
         ])->getJson('/api/mobile/inbox?per_page=0');
 
         $arabicValidation
             ->assertStatus(422)
+            ->assertHeader('Content-Language', 'ar')
+            ->assertHeader('X-Resolved-Locale', 'ar')
             ->assertJsonPath('message', 'يجب ألا تقل قيمة عدد العناصر في الصفحة عن 1.')
             ->assertJsonPath('msg', 'يجب ألا تقل قيمة عدد العناصر في الصفحة عن 1.');
 
         $englishValidation = $this->withHeaders([
-            'preferred_locale' => 'en',
+            'Preferred-Locale' => 'en',
         ])->getJson('/api/mobile/inbox?per_page=0');
 
         $englishValidation
             ->assertStatus(422)
+            ->assertHeader('Content-Language', 'en')
+            ->assertHeader('X-Resolved-Locale', 'en')
             ->assertJsonPath('message', 'The per page field must be at least 1.')
             ->assertJsonPath('msg', 'The per page field must be at least 1.');
     }

@@ -14,36 +14,94 @@ class SetLocaleFromRequest
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $locale = $this->resolvePreferredLocale($request);
+        $locale = $this->resolvePreferredLocale($request)
+            ?? $this->resolveAcceptLanguage($request)
+            ?? $this->normalizeLocale($request->user()?->preferred_locale)
+            ?? config('app.locale', 'ar');
 
-        if (! $locale) {
-            $accepted = (string) $request->header('Accept-Language', '');
+        app()->setLocale($locale);
 
-            $locale = collect(explode(',', $accepted))
-                ->map(fn (string $lang): ?string => $this->normalizeLocale(explode(';', $lang)[0] ?? null))
-                ->first(fn (?string $lang): bool => $lang !== null);
-        }
+        $response = $next($request);
+        $response->headers->set('Content-Language', $locale);
+        $response->headers->set('X-Resolved-Locale', $locale);
 
-        if (! $locale && $request->user()?->preferred_locale) {
-            $locale = $this->normalizeLocale($request->user()->preferred_locale);
-        }
-
-        app()->setLocale($locale ?: config('app.locale', 'ar'));
-
-        return $next($request);
+        return $response;
     }
 
     private function resolvePreferredLocale(Request $request): ?string
     {
-        foreach (['preferred_locale', 'preferred-locale'] as $header) {
-            $locale = $this->normalizeLocale($request->header($header));
+        foreach ([
+            $request->header('preferred_locale'),
+            $request->header('preferred-locale'),
+            $request->header('x-preferred-locale'),
+            $request->header('x_preferred_locale'),
+            $this->findPreferredLocaleHeaderValue($request),
+            $request->input('preferred_locale'),
+        ] as $candidate) {
+            $locale = $this->normalizeLocale($candidate);
 
             if ($locale) {
                 return $locale;
             }
         }
 
-        return $this->normalizeLocale($request->input('preferred_locale'));
+        return null;
+    }
+
+    private function resolveAcceptLanguage(Request $request): ?string
+    {
+        $accepted = (string) $request->header('Accept-Language', '');
+
+        return collect(explode(',', $accepted))
+            ->map(fn (string $lang): ?string => $this->normalizeLocale(explode(';', $lang)[0] ?? null))
+            ->first(fn (?string $lang): bool => $lang !== null);
+    }
+
+    private function findPreferredLocaleHeaderValue(Request $request): ?string
+    {
+        foreach ($request->headers->all() as $key => $values) {
+            if ($this->normalizeHeaderKey($key) !== 'preferredlocale') {
+                continue;
+            }
+
+            $value = is_array($values) ? ($values[0] ?? null) : $values;
+            $locale = $this->normalizeLocale($value);
+
+            if ($locale) {
+                return $locale;
+            }
+        }
+
+        foreach ($request->server->all() as $key => $value) {
+            if ($this->normalizeServerKey($key) !== 'preferredlocale') {
+                continue;
+            }
+
+            $locale = $this->normalizeLocale(is_array($value) ? ($value[0] ?? null) : $value);
+
+            if ($locale) {
+                return $locale;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeHeaderKey(string $key): string
+    {
+        return Str::of($key)
+            ->lower()
+            ->replaceMatches('/[^a-z]/', '')
+            ->value();
+    }
+
+    private function normalizeServerKey(string $key): string
+    {
+        return Str::of($key)
+            ->lower()
+            ->replace(['redirect_http_', 'http_', 'redirect_'], '')
+            ->replaceMatches('/[^a-z]/', '')
+            ->value();
     }
 
     private function normalizeLocale(mixed $locale): ?string

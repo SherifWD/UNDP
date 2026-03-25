@@ -65,6 +65,23 @@ class AuthOtpTest extends TestCase
             ->assertJsonPath('result', true);
     }
 
+    public function test_request_otp_for_unknown_number_accepts_dashed_locale_header_and_exposes_resolved_locale(): void
+    {
+        $response = $this->withHeaders([
+            'Preferred-Locale' => 'en',
+        ])->postJson('/api/auth/request-otp', [
+            'country_code' => '+218',
+            'phone' => '933333335',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertHeader('Content-Language', 'en')
+            ->assertHeader('X-Resolved-Locale', 'en')
+            ->assertJsonPath('message', 'User does not exist. Please create an account first.')
+            ->assertJsonPath('msg', 'User does not exist. Please create an account first.');
+    }
+
     public function test_register_reporter_then_request_and_verify_otp(): void
     {
         $municipality = Municipality::query()->create([
