@@ -16,6 +16,7 @@ api.interceptors.request.use((config) => {
         config.headers.Authorization = `Bearer ${token}`;
     }
 
+    config.headers['Preferred-Locale'] = locale;
     config.headers['Accept-Language'] = locale;
 
     return config;

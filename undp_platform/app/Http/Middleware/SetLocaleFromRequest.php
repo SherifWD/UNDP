@@ -15,9 +15,8 @@ class SetLocaleFromRequest
     public function handle(Request $request, Closure $next): Response
     {
         $locale = $this->resolvePreferredLocale($request)
-            ?? $this->resolveAcceptLanguage($request)
-            ?? $this->normalizeLocale($request->user()?->preferred_locale)
-            ?? config('app.locale', 'ar');
+            ?? $this->normalizeLocale(config('app.fallback_locale', 'en'))
+            ?? 'en';
 
         app()->setLocale($locale);
 
@@ -46,15 +45,6 @@ class SetLocaleFromRequest
         }
 
         return null;
-    }
-
-    private function resolveAcceptLanguage(Request $request): ?string
-    {
-        $accepted = (string) $request->header('Accept-Language', '');
-
-        return collect(explode(',', $accepted))
-            ->map(fn (string $lang): ?string => $this->normalizeLocale(explode(';', $lang)[0] ?? null))
-            ->first(fn (?string $lang): bool => $lang !== null);
     }
 
     private function findPreferredLocaleHeaderValue(Request $request): ?string

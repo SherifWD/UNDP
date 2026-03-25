@@ -27,6 +27,8 @@ class AuthOtpTest extends TestCase
 
         $requestResponse
             ->assertOk()
+            ->assertHeader('Content-Language', 'en')
+            ->assertHeader('X-Resolved-Locale', 'en')
             ->assertJsonPath('message', 'User does not exist. Please create an account first.')
             ->assertJsonPath('requires_registration', true)
             ->assertJsonPath('user_exists', false)
@@ -69,9 +71,27 @@ class AuthOtpTest extends TestCase
     {
         $response = $this->withHeaders([
             'Preferred-Locale' => 'en',
+            'Accept-Language' => 'ar',
         ])->postJson('/api/auth/request-otp', [
             'country_code' => '+218',
             'phone' => '933333335',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertHeader('Content-Language', 'en')
+            ->assertHeader('X-Resolved-Locale', 'en')
+            ->assertJsonPath('message', 'User does not exist. Please create an account first.')
+            ->assertJsonPath('msg', 'User does not exist. Please create an account first.');
+    }
+
+    public function test_request_otp_defaults_to_english_when_no_explicit_locale_is_sent(): void
+    {
+        $response = $this->withHeaders([
+            'Accept-Language' => 'ar',
+        ])->postJson('/api/auth/request-otp', [
+            'country_code' => '+218',
+            'phone' => '933333336',
         ]);
 
         $response

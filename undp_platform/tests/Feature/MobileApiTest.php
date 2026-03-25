@@ -1362,7 +1362,7 @@ class MobileApiTest extends TestCase
         $reporter = User::factory()->create([
             'role' => UserRole::REPORTER->value,
             'status' => 'active',
-            'preferred_locale' => 'en',
+            'preferred_locale' => 'ar',
         ]);
 
         Sanctum::actingAs($reporter);
@@ -1416,6 +1416,17 @@ class MobileApiTest extends TestCase
         ])->getJson('/api/mobile/inbox?per_page=0');
 
         $englishValidation
+            ->assertStatus(422)
+            ->assertHeader('Content-Language', 'en')
+            ->assertHeader('X-Resolved-Locale', 'en')
+            ->assertJsonPath('message', 'The per page field must be at least 1.')
+            ->assertJsonPath('msg', 'The per page field must be at least 1.');
+
+        $englishWithoutPreferredLocale = $this->withHeaders([
+            'Accept-Language' => 'ar',
+        ])->getJson('/api/mobile/inbox?per_page=0');
+
+        $englishWithoutPreferredLocale
             ->assertStatus(422)
             ->assertHeader('Content-Language', 'en')
             ->assertHeader('X-Resolved-Locale', 'en')
