@@ -43,7 +43,7 @@ const filters = reactive({
 
 const summaryFilters = reactive({
     project_id: '',
-    donor_user_id: '',
+    funding_source: '',
     beneficiary_period: 'all',
     beneficiary_custom_from: '',
     beneficiary_custom_to: '',
@@ -134,7 +134,11 @@ const summaryAreaOptions = computed(() => {
 
     return [...rows.values()].sort((a, b) => a.name.localeCompare(b.name));
 });
-const fundingDonorOptions = computed(() => fundingOverview.value?.donor_options || []);
+const fundingSourceOptions = computed(() => (
+    fundingOverview.value?.source_options
+    || fundingOverview.value?.donor_options
+    || []
+));
 
 const donutSegments = computed(() => {
     const parts = [
@@ -452,14 +456,14 @@ const closeProjectDetails = () => {
 };
 
 const handleSummaryProjectChange = async () => {
-    summaryFilters.donor_user_id = '';
+    summaryFilters.funding_source = '';
     await loadDashboard();
 };
 
 const handleMunicipalityChange = async () => {
     filters.area = '';
     summaryFilters.project_id = '';
-    summaryFilters.donor_user_id = '';
+    summaryFilters.funding_source = '';
     await loadDashboard();
 };
 
@@ -659,7 +663,7 @@ const loadDashboard = async () => {
         };
         const fundingScopeParams = {
             ...projectScopeParams,
-            donor_user_id: summaryFilters.donor_user_id ? Number(summaryFilters.donor_user_id) : undefined,
+            funding_source: summaryFilters.funding_source || undefined,
         };
 
         const results = await Promise.allSettled([
@@ -728,7 +732,7 @@ const loadDashboard = async () => {
 
             if (summaryFilters.project_id && !projectOptions.value.some((row) => Number(row.id) === Number(summaryFilters.project_id))) {
                 summaryFilters.project_id = '';
-                summaryFilters.donor_user_id = '';
+                summaryFilters.funding_source = '';
             }
         } else {
             projectOptions.value = [];
@@ -838,10 +842,10 @@ onBeforeUnmount(() => {
                 <div class="tracky-reports__block">
                     <div class="tracky-reports__head">
                         <h3>{{ t('dashboard.fundingProgress') }}</h3>
-                        <select v-model="summaryFilters.donor_user_id" @change="loadDashboard">
+                        <select v-model="summaryFilters.funding_source" @change="loadDashboard">
                             <option value="">{{ t('dashboard.allSources') }}</option>
-                            <option v-for="donor in fundingDonorOptions" :key="donor.id" :value="donor.id">
-                                {{ donor.name }}
+                            <option v-for="source in fundingSourceOptions" :key="source.id || source.name" :value="source.name">
+                                {{ source.name }}
                             </option>
                         </select>
                     </div>

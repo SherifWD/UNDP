@@ -524,7 +524,7 @@ class DashboardApiTest extends TestCase
             ->assertJsonPath('project_breakdown.0.approval_rate_percent', 100);
     }
 
-    public function test_funding_overview_can_be_filtered_by_donor_and_exposes_donor_options(): void
+    public function test_funding_overview_can_be_filtered_by_source_and_exposes_unique_source_options(): void
     {
         $municipality = Municipality::query()->create([
             'name_en' => 'Sabha',
@@ -537,18 +537,29 @@ class DashboardApiTest extends TestCase
             'name_en' => 'Water Point',
             'name_ar' => 'نقطة مياه',
             'status' => 'active',
+            'mobile_meta' => [
+                'funding_sources' => ['UNDP Libya', 'European Union', 'World Bank', 'UNDP Libya'],
+            ],
         ]);
 
         $donorA = User::factory()->create([
             'role' => UserRole::PARTNER_DONOR_VIEWER->value,
+            'name' => 'UNDP Libya',
         ]);
 
         $donorB = User::factory()->create([
             'role' => UserRole::PARTNER_DONOR_VIEWER->value,
+            'name' => 'European Union',
         ]);
 
         $donorPending = User::factory()->create([
             'role' => UserRole::PARTNER_DONOR_VIEWER->value,
+            'name' => 'UNDP Libya',
+        ]);
+
+        $donorDuplicate = User::factory()->create([
+            'role' => UserRole::PARTNER_DONOR_VIEWER->value,
+            'name' => 'UNDP Libya',
         ]);
 
         FundingRequest::query()->create([
@@ -575,35 +586,53 @@ class DashboardApiTest extends TestCase
             'status' => FundingRequestStatus::PENDING->value,
         ]);
 
+        FundingRequest::query()->create([
+            'project_id' => $project->id,
+            'donor_user_id' => $donorDuplicate->id,
+            'amount' => 300,
+            'currency' => 'USD',
+            'status' => FundingRequestStatus::APPROVED->value,
+        ]);
+
         $admin = User::factory()->create([
             'role' => UserRole::UNDP_ADMIN->value,
         ]);
 
         Sanctum::actingAs($admin);
 
-        $response = $this->getJson("/api/dashboard/kpis?project_id={$project->id}&donor_user_id={$donorB->id}");
+        $response = $this->getJson('/api/dashboard/kpis?project_id='.$project->id.'&funding_source='.urlencode('UNDP Libya'));
 
         $response
             ->assertOk()
-            ->assertJsonPath('funding_overview.total_requests', 1)
-            ->assertJsonPath('funding_overview.approved_requested_amount', 900)
-            ->assertJsonPath('funding_overview.approved_requested_amount_label', 'EUR 900')
-            ->assertJsonCount(2, 'funding_overview.donor_options')
-            ->assertJsonMissingPath('funding_overview.donor_options.2')
+            ->assertJsonPath('funding_overview.total_requests', 3)
+            ->assertJsonPath('funding_overview.pending_requests', 1)
+            ->assertJsonPath('funding_overview.approved_requests', 2)
+            ->assertJsonPath('funding_overview.approved_requested_amount', 1500)
+            ->assertJsonPath('funding_overview.approved_requested_amount_label', 'USD 1,500')
+            ->assertJsonPath('funding_overview.selected_funding_source', 'UNDP Libya')
+            ->assertJsonCount(3, 'funding_overview.source_options')
             ->assertJsonFragment([
-                'id' => $donorA->id,
-                'approved_requested_amount' => 1200,
-                'approved_requested_amount_label' => 'USD 1,200',
+                'id' => 'UNDP Libya',
+                'name' => 'UNDP Libya',
+                'approved_requested_amount' => 1500,
+                'approved_requested_amount_label' => 'USD 1,500',
             ])
             ->assertJsonFragment([
-                'id' => $donorB->id,
+                'id' => 'European Union',
+                'name' => 'European Union',
                 'approved_requested_amount' => 900,
                 'approved_requested_amount_label' => 'EUR 900',
+            ])
+            ->assertJsonFragment([
+                'id' => 'World Bank',
+                'name' => 'World Bank',
+                'approved_requested_amount' => 0,
+                'approved_requested_amount_label' => '0',
             ]);
 
-        $this->assertNotContains(
-            $donorPending->id,
-            collect($response->json('funding_overview.donor_options', []))->pluck('id')->all(),
+        $this->assertSame(
+            ['European Union', 'UNDP Libya', 'World Bank'],
+            collect($response->json('funding_overview.source_options', []))->pluck('name')->all(),
         );
     }
 }

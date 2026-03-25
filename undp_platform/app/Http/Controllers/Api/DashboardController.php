@@ -15,6 +15,7 @@ use App\Services\SubmissionAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class DashboardController extends Controller
@@ -37,6 +38,7 @@ class DashboardController extends Controller
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'status' => ['nullable', 'string', 'in:'.implode(',', SubmissionStatus::values())],
             'donor_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'funding_source' => ['nullable', 'string', 'max:255'],
         ]);
 
         $query = $this->buildScopedSubmissionQuery($request, $validated);
@@ -356,6 +358,7 @@ class DashboardController extends Controller
             'municipality_id' => ['nullable', 'integer', 'exists:municipalities,id'],
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'status' => ['nullable', Rule::in([SubmissionStatus::APPROVED->value])],
+            'funding_source' => ['nullable', 'string', 'max:255'],
         ]);
 
         $query = Submission::query()->where('status', SubmissionStatus::APPROVED->value);
@@ -689,16 +692,19 @@ class DashboardController extends Controller
             ->where('status', FundingRequestStatus::APPROVED->value)
             ->get();
 
-        $donorOptions = $approvedDonorRows
-            ->groupBy(fn (FundingRequest $row) => (int) $row->donor_user_id)
+        $projectSourceOptions = $this->projectFundingSourceOptions($request, $filters);
+        $sourceSummaries = $approvedDonorRows
+            ->filter(fn (FundingRequest $row): bool => $this->normalizeFundingSourceKey($row->donor?->name) !== null)
+            ->groupBy(fn (FundingRequest $row): string => (string) $this->normalizeFundingSourceKey($row->donor?->name))
             ->map(function ($rows): array {
                 /** @var FundingRequest $sample */
                 $sample = $rows->first();
                 $approvedCurrencyTotals = $this->fundingCurrencyTotals($rows->all());
+                $sourceName = trim((string) ($sample?->donor?->name ?? ''));
 
                 return [
-                    'id' => (int) ($sample?->donor_user_id ?? 0),
-                    'name' => $sample?->donor?->name ?? 'Unknown donor',
+                    'id' => $sourceName !== '' ? $sourceName : 'Unknown source',
+                    'name' => $sourceName !== '' ? $sourceName : 'Unknown source',
                     'approved_currency_totals' => $approvedCurrencyTotals,
                     'approved_requested_amount' => round((float) $rows->sum('amount'), 2),
                     'approved_requested_amount_label' => $this->formatCurrencyTotals($approvedCurrencyTotals),
@@ -706,10 +712,56 @@ class DashboardController extends Controller
                     'total_requested_amount' => round((float) $rows->sum('amount'), 2),
                     'total_requested_amount_label' => $this->formatCurrencyTotals($approvedCurrencyTotals),
                 ];
-            })
-            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            });
+
+        $sourceOptions = collect($projectSourceOptions)
+            ->mapWithKeys(function (array $option): array {
+                $key = (string) $this->normalizeFundingSourceKey($option['name'] ?? null);
+
+                return $key !== '' ? [$key => $option] : [];
+            });
+
+        foreach ($sourceSummaries as $key => $summary) {
+            if (! $sourceOptions->has($key)) {
+                $sourceOptions->put($key, $summary);
+                continue;
+            }
+
+            $sourceOptions->put($key, [
+                ...$sourceOptions->get($key),
+                'approved_currency_totals' => $summary['approved_currency_totals'],
+                'approved_requested_amount' => $summary['approved_requested_amount'],
+                'approved_requested_amount_label' => $summary['approved_requested_amount_label'],
+                'total_currency_totals' => $summary['total_currency_totals'],
+                'total_requested_amount' => $summary['total_requested_amount'],
+                'total_requested_amount_label' => $summary['total_requested_amount_label'],
+            ]);
+        }
+
+        $sourceOptions = $sourceOptions
+            ->sortBy(fn (array $row): string => $row['name'], SORT_NATURAL | SORT_FLAG_CASE)
             ->values()
             ->all();
+
+        $selectedFundingSource = trim((string) ($filters['funding_source'] ?? ''));
+        $selectedFundingSourceKey = $this->normalizeFundingSourceKey($selectedFundingSource);
+
+        if ($selectedFundingSourceKey !== null) {
+            $matchingDonorIds = (clone $query)
+                ->get()
+                ->filter(fn (FundingRequest $row): bool => $this->normalizeFundingSourceKey($row->donor?->name) === $selectedFundingSourceKey)
+                ->pluck('donor_user_id')
+                ->filter()
+                ->map(fn ($value): int => (int) $value)
+                ->unique()
+                ->values();
+
+            if ($matchingDonorIds->isEmpty()) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('donor_user_id', $matchingDonorIds->all());
+            }
+        }
 
         if (! empty($filters['donor_user_id'])) {
             $query->where('donor_user_id', $filters['donor_user_id']);
@@ -755,7 +807,9 @@ class DashboardController extends Controller
             'approval_rate_percent' => $total > 0 ? round(($approved / $total) * 100, 1) : 0.0,
             'pending_share_percent' => $total > 0 ? round(($pending / $total) * 100, 1) : 0.0,
             'selected_donor_user_id' => ! empty($filters['donor_user_id']) ? (int) $filters['donor_user_id'] : null,
-            'donor_options' => $donorOptions,
+            'selected_funding_source' => $selectedFundingSource !== '' ? $selectedFundingSource : null,
+            'source_options' => $sourceOptions,
+            'donor_options' => $sourceOptions,
             'status_breakdown' => [
                 FundingRequestStatus::PENDING->value => $pending,
                 FundingRequestStatus::APPROVED->value => $approved,
@@ -793,6 +847,76 @@ class DashboardController extends Controller
             })
             ->values()
             ->all();
+    }
+
+    private function projectFundingSourceOptions(Request $request, array $filters): array
+    {
+        $query = Project::query()->select(['id', 'municipality_id', 'mobile_meta']);
+
+        ProjectAccessService::scope($request->user(), $query);
+
+        if (! empty($filters['project_id'])) {
+            $query->where('id', $filters['project_id']);
+        }
+
+        if (! empty($filters['municipality_id'])) {
+            $query->where('municipality_id', $filters['municipality_id']);
+        }
+
+        return $query
+            ->get()
+            ->flatMap(function (Project $project): array {
+                $stored = is_array($project->mobile_meta) ? $project->mobile_meta : [];
+                $rows = $stored['funding_sources'] ?? $stored['donors'] ?? [];
+
+                return collect(is_array($rows) ? $rows : [])
+                    ->map(fn ($value): ?string => $this->normalizeFundingSourceDisplayName($value))
+                    ->filter()
+                    ->values()
+                    ->all();
+            })
+            ->reduce(function (array $carry, string $name): array {
+                $key = (string) $this->normalizeFundingSourceKey($name);
+
+                if ($key === '' || isset($carry[$key])) {
+                    return $carry;
+                }
+
+                $carry[$key] = [
+                    'id' => $name,
+                    'name' => $name,
+                    'approved_currency_totals' => [],
+                    'approved_requested_amount' => 0.0,
+                    'approved_requested_amount_label' => $this->formatCurrencyTotals([]),
+                    'total_currency_totals' => [],
+                    'total_requested_amount' => 0.0,
+                    'total_requested_amount_label' => $this->formatCurrencyTotals([]),
+                ];
+
+                return $carry;
+            }, []);
+    }
+
+    private function normalizeFundingSourceDisplayName(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $normalized = trim(preg_replace('/\s+/', ' ', $value) ?? '');
+
+        return $normalized !== '' ? $normalized : null;
+    }
+
+    private function normalizeFundingSourceKey(mixed $value): ?string
+    {
+        $display = $this->normalizeFundingSourceDisplayName($value);
+
+        if ($display === null) {
+            return null;
+        }
+
+        return Str::lower($display);
     }
 
     private function formatCurrencyTotals(array $totals): string
