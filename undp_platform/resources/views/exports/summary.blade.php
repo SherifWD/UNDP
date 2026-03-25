@@ -39,7 +39,7 @@
     </style>
 </head>
 <body>
-<h1>UNDP Platform Summary Report</h1>
+<h1>RASD Platform Summary Report</h1>
 
 <div class="meta">
     <div>Generated at: {{ $generatedAt->toDateTimeString() }}</div>
