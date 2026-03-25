@@ -35,9 +35,31 @@ class SetLocaleFromRequest
             $request->header('x-preferred-locale'),
             $request->header('x_preferred_locale'),
             $this->findPreferredLocaleHeaderValue($request),
+            $this->findPreferredLocaleApacheHeaderValue(),
             $request->input('preferred_locale'),
         ] as $candidate) {
             $locale = $this->normalizeLocale($candidate);
+
+            if ($locale) {
+                return $locale;
+            }
+        }
+
+        return null;
+    }
+
+    private function findPreferredLocaleApacheHeaderValue(): ?string
+    {
+        if (! function_exists('apache_request_headers')) {
+            return null;
+        }
+
+        foreach (apache_request_headers() as $key => $value) {
+            if ($this->normalizeHeaderKey((string) $key) !== 'preferredlocale') {
+                continue;
+            }
+
+            $locale = $this->normalizeLocale(is_array($value) ? ($value[0] ?? null) : $value);
 
             if ($locale) {
                 return $locale;

@@ -13,6 +13,15 @@
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
+    # Apache may drop underscored request headers before PHP sees them.
+    # Normalize preferred_locale to Preferred-Locale so Laravel can resolve it.
+    <IfModule mod_setenvif.c>
+        <IfModule mod_headers.c>
+            SetEnvIfNoCase ^preferred.locale$ ^(.*)$ fix_preferred_locale=$1
+            RequestHeader set Preferred-Locale %{fix_preferred_locale}e env=fix_preferred_locale
+        </IfModule>
+    </IfModule>
+
     # Redirect Trailing Slashes If Not A Folder...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$

@@ -17,6 +17,8 @@ api.interceptors.request.use((config) => {
     }
 
     config.headers['Preferred-Locale'] = locale;
+    config.headers['preferred-locale'] = locale;
+    config.headers['preferred_locale'] = locale;
     config.headers['Accept-Language'] = locale;
 
     return config;

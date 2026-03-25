@@ -112,6 +112,8 @@ class AuditLogApiTest extends TestCase
 
         $response = $this->getJson("/api/audit-logs/{$log->id}", [
             'Preferred-Locale' => 'ar',
+            'preferred-locale' => 'ar',
+            'preferred_locale' => 'ar',
         ]);
 
         $response
