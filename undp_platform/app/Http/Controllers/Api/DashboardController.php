@@ -685,26 +685,26 @@ class DashboardController extends Controller
             $query->whereDate('created_at', '<=', $filters['date_to']);
         }
 
-        $donorOptions = (clone $query)
-            ->get()
+        $approvedDonorRows = (clone $query)
+            ->where('status', FundingRequestStatus::APPROVED->value)
+            ->get();
+
+        $donorOptions = $approvedDonorRows
             ->groupBy(fn (FundingRequest $row) => (int) $row->donor_user_id)
             ->map(function ($rows): array {
                 /** @var FundingRequest $sample */
                 $sample = $rows->first();
-                $approvedCurrencyTotals = $this->fundingCurrencyTotals(
-                    $rows->where('status', FundingRequestStatus::APPROVED->value)->all(),
-                );
-                $totalCurrencyTotals = $this->fundingCurrencyTotals($rows->all());
+                $approvedCurrencyTotals = $this->fundingCurrencyTotals($rows->all());
 
                 return [
                     'id' => (int) ($sample?->donor_user_id ?? 0),
                     'name' => $sample?->donor?->name ?? 'Unknown donor',
                     'approved_currency_totals' => $approvedCurrencyTotals,
-                    'approved_requested_amount' => round((float) $rows->where('status', FundingRequestStatus::APPROVED->value)->sum('amount'), 2),
+                    'approved_requested_amount' => round((float) $rows->sum('amount'), 2),
                     'approved_requested_amount_label' => $this->formatCurrencyTotals($approvedCurrencyTotals),
-                    'total_currency_totals' => $totalCurrencyTotals,
+                    'total_currency_totals' => $approvedCurrencyTotals,
                     'total_requested_amount' => round((float) $rows->sum('amount'), 2),
-                    'total_requested_amount_label' => $this->formatCurrencyTotals($totalCurrencyTotals),
+                    'total_requested_amount_label' => $this->formatCurrencyTotals($approvedCurrencyTotals),
                 ];
             })
             ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)

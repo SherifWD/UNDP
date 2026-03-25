@@ -547,6 +547,10 @@ class DashboardApiTest extends TestCase
             'role' => UserRole::PARTNER_DONOR_VIEWER->value,
         ]);
 
+        $donorPending = User::factory()->create([
+            'role' => UserRole::PARTNER_DONOR_VIEWER->value,
+        ]);
+
         FundingRequest::query()->create([
             'project_id' => $project->id,
             'donor_user_id' => $donorA->id,
@@ -563,6 +567,14 @@ class DashboardApiTest extends TestCase
             'status' => FundingRequestStatus::APPROVED->value,
         ]);
 
+        FundingRequest::query()->create([
+            'project_id' => $project->id,
+            'donor_user_id' => $donorPending->id,
+            'amount' => 700,
+            'currency' => 'USD',
+            'status' => FundingRequestStatus::PENDING->value,
+        ]);
+
         $admin = User::factory()->create([
             'role' => UserRole::UNDP_ADMIN->value,
         ]);
@@ -576,6 +588,22 @@ class DashboardApiTest extends TestCase
             ->assertJsonPath('funding_overview.total_requests', 1)
             ->assertJsonPath('funding_overview.approved_requested_amount', 900)
             ->assertJsonPath('funding_overview.approved_requested_amount_label', 'EUR 900')
-            ->assertJsonCount(2, 'funding_overview.donor_options');
+            ->assertJsonCount(2, 'funding_overview.donor_options')
+            ->assertJsonMissingPath('funding_overview.donor_options.2')
+            ->assertJsonFragment([
+                'id' => $donorA->id,
+                'approved_requested_amount' => 1200,
+                'approved_requested_amount_label' => 'USD 1,200',
+            ])
+            ->assertJsonFragment([
+                'id' => $donorB->id,
+                'approved_requested_amount' => 900,
+                'approved_requested_amount_label' => 'EUR 900',
+            ]);
+
+        $this->assertNotContains(
+            $donorPending->id,
+            collect($response->json('funding_overview.donor_options', []))->pluck('id')->all(),
+        );
     }
 }
