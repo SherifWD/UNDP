@@ -66,7 +66,7 @@ class InboxController extends MobileController
     {
         if ((int) $notification->notifiable_id !== (int) $request->user()->id
             || $notification->notifiable_type !== $request->user()::class) {
-            return $this->errorResponse('Notification not found.', 404);
+            return $this->errorResponse(__('Notification not found.'), 404);
         }
 
         if (! $notification->read_at) {
@@ -75,7 +75,7 @@ class InboxController extends MobileController
 
         return $this->successResponse([
             'notification' => $this->serializeNotification($notification->fresh()),
-        ], 'Notification marked as read.');
+        ], __('Notification marked as read.'));
     }
 
     public function markAllRead(Request $request): JsonResponse
@@ -84,7 +84,7 @@ class InboxController extends MobileController
             'read_at' => now(),
         ]);
 
-        return $this->successResponse([], 'All notifications marked as read.');
+        return $this->successResponse([], __('All notifications marked as read.'));
     }
 
     private function serializeNotification(DatabaseNotification $notification): array

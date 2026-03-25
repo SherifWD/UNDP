@@ -19,7 +19,7 @@ class ProjectController extends MobileController
         $user = $request->user();
 
         if (! $user->hasPermission('projects.view')) {
-            return $this->errorResponse('Access denied.', 403);
+            return $this->errorResponse(__('Access denied.'), 403);
         }
 
         $validator = Validator::make($request->all(), [
@@ -79,13 +79,13 @@ class ProjectController extends MobileController
         $user = $request->user();
 
         if (! $user->hasPermission('projects.view')) {
-            return $this->errorResponse('Access denied.', 403);
+            return $this->errorResponse(__('Access denied.'), 403);
         }
 
         $project->loadMissing('municipality');
 
         if (! ProjectAccessService::canView($user, $project)) {
-            return $this->errorResponse('Access denied.', 403);
+            return $this->errorResponse(__('Access denied.'), 403);
         }
 
         $submissionQuery = Submission::query()->where('project_id', $project->id);

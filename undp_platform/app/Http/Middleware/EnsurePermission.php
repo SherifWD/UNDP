@@ -20,7 +20,7 @@ class EnsurePermission
             AuditLogger::blocked($request, $permission, $user);
 
             return response()->json([
-                'message' => 'Access denied. You are not allowed to perform this action.',
+                'message' => __('Access denied. You are not allowed to perform this action.'),
                 'required_permission' => $permission,
             ], 403);
         }

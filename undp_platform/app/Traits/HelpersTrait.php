@@ -262,6 +262,25 @@ trait HelpersTrait
     return __($message);
   }
 
+  protected function localizeResponseRows(array $rows, array $fields = ['label', 'description']): array
+  {
+    return collect($rows)
+      ->map(function ($row) use ($fields) {
+        if (! is_array($row)) {
+          return $row;
+        }
+
+        foreach ($fields as $field) {
+          if (isset($row[$field]) && is_string($row[$field]) && trim($row[$field]) !== '') {
+            $row[$field] = __($row[$field]);
+          }
+        }
+
+        return $row;
+      })
+      ->all();
+  }
+
 
   public function returnCodeAccordingToInput($validator)
   {

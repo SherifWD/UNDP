@@ -110,7 +110,7 @@ class SubmissionController extends MobileController
     public function store(Request $request): JsonResponse
     {
         if (! $request->user()->hasPermission('submissions.create')) {
-            return $this->errorResponse('Access denied.', 403);
+            return $this->errorResponse(__('Access denied.'), 403);
         }
 
         $validator = $this->makeSubmissionValidator($request, true);
@@ -139,7 +139,7 @@ class SubmissionController extends MobileController
                 return $this->successResponse([
                     'submission' => $this->serializeSubmissionDetail($existing),
                     'idempotent_reuse' => true,
-                ], 'Draft already exists. Returning the existing submission.');
+                ], __('Draft already exists. Returning the existing submission.'));
             }
         }
 
@@ -150,16 +150,16 @@ class SubmissionController extends MobileController
     {
         if (! SubmissionAccessService::canView($request->user(), $submission)
             || (int) $submission->reporter_id !== (int) $request->user()->id) {
-            return $this->errorResponse('Access denied.', 403);
+            return $this->errorResponse(__('Access denied.'), 403);
         }
 
         if (! $this->canEditSubmission($submission)) {
-            return $this->errorResponse('This submission can no longer be edited.', 422);
+            return $this->errorResponse(__('This submission can no longer be edited.'), 422);
         }
 
         if ($this->isMultipartFileUpdateWithoutPostTransport($request)) {
             return $this->errorResponse(
-                'Multipart submission updates must be sent as POST with `_method=PUT` so PHP can parse uploaded files.',
+                __('Multipart submission updates must be sent as POST with `_method=PUT` so PHP can parse uploaded files.'),
                 422,
             );
         }
@@ -176,7 +176,7 @@ class SubmissionController extends MobileController
     public function show(Request $request, Submission $submission): JsonResponse
     {
         if (! SubmissionAccessService::canView($request->user(), $submission)) {
-            return $this->errorResponse('Access denied.', 403);
+            return $this->errorResponse(__('Access denied.'), 403);
         }
 
         $submission->load([
@@ -195,7 +195,7 @@ class SubmissionController extends MobileController
                 'from_status_label' => $event->from_status ? $this->mobileSubmissionStatusLabel($event->from_status) : null,
                 'to_status' => $event->to_status,
                 'to_status_label' => $this->mobileSubmissionStatusLabel($event->to_status),
-                'comment' => $event->comment,
+                'comment' => is_string($event->comment) ? __($event->comment) : $event->comment,
                 'actor' => $event->actor ? [
                     'id' => $event->actor->id,
                     'name' => $event->actor->name,
@@ -209,7 +209,7 @@ class SubmissionController extends MobileController
     public function summary(Request $request, Submission $submission): JsonResponse
     {
         if (! SubmissionAccessService::canView($request->user(), $submission)) {
-            return $this->errorResponse('Access denied.', 403);
+            return $this->errorResponse(__('Access denied.'), 403);
         }
 
         $submission->load([
@@ -233,7 +233,7 @@ class SubmissionController extends MobileController
 
         if (! SubmissionAccessService::canView($user, $submission)
             || ! $this->canViewSubmissionMedia($user, $submission)) {
-            return $this->errorResponse('Access denied.', 403);
+            return $this->errorResponse(__('Access denied.'), 403);
         }
 
         $submission->load('mediaAssets');
@@ -253,15 +253,15 @@ class SubmissionController extends MobileController
         if (! SubmissionAccessService::canView($user, $submission)
             || (int) $submission->reporter_id !== (int) $user->id
             || ! $user->hasPermission('media.upload')) {
-            return $this->errorResponse('Access denied.', 403);
+            return $this->errorResponse(__('Access denied.'), 403);
         }
 
         if (! $this->canEditSubmission($submission)) {
-            return $this->errorResponse('This submission can no longer be edited.', 422);
+            return $this->errorResponse(__('This submission can no longer be edited.'), 422);
         }
 
         if ((int) $mediaAsset->submission_id !== (int) $submission->id) {
-            return $this->errorResponse('Media asset does not belong to this submission.', 422);
+            return $this->errorResponse(__('Media asset does not belong to this submission.'), 422);
         }
 
         $submissionMedia = collect($this->submissionMediaReferences($submission))
@@ -300,7 +300,7 @@ class SubmissionController extends MobileController
             'submission_id' => $submission->id,
             'media_assets' => $mediaAssets,
             'assets' => $mediaAssets,
-        ], 'Media removed successfully.');
+        ], __('Media removed successfully.'));
     }
 
     private function makeSubmissionValidator(Request $request, bool $creating)
@@ -380,7 +380,7 @@ class SubmissionController extends MobileController
                 ->values();
 
             if ($mediaRows->contains(fn (array $row): bool => ! empty($row) && empty($row['id']))) {
-                $validator->errors()->add('media', 'Each selected media item must include its media asset id.');
+                $validator->errors()->add('media', __('Each selected media item must include its media asset id.'));
             }
 
             if ($mediaIds->isNotEmpty()) {
@@ -389,12 +389,12 @@ class SubmissionController extends MobileController
                     ->count();
 
                 if ($existingMediaCount !== $mediaIds->count()) {
-                    $validator->errors()->add('media', 'One or more media assets could not be found.');
+                    $validator->errors()->add('media', __('One or more media assets could not be found.'));
                 }
             }
 
             if ($creating && $mediaIds->isNotEmpty()) {
-                $validator->errors()->add('media', 'Attach media after creating the draft submission.');
+                $validator->errors()->add('media', __('Attach media after creating the draft submission.'));
             }
 
             if (! $creating && $routeSubmission instanceof Submission && $mediaIds->isNotEmpty()) {
@@ -404,7 +404,7 @@ class SubmissionController extends MobileController
                     ->count();
 
                 if ($ownedMediaCount !== $mediaIds->count()) {
-                    $validator->errors()->add('media', 'One or more media assets do not belong to this submission.');
+                    $validator->errors()->add('media', __('One or more media assets do not belong to this submission.'));
                 }
             }
 
@@ -421,42 +421,42 @@ class SubmissionController extends MobileController
             }
 
             if (empty($input['project_status'])) {
-                $validator->errors()->add('project_status', 'Current project status is required.');
+                $validator->errors()->add('project_status', __('Current project status is required.'));
             }
 
             if (empty($input['confirm_accuracy'])) {
-                $validator->errors()->add('confirm_accuracy', 'You must confirm the report accuracy before submission.');
+                $validator->errors()->add('confirm_accuracy', __('You must confirm the report accuracy before submission.'));
             }
 
             if (! isset($input['actual_beneficiaries'])) {
-                $validator->errors()->add('actual_beneficiaries', 'Actual beneficiaries is required.');
+                $validator->errors()->add('actual_beneficiaries', __('Actual beneficiaries is required.'));
             }
 
             if (empty($input['location_label']) && (! isset($input['latitude']) || ! isset($input['longitude']))) {
-                $validator->errors()->add('location_label', 'Submission location is required.');
+                $validator->errors()->add('location_label', __('Submission location is required.'));
             }
 
             if (($input['location_source'] ?? null) === 'gps' && (! isset($input['latitude']) || ! isset($input['longitude']))) {
-                $validator->errors()->add('latitude', 'GPS location requires latitude and longitude coordinates.');
+                $validator->errors()->add('latitude', __('GPS location requires latitude and longitude coordinates.'));
             }
 
             $projectStatus = $input['project_status'] ?? null;
 
             if ($projectStatus === 'planned' && empty($input['delay_reason'])) {
-                $validator->errors()->add('delay_reason', 'Reason for delay is required when the project is still planned.');
+                $validator->errors()->add('delay_reason', __('Reason for delay is required when the project is still planned.'));
             }
 
             if ($projectStatus === 'in_progress') {
                 if (empty($input['progress_impression'])) {
-                    $validator->errors()->add('progress_impression', 'Impression of work progress is required.');
+                    $validator->errors()->add('progress_impression', __('Impression of work progress is required.'));
                 }
 
                 if (! array_key_exists('physical_progress', $input)) {
-                    $validator->errors()->add('physical_progress', 'Please indicate if physical progress is visible.');
+                    $validator->errors()->add('physical_progress', __('Please indicate if physical progress is visible.'));
                 }
 
                 if (! isset($input['approximate_completion_percentage'])) {
-                    $validator->errors()->add('approximate_completion_percentage', 'Approximate completion percentage is required.');
+                    $validator->errors()->add('approximate_completion_percentage', __('Approximate completion percentage is required.'));
                 }
 
                 // if (empty($input['additional_observations'])) {
@@ -466,23 +466,23 @@ class SubmissionController extends MobileController
 
             if ($projectStatus === 'completed') {
                 if (! array_key_exists('is_project_being_used', $input)) {
-                    $validator->errors()->add('is_project_being_used', 'Please confirm whether the project is being used.');
+                    $validator->errors()->add('is_project_being_used', __('Please confirm whether the project is being used.'));
                 }
 
                 if (($input['is_project_being_used'] ?? false) && empty($input['user_categories'])) {
-                    $validator->errors()->add('user_categories', 'At least one user category is required.');
+                    $validator->errors()->add('user_categories', __('At least one user category is required.'));
                 }
 
                 if (! array_key_exists('is_used_as_intended', $input)) {
-                    $validator->errors()->add('is_used_as_intended', 'Please confirm whether the project is being used as intended.');
+                    $validator->errors()->add('is_used_as_intended', __('Please confirm whether the project is being used as intended.'));
                 }
 
                 if (empty($input['functional_status'])) {
-                    $validator->errors()->add('functional_status', 'Functional status is required.');
+                    $validator->errors()->add('functional_status', __('Functional status is required.'));
                 }
 
                 if (! array_key_exists('negative_environmental_impact', $input)) {
-                    $validator->errors()->add('negative_environmental_impact', 'Please confirm whether there is a negative environmental impact.');
+                    $validator->errors()->add('negative_environmental_impact', __('Please confirm whether there is a negative environmental impact.'));
                 }
             }
         });
@@ -500,7 +500,7 @@ class SubmissionController extends MobileController
         $project = Project::query()->with('municipality')->findOrFail($projectId);
 
         if (! ProjectAccessService::canView($user, $project)) {
-            return $this->errorResponse('You can only report projects within your assigned scope.', 403);
+            return $this->errorResponse(__('You can only report projects within your assigned scope.'), 403);
         }
 
         $mode = $this->resolveSubmissionMode(
@@ -529,7 +529,7 @@ class SubmissionController extends MobileController
             ?? $submission?->details;
 
         if ($uploadedAssetFiles !== [] && ! $user->hasPermission('media.upload')) {
-            return $this->errorResponse('Access denied.', 403);
+            return $this->errorResponse(__('Access denied.'), 403);
         }
 
         $hasMediaPayload = array_key_exists('media', $validated)
@@ -628,8 +628,8 @@ class SubmissionController extends MobileController
             'submission' => $this->serializeSubmissionDetail($submission),
             'idempotent_reuse' => false,
         ], $targetStatus === SubmissionStatus::DRAFT->value
-            ? 'Draft saved successfully.'
-            : 'Monitoring report submitted successfully.', $isNew ? 201 : 200);
+            ? __('Draft saved successfully.')
+            : __('Monitoring report submitted successfully.'), $isNew ? 201 : 200);
     }
 
     private function buildSubmissionData(array $validated, Project $project, array $existing = []): array
@@ -769,7 +769,7 @@ class SubmissionController extends MobileController
 
         foreach (array_values($files) as $index => $file) {
             if (! $file instanceof UploadedFile || ! $file->isValid()) {
-                $validator->errors()->add("assets.{$index}", 'Uploaded asset is invalid.');
+                $validator->errors()->add("assets.{$index}", __('Uploaded asset is invalid.'));
 
                 continue;
             }
@@ -779,13 +779,13 @@ class SubmissionController extends MobileController
             $sizeBytes = (int) ($file->getSize() ?? 0);
 
             if (! $mediaType || ! in_array($mimeType, config('media.allowed_mime_types', []), true)) {
-                $validator->errors()->add("assets.{$index}", 'Uploaded asset must be a supported image or video.');
+                $validator->errors()->add("assets.{$index}", __('Uploaded asset must be a supported image or video.'));
 
                 continue;
             }
 
             if (! $this->withinDirectUploadLimits($countsByType[$mediaType] ?? 0, $mediaType, $sizeBytes)) {
-                $validator->errors()->add("assets.{$index}", 'Media limits exceeded for this submission.');
+                $validator->errors()->add("assets.{$index}", __('Media limits exceeded for this submission.'));
 
                 continue;
             }

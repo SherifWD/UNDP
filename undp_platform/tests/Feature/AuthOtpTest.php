@@ -34,6 +34,37 @@ class AuthOtpTest extends TestCase
             ->assertJsonPath('data.requires_registration', true);
     }
 
+    public function test_request_otp_for_unknown_number_uses_preferred_locale_header(): void
+    {
+        $arabicResponse = $this->withHeaders([
+            'preferred_locale' => 'ar',
+        ])->postJson('/api/auth/request-otp', [
+            'country_code' => '+218',
+            'phone' => '933333334',
+        ]);
+
+        $arabicResponse
+            ->assertOk()
+            ->assertJsonPath('message', 'المستخدم غير موجود. يرجى إنشاء حساب أولًا.')
+            ->assertJsonPath('msg', 'المستخدم غير موجود. يرجى إنشاء حساب أولًا.')
+            ->assertJsonPath('requires_registration', true)
+            ->assertJsonPath('result', true);
+
+        $englishResponse = $this->withHeaders([
+            'preferred_locale' => 'en',
+        ])->postJson('/api/auth/request-otp', [
+            'country_code' => '+218',
+            'phone' => '933333334',
+        ]);
+
+        $englishResponse
+            ->assertOk()
+            ->assertJsonPath('message', 'User does not exist. Please create an account first.')
+            ->assertJsonPath('msg', 'User does not exist. Please create an account first.')
+            ->assertJsonPath('requires_registration', true)
+            ->assertJsonPath('result', true);
+    }
+
     public function test_register_reporter_then_request_and_verify_otp(): void
     {
         $municipality = Municipality::query()->create([

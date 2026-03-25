@@ -28,7 +28,7 @@ class EnsureAnyPermission
             );
 
             return response()->json([
-                'message' => 'Access denied. You are not allowed to perform this action.',
+                'message' => __('Access denied. You are not allowed to perform this action.'),
                 'required_any_permission' => $permissions,
             ], 403);
         }

@@ -11,6 +11,7 @@ use App\Services\MediaStorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 class MediaController extends Controller
@@ -26,12 +27,12 @@ class MediaController extends Controller
 
         if (($diskConfig['driver'] ?? null) !== 's3') {
             return response()->json([
-                'message' => 'Presigned uploads are only available for S3-compatible storage. Upload files directly using multipart form-data on the submission endpoints.',
+                'message' => __('Presigned uploads are only available for S3-compatible storage. Upload files directly using multipart form-data on the submission endpoints.'),
                 'disk' => $disk,
             ], 422);
         }
 
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'submission_id' => ['required', 'integer', 'exists:submissions,id'],
             'client_media_id' => ['nullable', 'string', 'max:120'],
             'label' => ['nullable', 'string', 'max:255'],
@@ -43,13 +44,19 @@ class MediaController extends Controller
             'checksum_sha256' => ['nullable', 'regex:/^[A-Fa-f0-9]{64}$/'],
         ]);
 
+        if ($validator->fails()) {
+            return $this->returnValidationError($validator);
+        }
+
+        $validated = $validator->validated();
+
         $submission = Submission::query()->findOrFail($validated['submission_id']);
 
         $this->authorize('view', $submission);
 
         if (! $this->withinMediaLimits($submission, $validated['media_type'], (int) $validated['size_bytes'])) {
             return response()->json([
-                'message' => 'Media limits exceeded for this submission.',
+                'message' => __('Media limits exceeded for this submission.'),
             ], 422);
         }
 
@@ -138,10 +145,16 @@ class MediaController extends Controller
 
     public function completeUpload(Request $request, MediaAsset $mediaAsset): JsonResponse
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'size_bytes' => ['nullable', 'integer', 'min:1'],
             'checksum_sha256' => ['nullable', 'regex:/^[A-Fa-f0-9]{64}$/'],
         ]);
+
+        if ($validator->fails()) {
+            return $this->returnValidationError($validator);
+        }
+
+        $validated = $validator->validated();
 
         $mediaAsset->load('submission');
 
@@ -169,7 +182,7 @@ class MediaController extends Controller
         );
 
         return response()->json([
-            'message' => 'Media upload completed and processing queued.',
+            'message' => __('Media upload completed and processing queued.'),
             'media_asset' => $this->serializeMediaAsset($mediaAsset->fresh()),
         ]);
     }
@@ -182,7 +195,7 @@ class MediaController extends Controller
 
         if ($request->user()->hasRole('partner_donor_viewer')) {
             return response()->json([
-                'message' => 'Raw media is not available in donor view.',
+                'message' => __('Raw media is not available in donor view.'),
             ], 403);
         }
 

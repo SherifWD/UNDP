@@ -35,7 +35,7 @@ class EnsureActiveUser
             );
 
             return response()->json([
-                'message' => 'Your account is disabled. Please contact an administrator.',
+                'message' => __('Your account is disabled. Please contact an administrator.'),
             ], 403);
         }
 

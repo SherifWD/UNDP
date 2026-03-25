@@ -32,7 +32,7 @@ class ReportingController extends MobileController
                 UserRole::REPORTER->value,
                 UserRole::MUNICIPAL_FOCAL_POINT->value,
             ]) && (int) $project->municipality_id !== (int) $user->municipality_id) {
-                return $this->errorResponse('Access denied.', 403);
+                return $this->errorResponse(__('Access denied.'), 403);
             }
 
             $projectPayload = $this->serializeProject($project, $user);

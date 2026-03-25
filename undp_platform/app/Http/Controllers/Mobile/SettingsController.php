@@ -14,9 +14,9 @@ class SettingsController extends MobileController
         return $this->successResponse([
             'language' => [
                 'selected' => $request->user()->preferred_locale,
-                'available' => config('mobile.available_locales', []),
+                'available' => $this->localizeResponseRows(config('mobile.available_locales', []), ['label']),
             ],
-            'permissions' => config('mobile.permissions', []),
+            'permissions' => $this->localizeResponseRows(config('mobile.permissions', []), ['label', 'description']),
             'actions' => [
                 'can_logout' => true,
             ],
@@ -45,7 +45,7 @@ class SettingsController extends MobileController
 
         return $this->successResponse([
             'preferred_locale' => $request->user()->preferred_locale,
-            'available_locales' => config('mobile.available_locales', []),
-        ], 'Language updated successfully.');
+            'available_locales' => $this->localizeResponseRows(config('mobile.available_locales', []), ['label']),
+        ], __('Language updated successfully.'));
     }
 }

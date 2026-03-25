@@ -46,7 +46,7 @@ class ProfileController extends MobileController
 
         return $this->successResponse([
             'profile' => $this->serializeProfile($user),
-        ], 'Profile updated successfully.');
+        ], __('Profile updated successfully.'));
     }
 
     public function uploadAvatar(Request $request): JsonResponse
@@ -75,7 +75,7 @@ class ProfileController extends MobileController
 
         return $this->successResponse([
             'profile' => $this->serializeProfile($user),
-        ], 'Profile image updated successfully.');
+        ], __('Profile image updated successfully.'));
     }
 
     private function serializeProfile($user): array

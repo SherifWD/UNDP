@@ -14,6 +14,7 @@ use App\Support\PhoneNumber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Laravel\Sanctum\PersonalAccessToken;
 use Throwable;
@@ -26,10 +27,16 @@ class AuthController extends Controller
 
     public function requestOtp(Request $request): JsonResponse
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'country_code' => ['required', 'regex:/^\+?[0-9]{1,4}$/'],
             'phone' => ['required', 'digits_between:6,15'],
         ]);
+
+        if ($validator->fails()) {
+            return $this->returnValidationError($validator);
+        }
+
+        $validated = $validator->validated();
 
         $phoneData = PhoneNumber::normalize($validated['country_code'], $validated['phone']);
         $user = User::query()->where('phone_e164', $phoneData['phone_e164'])->first();
@@ -118,12 +125,18 @@ class AuthController extends Controller
 
     public function verifyOtp(Request $request): JsonResponse
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'country_code' => ['required', 'regex:/^\+?[0-9]{1,4}$/'],
             'phone' => ['required', 'digits_between:6,15'],
             'code' => ['required', 'digits_between:4,8'],
             'preferred_locale' => ['nullable', Rule::in(['ar', 'en'])],
         ]);
+
+        if ($validator->fails()) {
+            return $this->returnValidationError($validator);
+        }
+
+        $validated = $validator->validated();
 
         $phoneData = PhoneNumber::normalize($validated['country_code'], $validated['phone']);
         $user = User::query()->where('phone_e164', $phoneData['phone_e164'])->first();
@@ -232,10 +245,16 @@ class AuthController extends Controller
 
     public function refreshToken(Request $request): JsonResponse
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'refresh_token' => ['required', 'string'],
             'preferred_locale' => ['nullable', Rule::in(['ar', 'en'])],
         ]);
+
+        if ($validator->fails()) {
+            return $this->returnValidationError($validator);
+        }
+
+        $validated = $validator->validated();
 
         $personalAccessToken = PersonalAccessToken::findToken($validated['refresh_token']);
 
@@ -311,20 +330,20 @@ class AuthController extends Controller
 
         return response()->json([
             'municipalities' => $municipalities,
-            'genders' => [
+            'genders' => $this->localizeResponseRows([
                 ['value' => 'male', 'label' => 'Man'],
                 ['value' => 'female', 'label' => 'Woman'],
                 ['value' => 'other', 'label' => 'Other'],
                 ['value' => 'prefer_not_to_say', 'label' => 'Prefer not to say'],
-            ],
-            'available_locales' => config('mobile.available_locales', []),
+            ], ['label']),
+            'available_locales' => $this->localizeResponseRows(config('mobile.available_locales', []), ['label']),
             'default_country_code' => '+218',
         ]);
     }
 
     public function registerReporter(Request $request): JsonResponse
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'country_code' => ['required', 'regex:/^\+?[0-9]{1,4}$/'],
             'phone' => ['required', 'digits_between:6,15'],
             'name' => ['required', 'string', 'max:255'],
@@ -334,6 +353,12 @@ class AuthController extends Controller
             'email' => ['nullable', 'email', 'max:255', Rule::unique('users', 'email')],
             'preferred_locale' => ['nullable', Rule::in(['ar', 'en'])],
         ]);
+
+        if ($validator->fails()) {
+            return $this->returnValidationError($validator);
+        }
+
+        $validated = $validator->validated();
 
         $phoneData = PhoneNumber::normalize($validated['country_code'], $validated['phone']);
 
@@ -419,9 +444,15 @@ class AuthController extends Controller
 
     public function updateDeviceToken(Request $request): JsonResponse
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'fcm_token' => ['required', 'string', 'max:255'],
         ]);
+
+        if ($validator->fails()) {
+            return $this->returnValidationError($validator);
+        }
+
+        $validated = $validator->validated();
 
         $request->user()->forceFill([
             'fcm_token' => $validated['fcm_token'],
