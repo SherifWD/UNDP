@@ -9,6 +9,7 @@ use App\Models\Municipality;
 use App\Models\Project;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\MediaStorageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Http\UploadedFile;
@@ -566,6 +567,8 @@ class MobileApiTest extends TestCase
 
     public function test_reporter_can_submit_using_assets_alias(): void
     {
+        $this->fakeS3MediaStorage();
+
         $municipality = Municipality::query()->create([
             'name_en' => 'Alkufraa',
             'name_ar' => 'الكفرة',
@@ -609,7 +612,7 @@ class MobileApiTest extends TestCase
             'submission_id' => $submissionId,
             'uploaded_by' => $reporter->id,
             'client_media_id' => 'assets-alias-1',
-            'disk' => 'public',
+            'disk' => 's3',
             'bucket' => null,
             'object_key' => 'mobile/assets/'.$submissionId.'/assets-alias-1.jpg',
             'media_type' => 'image',
@@ -644,12 +647,12 @@ class MobileApiTest extends TestCase
             ->assertJsonPath('data.submission.data.activity_started', true)
             ->assertJsonPath('data.submission.media_assets.0.id', $mediaAsset->id)
             ->assertJsonPath('data.submission.assets.0.id', $mediaAsset->id)
-            ->assertJsonPath('data.submission.assets.0.url', url('/storage/'.$mediaAsset->object_key));
+            ->assertJsonPath('data.submission.assets.0.url', $this->expectedMediaUrl($mediaAsset));
     }
 
     public function test_reporter_can_upload_assets_via_submission_form_data(): void
     {
-        Storage::fake(config('media.direct_upload_disk', config('media.disk', 'public')));
+        $this->fakeS3MediaStorage();
 
         $municipality = Municipality::query()->create([
             'name_en' => 'Alkufraa',
@@ -727,9 +730,9 @@ class MobileApiTest extends TestCase
             ->first();
 
         $this->assertNotNull($mediaAsset);
-        $this->assertSame('public', $mediaAsset->disk);
+        $this->assertSame('s3', $mediaAsset->disk);
         $this->assertStringStartsWith('mobile/assets/'.$submissionId.'/', $mediaAsset->object_key);
-        $submitResponse->assertJsonPath('data.submission.assets.0.url', url('/storage/'.$mediaAsset->object_key));
+        $submitResponse->assertJsonPath('data.submission.assets.0.url', $this->expectedMediaUrl($mediaAsset));
         Storage::disk(config('media.direct_upload_disk', config('media.disk', 'public')))
             ->assertExists($mediaAsset->object_key);
     }
@@ -874,6 +877,8 @@ class MobileApiTest extends TestCase
 
     public function test_reporting_options_expose_status_driven_mobile_flow(): void
     {
+        $this->fakeS3MediaStorage();
+
         $municipality = Municipality::query()->create([
             'name_en' => 'Alkufraa',
             'name_ar' => 'الكفرة',
@@ -929,13 +934,14 @@ class MobileApiTest extends TestCase
             ->assertJsonPath('data.submission_contract.update.multipart_transport.form_field', '_method=PUT')
             ->assertJsonPath('data.submission_contract.field_aliases.activities_started.0', 'activity_started')
             ->assertJsonPath('data.submission_contract.field_aliases.activities_started.1', 'activities_workshops_or_training_started')
-            ->assertJsonPath('data.submission_contract.media_storage.disk', 'public')
-            ->assertJsonPath('data.submission_contract.media_storage.base_url', url('/storage/mobile/assets'))
-            ->assertJsonPath('data.submission_contract.media_storage.public_path_pattern', 'storage/app/public/mobile/assets/{submission_id}/{filename}')
-            ->assertJsonPath('data.submission_contract.media_storage.presigned_uploads_enabled', false)
-            ->assertJsonPath('data.submission_contract.media_upload_flow.0.endpoint', 'POST /api/mobile/submissions')
-            ->assertJsonPath('data.submission_contract.media_upload_flow.1.endpoint', 'POST /api/mobile/submissions/{submission_id} with _method=PUT')
-            ->assertJsonPath('data.submission_contract.media_upload_flow.2.endpoint', 'GET /api/mobile/media/{media_asset_id}/download-url')
+            ->assertJsonPath('data.submission_contract.media_storage.disk', 's3')
+            ->assertJsonPath('data.submission_contract.media_storage.base_url', null)
+            ->assertJsonPath('data.submission_contract.media_storage.public_path_pattern', null)
+            ->assertJsonPath('data.submission_contract.media_storage.presigned_uploads_enabled', true)
+            ->assertJsonPath('data.submission_contract.media_storage.download_strategy', 'temporary_url')
+            ->assertJsonPath('data.submission_contract.media_upload_flow.0.endpoint', 'POST /api/mobile/submissions or POST /api/mobile/submissions/{submission_id} with _method=PUT')
+            ->assertJsonPath('data.submission_contract.media_upload_flow.2.endpoint', 'POST /api/mobile/media/presign-upload')
+            ->assertJsonPath('data.submission_contract.media_upload_flow.4.endpoint', 'POST /api/mobile/media/{media_asset_id}/complete')
             ->assertJsonPath('data.media_limits.images.max_count', 10);
     }
 
@@ -1063,7 +1069,7 @@ class MobileApiTest extends TestCase
 
     public function test_reporter_can_list_and_remove_submission_media(): void
     {
-        Storage::fake('public');
+        $this->fakeS3MediaStorage();
 
         $municipality = Municipality::query()->create([
             'name_en' => 'Alkufraa',
@@ -1105,7 +1111,7 @@ class MobileApiTest extends TestCase
             'submission_id' => $submission->id,
             'uploaded_by' => $reporter->id,
             'client_media_id' => 'm-1',
-            'disk' => 'public',
+            'disk' => 's3',
             'bucket' => null,
             'object_key' => 'mobile/assets/'.$submission->id.'/media-1.jpg',
             'media_type' => 'image',
@@ -1121,7 +1127,7 @@ class MobileApiTest extends TestCase
             'submission_id' => $submission->id,
             'uploaded_by' => $reporter->id,
             'client_media_id' => 'm-2',
-            'disk' => 'public',
+            'disk' => 's3',
             'bucket' => null,
             'object_key' => 'mobile/assets/'.$submission->id.'/media-2.jpg',
             'media_type' => 'image',
@@ -1132,8 +1138,8 @@ class MobileApiTest extends TestCase
             'display_order' => 0,
         ]);
 
-        Storage::disk('public')->put($firstMedia->object_key, 'media-1');
-        Storage::disk('public')->put($secondMedia->object_key, 'media-2');
+        Storage::disk('s3')->put($firstMedia->object_key, 'media-1');
+        Storage::disk('s3')->put($secondMedia->object_key, 'media-2');
 
         $submission->forceFill([
             'media' => [
@@ -1149,9 +1155,9 @@ class MobileApiTest extends TestCase
         $listResponse
             ->assertOk()
             ->assertJsonPath('data.media_assets.0.id', $secondMedia->id)
-            ->assertJsonPath('data.media_assets.0.url', url('/storage/'.$secondMedia->object_key))
+            ->assertJsonPath('data.media_assets.0.url', $this->expectedMediaUrl($secondMedia))
             ->assertJsonPath('data.media_assets.1.id', $firstMedia->id)
-            ->assertJsonPath('data.media_assets.1.url', url('/storage/'.$firstMedia->object_key));
+            ->assertJsonPath('data.media_assets.1.url', $this->expectedMediaUrl($firstMedia));
 
         $deleteResponse = $this->deleteJson('/api/mobile/submissions/'.$submission->id.'/media/'.$secondMedia->id);
 
@@ -1162,12 +1168,12 @@ class MobileApiTest extends TestCase
         $this->assertDatabaseMissing('media_assets', [
             'id' => $secondMedia->id,
         ]);
-        Storage::disk('public')->assertMissing($secondMedia->object_key);
+        Storage::disk('s3')->assertMissing($secondMedia->object_key);
     }
 
-    public function test_mobile_media_download_url_returns_public_storage_url(): void
+    public function test_mobile_media_download_url_returns_s3_backed_url(): void
     {
-        Storage::fake('public');
+        $this->fakeS3MediaStorage();
 
         $municipality = Municipality::query()->create([
             'name_en' => 'Alkufraa',
@@ -1204,7 +1210,7 @@ class MobileApiTest extends TestCase
             'uuid' => (string) Str::uuid(),
             'submission_id' => $submission->id,
             'uploaded_by' => $reporter->id,
-            'disk' => 'public',
+            'disk' => 's3',
             'bucket' => null,
             'object_key' => 'mobile/assets/'.$submission->id.'/downloadable.jpg',
             'media_type' => 'image',
@@ -1218,24 +1224,17 @@ class MobileApiTest extends TestCase
             ->storeAs(
                 'mobile/assets/'.$submission->id,
                 'downloadable.jpg',
-                'public',
+                's3',
             );
 
         Sanctum::actingAs($reporter);
 
         $response = $this->getJson('/api/mobile/media/'.$mediaAsset->id.'/download-url');
 
-        $downloadUrl = $response->json('url');
-        $downloadPath = parse_url((string) $downloadUrl, PHP_URL_PATH);
-
         $response
             ->assertOk()
             ->assertJsonPath('media_asset_id', $mediaAsset->id)
-            ->assertJsonPath('url', url('/storage/'.$mediaAsset->object_key));
-
-        $this->get($downloadPath)
-            ->assertOk()
-            ->assertHeader('Content-Type', 'image/jpeg');
+            ->assertJsonPath('url', $this->expectedMediaUrl($mediaAsset));
     }
 
     public function test_reporter_can_read_and_mark_mobile_notifications(): void
@@ -1432,5 +1431,26 @@ class MobileApiTest extends TestCase
             ->assertHeader('X-Resolved-Locale', 'en')
             ->assertJsonPath('message', 'The per page field must be at least 1.')
             ->assertJsonPath('msg', 'The per page field must be at least 1.');
+    }
+
+    private function fakeS3MediaStorage(): void
+    {
+        config()->set('media.disk', 's3');
+        config()->set('media.direct_upload_disk', 's3');
+        config()->set('filesystems.disks.s3.key', 'testing');
+        config()->set('filesystems.disks.s3.secret', 'testing');
+        config()->set('filesystems.disks.s3.region', 'us-east-1');
+        config()->set('filesystems.disks.s3.bucket', 'undp-media-test');
+        config()->set('filesystems.disks.s3.url', 'https://media.example.test');
+
+        Storage::fake('s3');
+    }
+
+    private function expectedMediaUrl(MediaAsset $mediaAsset): string
+    {
+        return app(MediaStorageService::class)->createDownloadUrl(
+            $mediaAsset->fresh(),
+            (int) config('media.presigned_download_expiry_seconds', 600),
+        );
     }
 }

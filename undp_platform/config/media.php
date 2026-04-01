@@ -1,8 +1,8 @@
 <?php
 
 return [
-    'disk' => env('MEDIA_DISK', 'public'),
-    'direct_upload_disk' => env('MEDIA_DIRECT_UPLOAD_DISK', env('MEDIA_DISK', 'public')),
+    'disk' => env('MEDIA_DISK', 's3'),
+    'direct_upload_disk' => env('MEDIA_DIRECT_UPLOAD_DISK', env('MEDIA_DISK', 's3')),
 
     'presigned_upload_expiry_seconds' => env('MEDIA_PRESIGNED_UPLOAD_EXPIRY_SECONDS', 900),
     'presigned_download_expiry_seconds' => env('MEDIA_PRESIGNED_DOWNLOAD_EXPIRY_SECONDS', 600),

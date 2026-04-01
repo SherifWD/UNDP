@@ -6,11 +6,15 @@ use App\Enums\FundingRequestStatus;
 use App\Enums\SubmissionStatus;
 use App\Enums\UserRole;
 use App\Models\FundingRequest;
+use App\Models\MediaAsset;
 use App\Models\Municipality;
 use App\Models\Project;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\MediaStorageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -88,6 +92,85 @@ class DashboardApiTest extends TestCase
         $response = $this->getJson('/api/dashboard/kpis');
 
         $response->assertForbidden();
+    }
+
+    public function test_dashboard_submission_media_reads_from_s3_backed_urls(): void
+    {
+        $this->fakeS3MediaStorage();
+
+        $municipality = Municipality::query()->create([
+            'name_en' => 'Tripoli',
+            'name_ar' => 'طرابلس',
+            'code' => 'TRI',
+        ]);
+
+        $project = Project::query()->create([
+            'municipality_id' => $municipality->id,
+            'name_en' => 'Water Network',
+            'name_ar' => 'شبكة المياه',
+            'status' => 'active',
+            'latitude' => 32.8872,
+            'longitude' => 13.1913,
+        ]);
+
+        $reporter = User::factory()->create([
+            'role' => UserRole::REPORTER->value,
+            'municipality_id' => $municipality->id,
+        ]);
+
+        $submission = Submission::query()->create([
+            'reporter_id' => $reporter->id,
+            'project_id' => $project->id,
+            'municipality_id' => $municipality->id,
+            'status' => SubmissionStatus::UNDER_REVIEW->value,
+            'title' => 'Reporter scoped item',
+            'media' => [],
+        ]);
+
+        $mediaAsset = MediaAsset::query()->create([
+            'uuid' => (string) Str::uuid(),
+            'submission_id' => $submission->id,
+            'uploaded_by' => $reporter->id,
+            'disk' => 's3',
+            'bucket' => 'undp-media-test',
+            'object_key' => 'mobile/assets/'.$submission->id.'/dashboard-evidence.jpg',
+            'media_type' => 'image',
+            'mime_type' => 'image/jpeg',
+            'original_filename' => 'dashboard-evidence.jpg',
+            'size_bytes' => 1024,
+            'status' => 'uploaded',
+            'uploaded_at' => now(),
+        ]);
+
+        $submission->forceFill([
+            'media' => [
+                ['id' => $mediaAsset->id, 'type' => 'image', 'label' => 'Dashboard evidence'],
+            ],
+        ])->save();
+
+        Storage::disk('s3')->put($mediaAsset->object_key, 'image-bytes');
+
+        $admin = User::factory()->create([
+            'role' => UserRole::UNDP_ADMIN->value,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $expectedUrl = $this->expectedMediaUrl($mediaAsset);
+
+        $showResponse = $this->getJson('/api/submissions/'.$submission->id);
+
+        $showResponse
+            ->assertOk()
+            ->assertJsonPath('submission.media_assets.0.id', $mediaAsset->id)
+            ->assertJsonPath('submission.media_assets.0.url', $expectedUrl);
+
+        $downloadResponse = $this->getJson('/api/media/'.$mediaAsset->id.'/download-url');
+
+        $downloadResponse
+            ->assertOk()
+            ->assertJsonPath('media_asset_id', $mediaAsset->id)
+            ->assertJsonPath('url', $expectedUrl);
     }
 
     public function test_map_endpoint_returns_markers_and_clusters(): void
@@ -633,6 +716,27 @@ class DashboardApiTest extends TestCase
         $this->assertSame(
             ['European Union', 'UNDP Libya', 'World Bank'],
             collect($response->json('funding_overview.source_options', []))->pluck('name')->all(),
+        );
+    }
+
+    private function fakeS3MediaStorage(): void
+    {
+        config()->set('media.disk', 's3');
+        config()->set('media.direct_upload_disk', 's3');
+        config()->set('filesystems.disks.s3.key', 'testing');
+        config()->set('filesystems.disks.s3.secret', 'testing');
+        config()->set('filesystems.disks.s3.region', 'us-east-1');
+        config()->set('filesystems.disks.s3.bucket', 'undp-media-test');
+        config()->set('filesystems.disks.s3.url', 'https://media.example.test');
+
+        Storage::fake('s3');
+    }
+
+    private function expectedMediaUrl(MediaAsset $mediaAsset): string
+    {
+        return app(MediaStorageService::class)->createDownloadUrl(
+            $mediaAsset->fresh(),
+            (int) config('media.presigned_download_expiry_seconds', 600),
         );
     }
 }

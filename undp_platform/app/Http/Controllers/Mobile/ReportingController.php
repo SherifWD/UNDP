@@ -371,6 +371,12 @@ class ReportingController extends MobileController
 
     private function mediaBaseUrl(string $disk): ?string
     {
+        $diskConfig = config("filesystems.disks.{$disk}");
+
+        if (($diskConfig['driver'] ?? null) === 's3') {
+            return null;
+        }
+
         try {
             $url = Storage::disk($disk)->url('mobile/assets');
         } catch (\Throwable) {
