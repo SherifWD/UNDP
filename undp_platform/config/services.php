@@ -33,11 +33,15 @@ return [
         ],
     ],
 
-    'isendly' => [
-        'enabled' => (bool) env('ISENDLY_ENABLED', false),
-        'base_url' => env('ISENDLY_BASE_URL', 'https://api.isend.ly'),
-        'api_key' => env('ISENDLY_API_KEY'),
-        'sender_id' => env('ISENDLY_SENDER_ID', 'UNDP'),
+    'resala' => [
+        'enabled' => (bool) env('RESALA_ENABLED', false),
+        'base_url' => env('RESALA_BASE_URL', 'https://dev.resala.ly/api/v1'),
+        'token' => env('RESALA_AUTH_TOKEN'),
+        'service_name' => env('RESALA_SERVICE_NAME', env('APP_NAME', 'UNDP')),
+        'autofill_signature' => env('RESALA_AUTOFILL_SIGNATURE'),
+        'region' => env('RESALA_REGION'),
+        'test_mode' => (bool) env('RESALA_TEST_MODE', false),
+        'timeout_seconds' => env('RESALA_TIMEOUT_SECONDS', 10),
     ],
 
     'fcm' => [

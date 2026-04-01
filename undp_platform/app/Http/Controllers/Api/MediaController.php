@@ -22,7 +22,7 @@ class MediaController extends Controller
 
     public function presignUpload(Request $request): JsonResponse
     {
-        $disk = (string) config('media.disk', 'public');
+        $disk = (string) config('media.direct_upload_disk', config('media.disk', 'public'));
         $diskConfig = config("filesystems.disks.{$disk}");
 
         if (($diskConfig['driver'] ?? null) !== 's3') {

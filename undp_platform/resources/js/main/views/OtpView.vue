@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '../stores/auth';
@@ -11,11 +11,22 @@ const auth = useAuthStore();
 const ui = useUiStore();
 const { t, locale } = useI18n();
 
+const normalizeOtpLength = (value) => {
+    const parsed = Number.parseInt(String(value ?? ''), 10);
+
+    if (Number.isNaN(parsed)) {
+        return 6;
+    }
+
+    return Math.max(4, Math.min(parsed, 6));
+};
+
 const countryCode = computed(() => route.query.country_code || auth.otpContext?.country_code || '+218');
+const otpLength = computed(() => normalizeOtpLength(route.query.digits || auth.otpContext?.otp_digits || 6));
 const phone = computed(() => route.query.phone || auth.otpContext?.phone || '');
 const maskedPhone = computed(() => auth.otpContext?.masked_phone || `${countryCode.value} ****${String(phone.value).slice(-2)}`);
 
-const digits = ref(['', '', '', '', '', '']);
+const digits = ref(Array.from({ length: otpLength.value }, () => ''));
 const inputs = ref([]);
 const error = ref('');
 const loading = ref(false);
@@ -23,7 +34,7 @@ const countdown = ref(60);
 let interval;
 
 const code = computed(() => digits.value.join(''));
-const canVerify = computed(() => code.value.length === 6 && !digits.value.includes(''));
+const canVerify = computed(() => code.value.length === otpLength.value && !digits.value.includes(''));
 
 const focusInput = (index) => {
     inputs.value[index]?.focus();
@@ -33,7 +44,7 @@ const handleInput = (index, event) => {
     const value = event.target.value.replace(/\D/g, '').slice(-1);
     digits.value[index] = value;
 
-    if (value && index < 5) {
+    if (value && index < digits.value.length - 1) {
         focusInput(index + 1);
     }
 };
@@ -43,6 +54,14 @@ const handleKeydown = (index, event) => {
         focusInput(index - 1);
     }
 };
+
+watch(otpLength, (length) => {
+    if (digits.value.length === length) {
+        return;
+    }
+
+    digits.value = Array.from({ length }, (_, index) => digits.value[index] || '');
+});
 
 const startCountdown = () => {
     clearInterval(interval);

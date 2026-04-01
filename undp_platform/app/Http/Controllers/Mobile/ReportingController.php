@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Project;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class ReportingController extends MobileController
@@ -93,9 +94,13 @@ class ReportingController extends MobileController
                 'media_storage' => [
                     'disk' => $mediaDisk,
                     'driver' => $mediaDiskConfig['driver'] ?? null,
-                    'base_url' => url('/storage/mobile/assets'),
-                    'public_path_pattern' => 'storage/app/public/mobile/assets/{submission_id}/{filename}',
+                    'base_url' => $this->mediaBaseUrl($mediaDisk),
+                    'bucket' => $mediaDiskConfig['bucket'] ?? null,
+                    'endpoint' => $mediaDiskConfig['endpoint'] ?? null,
+                    'object_key_pattern' => 'mobile/assets/{submission_id}/{filename}',
+                    'public_path_pattern' => $this->mediaPublicPathPattern($mediaDiskConfig),
                     'presigned_uploads_enabled' => $presignedUploadsEnabled,
+                    'download_strategy' => $presignedUploadsEnabled ? 'temporary_url' : 'direct_url',
                 ],
                 'media_upload_flow' => $presignedUploadsEnabled
                     ? [
@@ -362,6 +367,42 @@ class ReportingController extends MobileController
                 ],
             ],
         ];
+    }
+
+    private function mediaBaseUrl(string $disk): ?string
+    {
+        try {
+            $url = Storage::disk($disk)->url('mobile/assets');
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+            return rtrim($url, '/');
+        }
+
+        return rtrim(url($url), '/');
+    }
+
+    private function mediaPublicPathPattern(array $diskConfig): ?string
+    {
+        if (($diskConfig['driver'] ?? null) !== 'local') {
+            return null;
+        }
+
+        $root = rtrim((string) ($diskConfig['root'] ?? ''), DIRECTORY_SEPARATOR);
+
+        if ($root === '') {
+            return null;
+        }
+
+        $basePath = rtrim(base_path(), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
+
+        if (str_starts_with($root, $basePath)) {
+            $root = substr($root, strlen($basePath));
+        }
+
+        return trim($root, DIRECTORY_SEPARATOR).'/mobile/assets/{submission_id}/{filename}';
     }
 
     private function yesNoOptions(): array

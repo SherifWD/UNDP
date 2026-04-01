@@ -49,7 +49,7 @@ const submit = async () => {
     loading.value = true;
 
     try {
-        await auth.requestOtp({
+        const result = await auth.requestOtp({
             country_code: form.country_code,
             phone: phoneDigits.value,
         });
@@ -58,6 +58,7 @@ const submit = async () => {
             name: 'otp',
             query: {
                 country_code: form.country_code,
+                digits: result.code_digits || 6,
                 phone: phoneDigits.value,
             },
         });

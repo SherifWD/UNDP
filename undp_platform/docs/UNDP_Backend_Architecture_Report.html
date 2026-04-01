@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UNDP Platform Backend Architecture Report</title>
+<style>
+@page {
+    margin: 22mm 18mm 20mm 18mm;
+}
+body {
+    font-family: Helvetica, Arial, sans-serif;
+    line-height: 1.52;
+    margin: 30px;
+    color: #1b2638;
+}
+h1, h2, h3, h4 {
+    color: #12344d;
+}
+h1 {
+    font-size: 28px;
+    margin-bottom: 8px;
+    border-bottom: 2px solid #d7deea;
+    padding-bottom: 10px;
+}
+h2 {
+    font-size: 20px;
+    margin-top: 26px;
+    border-bottom: 1px solid #e3e9f3;
+    padding-bottom: 6px;
+}
+h3 {
+    font-size: 15px;
+    margin-top: 18px;
+    margin-bottom: 6px;
+}
+h4 {
+    font-size: 13px;
+    margin-top: 14px;
+    margin-bottom: 6px;
+}
+p, li, td, th {
+    font-size: 11px;
+}
+ul, ol {
+    margin-top: 6px;
+}
+a {
+    color: #1d4ed8;
+    text-decoration: none;
+}
+.cover {
+    page-break-after: always;
+    border: 1px solid #d8dfeb;
+    border-radius: 16px;
+    padding: 28px 30px;
+    background: #fbfcfe;
+}
+.cover h1 {
+    border-bottom: none;
+    margin-top: 0;
+    padding-bottom: 0;
+}
+.small {
+    font-size: 10px;
+    color: #5d6678;
+}
+.meta, .table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 18px;
+}
+.meta td, .table th, .table td {
+    border: 1px solid #d7deea;
+    padding: 8px;
+    vertical-align: top;
+}
+.meta td:first-child {
+    width: 28%;
+    background: #f4f7fb;
+    font-weight: 700;
+}
+.table th {
+    background: #f2f6fb;
+    text-align: left;
+}
+.notice {
+    border-left: 4px solid #1d4ed8;
+    background: #eef4ff;
+    padding: 10px 12px;
+    margin: 12px 0;
+}
+.callout {
+    border: 1px solid #d7deea;
+    background: #f8fbff;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 12px 0;
+}
+.warning {
+    border-left: 4px solid #b45309;
+    background: #fff7ed;
+    padding: 10px 12px;
+    margin: 12px 0;
+}
+.toc {
+    columns: 2;
+    column-gap: 28px;
+    margin-top: 14px;
+}
+.toc ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 0 0 12px;
+    break-inside: avoid;
+}
+.toc li {
+    margin: 4px 0;
+}
+pre {
+    background: #f4f6fa;
+    border: 1px solid #dde4ef;
+    border-radius: 8px;
+    padding: 12px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    font-size: 10px;
+    line-height: 1.42;
+}
+.diagram {
+    background: #f8fafc;
+    border: 1px solid #d7deea;
+}
+.section-break {
+    page-break-before: always;
+}
+.footer-link {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: 10px;
+}
+.tight td, .tight th {
+    padding: 6px 7px;
+}
+</style>
+</head>
+<body>
+<div class="cover" id="top">
+    <h1>UNDP Platform Backend Architecture Report</h1>
+    <p><strong>Document Scope:</strong> Backend system architecture, authorization model, submission workflow, media design, auditability, reporting, and hosting topology.</p>
+    <p><strong>Platform Positioning:</strong> Laravel API-first backend hosted on a Libyan Spider VPS, with private S3-compatible object storage used for evidence media and backups only.</p>
+    <p class="small">Prepared from the current repository context and the supplied architecture brief on 31 March 2026.</p>
+
+    <table class="meta">
+        <tr><td>Primary Compute Hosting</td><td>Libyan Spider VPS</td></tr>
+        <tr><td>Compute Profile</td><td>2 vCPU, 8 GB RAM, 80 GB SSD, 20 TB bandwidth</td></tr>
+        <tr><td>Backend Framework</td><td>Laravel 12.x</td></tr>
+        <tr><td>Primary Database</td><td>MySQL with Eloquent ORM</td></tr>
+        <tr><td>Queue Driver</td><td>Laravel Queues using the database driver</td></tr>
+        <tr><td>Authentication Layer</td><td>Laravel Sanctum with OTP login, access tokens, and refresh tokens</td></tr>
+        <tr><td>OTP Gateway</td><td>Resala OTP</td></tr>
+        <tr><td>Push Notifications</td><td>Firebase Cloud Messaging (FCM)</td></tr>
+        <tr><td>Media Storage</td><td>AWS S3 or equivalent S3-compatible private object storage</td></tr>
+        <tr><td>Localization</td><td>Arabic / English</td></tr>
+    </table>
+
+    <div class="notice">
+        This is not an AWS hosting report. Application compute, PHP runtime, MySQL, scheduler, and queue workers are hosted on the Libyan Spider VPS. AWS S3 is relevant only as private object storage for evidence media and backup retention.
+    </div>
+
+    <h2>Contents</h2>
+    <div class="toc">
+        <ul>
+            <li><a href="#objective">Objective</a></li>
+            <li><a href="#section-1">1. Architectural Overview</a></li>
+            <li><a href="#section-2">2. Core Technology Stack</a></li>
+            <li><a href="#section-3">3. Authentication &amp; Authorization</a></li>
+            <li><a href="#section-4">4. Submission Lifecycle &amp; Workflow Engine</a></li>
+            <li><a href="#section-5">5. Media Handling &amp; Evidence Management</a></li>
+            <li><a href="#section-6">6. Audit Logging &amp; Accountability</a></li>
+            <li><a href="#section-7">7. Web Validation &amp; Oversight Modules</a></li>
+        </ul>
+        <ul>
+            <li><a href="#section-8">8. Dashboards, Reporting &amp; Maps</a></li>
+            <li><a href="#section-9">9. Localization (AR / EN)</a></li>
+            <li><a href="#section-10">10. Security &amp; Privacy Controls</a></li>
+            <li><a href="#section-11">11. Performance &amp; Scalability</a></li>
+            <li><a href="#section-12">12. Alignment With Backlog &amp; Epics</a></li>
+            <li><a href="#section-13">13. Hosting &amp; Object Storage Plan</a></li>
+            <li><a href="#section-14">14. Concluding Architecture Position</a></li>
+        </ul>
+    </div>
+</div>
+
+<h2 id="objective">Objective</h2>
+<p>This document explains the backend architecture by first presenting the main system idea through architecture graphs, then expanding that view into a detailed explanation of the security model, workflow engine, storage design, accountability controls, reporting model, and production hosting plan.</p>
+<p>The report is intended to show how the UNDP Platform backend supports secure municipal reporting, offline-capable mobile submission, validation workflows, donor-safe reporting, bilingual operation, and long-term operational accountability.</p>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-1">1. Architectural Overview</h2>
+<p>The backend is designed as a secure, role-aware, API-first Laravel system supporting offline-capable mobile reporting, role-based validation workflows, municipal and national aggregation, immutable auditability, donor-grade reporting, and bilingual Arabic / English operation.</p>
+
+<h3>1.1 Architectural Goals</h3>
+<ul>
+    <li>Support field reporting from mobile clients that may operate with delayed connectivity.</li>
+    <li>Enforce least-privilege RBAC entirely at the API layer.</li>
+    <li>Separate compute, transactional data, and evidence media responsibilities.</li>
+    <li>Maintain a full immutable governance trail for operationally sensitive actions.</li>
+    <li>Provide municipality-scoped and nationally aggregated reporting views without leaking unauthorized raw data.</li>
+</ul>
+
+<h3>1.2 High-Level Architecture Principles</h3>
+<ul>
+    <li>API-first, RESTful JSON contracts.</li>
+    <li>Strict RBAC enforcement at the API boundary and business-rule layers.</li>
+    <li>Stateless authentication for mobile and tokenized access for API clients.</li>
+    <li>Offline-tolerant submission lifecycle with idempotent retries.</li>
+    <li>Immutable audit logging for governance-critical actions.</li>
+    <li>Compute on VPS, large binary evidence in private object storage.</li>
+</ul>
+
+<h3>1.3 Graph: System Context</h3>
+<pre class="diagram">+------------------------------------+       +------------------------------------+
+| Community Reporter Mobile Client   | ----&gt; |                                    |
+| Offline-capable reporting          |        |                                    |
++------------------------------------+        |                                    |
+                                              |                                    |
++------------------------------------+        |        Laravel 12 API Core         |
+| Municipal Validation Portal        | ----&gt; |     Auth, RBAC, Workflow, Audit    |
+| Web dashboard                      |        |                                    |
++------------------------------------+        |                                    |
+                                              |                                    |
++------------------------------------+        |                                    |
+| UNDP Admin &amp; Oversight Portal      | ----&gt; |                                    |
+| Global reporting and governance    |        |                                    |
++------------------------------------+        +----------------+-------------------+
+                                                               |        |        |
+                                                               |        |        |
+                                                     +---------+   +----+---+ +--+--------------------+
+                                                     | MySQL   |   | DB Queue| | Private S3-compatible |
+                                                     | Eloquent|   | Jobs    | | object storage        |
+                                                     +---------+   +--------+ | evidence + backups    |
+                                                                               +----------------------+
+                                                               |        |
+                                                               |        |
+                                                     +---------+        +-----------------------------+
+                                                     | Resala OTP       | Firebase Cloud Messaging   |
+                                                     | SMS delivery     | push status notifications  |
+                                                     +------------------+-----------------------------+</pre>
+
+<h3>1.4 Graph: Runtime and Control Topology</h3>
+<pre class="diagram">                Libyan Spider VPS
+  +------------------------------------------------------+
+  | Nginx / PHP-FPM / Laravel API / Vue dashboard        |
+  | MySQL / Scheduler / Queue workers / Logs / Config    |
+  +----------------------+-------------------------------+
+                         |                       |
+                         | secure API + auth     | signed media operations
+                         |                       |
+                +--------v--------+      +------v--------------------------+
+                | Mobile / Web    |      | AWS S3 or S3-compatible bucket  |
+                | API consumers   |      | private evidence media storage  |
+                +-----------------+      +---------------------------------+</pre>
+
+<div class="callout">
+    Architecture note: where the current repository already implements a capability directly, the report describes it as implemented. Where the report defines the intended production operating shape, such as the final object-key taxonomy or media processing pipeline, the document identifies it as the operational design target.
+</div>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-2">2. Core Technology Stack</h2>
+<table class="table tight">
+    <tr><th>Layer</th><th>Technology</th><th>Architectural Role</th></tr>
+    <tr><td>Backend Framework</td><td>Laravel 12.x</td><td>RESTful API core, middleware, policies, queue dispatch, localization, and operational services.</td></tr>
+    <tr><td>API Authentication</td><td>Laravel Sanctum</td><td>Access tokens, refresh tokens, protected API routes, current-token invalidation when accounts are disabled.</td></tr>
+    <tr><td>Database</td><td>MySQL</td><td>Primary transactional store for users, submissions, workflow events, audit logs, jobs, and settings.</td></tr>
+    <tr><td>ORM</td><td>Eloquent</td><td>Entity modeling, relationships, scopes, and persistence logic.</td></tr>
+    <tr><td>Queue System</td><td>Laravel Queues (DB driver)</td><td>Asynchronous notification dispatch, export tasks, media processing triggers, and retry-safe background work.</td></tr>
+    <tr><td>Notifications &amp; OTP</td><td>Resala OTP + Firebase Cloud Messaging</td><td>OTP delivery for login and push notifications for workflow changes.</td></tr>
+    <tr><td>File Storage</td><td>Object Storage (S3-compatible)</td><td>Private storage of images, videos, thumbnails, and backup artifacts.</td></tr>
+    <tr><td>Localization</td><td>Laravel localization (AR / EN)</td><td>Localized validation messages, labels, and API responses.</td></tr>
+    <tr><td>Authorization</td><td>Spatie roles and permissions + policies + query scopes</td><td>Role and permission storage, middleware enforcement, and scoped data access.</td></tr>
+    <tr><td>Security</td><td>TLS 1.2+, bcrypt / Argon2 policy support</td><td>Transport protection, secure hashing, token protection, and API hardening.</td></tr>
+</table>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-3">3. Authentication &amp; Authorization (AUTH &amp; RBAC)</h2>
+<h3>3.1 Authentication Strategy</h3>
+<p>The platform uses Laravel Sanctum as the unified authentication layer. The current repository implements bearer-style access tokens and refresh tokens for API clients, including the Vue dashboard and mobile-facing flows, while keeping the backend compatible with first-party web deployment patterns.</p>
+
+<table class="table">
+    <tr><th>Channel</th><th>Mechanism</th><th>Current Behavior</th><th>Notes</th></tr>
+    <tr><td>Web Dashboard</td><td>Sanctum-protected API access</td><td>The current Vue client stores a bearer token and sends it on protected requests.</td><td>Used by admins, municipal users, auditors, and partner viewers through the web interface.</td></tr>
+    <tr><td>Mobile Client</td><td>Sanctum personal access token + refresh token</td><td>Login returns access and refresh tokens with expiry metadata.</td><td>Designed for secure device storage and app-managed token refresh.</td></tr>
+    <tr><td>Login Method</td><td>OTP-based identity verification</td><td>OTP requested and verified through Resala-backed endpoints.</td><td>Localized responses and auditable auth events are built in.</td></tr>
+    <tr><td>Device Notification Binding</td><td>FCM token registration</td><td>Authenticated users can update device tokens for push notifications.</td><td>Used after login to support workflow notifications.</td></tr>
+    <tr><td>Disabled User Handling</td><td>Active-user middleware</td><td>Current access token is revoked immediately if a disabled user attempts access.</td><td>Prevents stale token use after account deactivation.</td></tr>
+</table>
+
+<h4>Concrete authentication controls in the current backend</h4>
+<ul>
+    <li>OTP expiry: 300 seconds.</li>
+    <li>OTP resend cooldown: 60 seconds.</li>
+    <li>OTP max verification attempts: 5.</li>
+    <li>OTP code length: 6 digits.</li>
+    <li>OTP rate limiting: 6 requests per minute by IP and 5 requests per minute by phone number.</li>
+    <li>General API throttle: 240 requests per minute by user or IP.</li>
+    <li>Localized error messages returned in Arabic or English depending on resolved locale.</li>
+</ul>
+
+<h4>Security controls</h4>
+<ul>
+    <li>Password or secret hashing uses Laravel hashing facilities. The current environment template exposes <code>BCRYPT_ROUNDS=12</code>; Argon2id remains a valid production policy alternative.</li>
+    <li>No credential material is hard-coded into the client application.</li>
+    <li>Refresh token rotation is enforced by deleting the old refresh token when a new pair is issued.</li>
+    <li>User disable events cause immediate token invalidation at middleware level and are written to the audit trail.</li>
+</ul>
+
+<h3>3.2 Role-Based Access Control (RBAC)</h3>
+<p>Access follows a permission-driven least-privilege model: access is explicitly granted, never implied. Client-side checks exist only to improve UX; all effective protection is performed on the server.</p>
+
+<h4>Key RBAC principles</h4>
+<ul>
+    <li>Least privilege: each role receives only the permissions required to perform its duties.</li>
+    <li>Scoped permissions: visibility is constrained by municipality, ownership, and workflow state.</li>
+    <li>Server-side enforcement only: the backend remains the trust boundary.</li>
+    <li>No implicit access: absence of permission equals denial.</li>
+</ul>
+
+<h4>Representative permission patterns</h4>
+<ul>
+    <li><code>submissions.view.own</code>, <code>submissions.view.municipality</code>, <code>submissions.view.all</code></li>
+    <li><code>submissions.validate</code>, <code>submissions.approve</code>, <code>submissions.reject</code>, <code>submissions.rework</code></li>
+    <li><code>projects.view</code>, <code>projects.manage</code></li>
+    <li><code>audit.view</code>, <code>workflow.manage</code></li>
+    <li><code>dashboards.view.system</code>, <code>dashboards.view.municipality</code>, <code>dashboards.view.partner</code></li>
+    <li><code>media.upload</code>, <code>reports.export.csv</code>, <code>reports.export.pdf</code></li>
+</ul>
+
+<h4>Supported role model</h4>
+<table class="table">
+    <tr><th>Role</th><th>Main Permissions</th><th>Visibility Model</th></tr>
+    <tr><td>Community Reporter</td><td>Create submissions, view own submissions, upload permitted media.</td><td>No cross-municipality visibility. Own records only.</td></tr>
+    <tr><td>Municipal Validation Role</td><td>Review, validate, reject, and rework municipality-scoped submissions.</td><td>Scoped to assigned municipality only.</td></tr>
+    <tr><td>Municipal Focal Point</td><td>Municipality worklists, monitoring, validation oversight, municipal dashboards.</td><td>Full municipality visibility, no global dataset access.</td></tr>
+    <tr><td>UNDP Admin</td><td>Cross-municipality oversight, reporting, user administration, workflow settings, audit access.</td><td>Global visibility across the platform.</td></tr>
+    <tr><td>Partner / Donor Viewer</td><td>Read-only reporting and donor-safe project visibility.</td><td>Aggregated or approved-only data, no unrestricted raw evidence access.</td></tr>
+    <tr><td>Auditor</td><td>Immutable audit review and oversight functions.</td><td>Read access to governance trails and related reporting.</td></tr>
+ </table>
+
+<p class="small">Implementation note: the current repository exposes the concrete roles <code>reporter</code>, <code>municipal_focal_point</code>, <code>undp_admin</code>, <code>partner_donor_viewer</code>, and <code>auditor</code>. Municipality-scoped validation authority is enforced through permissions and the submission access layer.</p>
+
+<h3>3.3 Technological Enforcement (How)</h3>
+<p>RBAC is enforced through three mandatory backend layers working together. No API endpoint should return data outside the caller’s effective scope.</p>
+
+<table class="table">
+    <tr><th>Layer</th><th>Purpose</th><th>Concrete Mechanism</th></tr>
+    <tr><td>Middleware Layer</td><td>Block unauthorized requests before business logic executes.</td><td>Route middleware such as <code>auth:sanctum</code>, <code>active</code>, <code>permission:submissions.validate</code>, and <code>any_permission:dashboards.view.system,...</code>.</td></tr>
+    <tr><td>Policy Layer</td><td>Apply action-specific business rules on protected records.</td><td><code>SubmissionPolicy</code> enforces create, view, approve, reject, and rework authority.</td></tr>
+    <tr><td>Query Scoping Layer</td><td>Ensure data isolation in list and aggregate queries.</td><td><code>SubmissionAccessService</code> and <code>ProjectAccessService</code> constrain results by role, municipality, ownership, and approved-only visibility.</td></tr>
+ </table>
+
+<pre class="diagram">             RBAC Enforcement Stack
+
+   Request enters API
+          |
+          v
+ +------------------------+
+ | Middleware Gatekeeping |
+ | auth, active,          |
+ | permission, throttle   |
+ +-----------+------------+
+             |
+             v
+ +------------------------+
+ | Policy Enforcement     |
+ | view / approve /       |
+ | reject / rework rules  |
+ +-----------+------------+
+             |
+             v
+ +------------------------+
+ | Query Scoping          |
+ | municipality, owner,   |
+ | role, approved-only    |
+ +-----------+------------+
+             |
+             v
+      Scoped JSON response</pre>
+
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-4">4. Submission Lifecycle &amp; Workflow Engine</h2>
+<h3>4.1 Submission States</h3>
+<table class="table tight">
+    <tr><th>State</th><th>Meaning</th></tr>
+    <tr><td>Draft</td><td>Locally saved or server-side editable draft, primarily aligned with the mobile reporting flow.</td></tr>
+    <tr><td>Queued</td><td>Pending synchronization or queued for further processing.</td></tr>
+    <tr><td>Submitted</td><td>Reporter has formally submitted the payload to the backend.</td></tr>
+    <tr><td>Under Review</td><td>Visible in validation worklists and pending municipality or admin action.</td></tr>
+    <tr><td>Approved</td><td>Accepted into the official dataset and eligible for approved-only reporting.</td></tr>
+    <tr><td>Rework Requested</td><td>Returned to the reporter for correction with comment context.</td></tr>
+    <tr><td>Rejected</td><td>Submission denied and retained for governance traceability.</td></tr>
+ </table>
+
+<p>Status and reason dictionaries are stored in dedicated workflow tables and settings structures, so the system can evolve operationally without requiring code deployment for every workflow label change.</p>
+
+<h3>4.2 Offline to Online Submission Flow</h3>
+<pre class="diagram">Mobile user creates report
+        |
+        v
+Local draft stored on device
+        |
+        v
+Connectivity restored
+        |
+        v
+POST submission payload with client_uuid
+        |
+        v
+Backend validates and creates or reuses record idempotently
+        |
+        +------------------+
+        |                  |
+        v                  v
+Media uploaded          Submission state
+through authenticated   transitions to submitted /
+or presigned flow       under review
+        |                  |
+        v                  v
+Media processing queued  Validator action
+        |                  |
+        v                  v
+Variants ready         approve / reject / rework
+        |                  |
+        +---------+--------+
+                  |
+                  v
+       Push notification via FCM
+       + immutable audit trail</pre>
+
+<h4>Idempotency and retry safety</h4>
+<ul>
+    <li>The mobile submission flow accepts a <code>client_uuid</code> and reuses existing submissions when the same identifier is submitted again.</li>
+    <li>Presigned media creation also supports a client-side media identifier to safely reuse an existing media asset record.</li>
+    <li>Retries should not create duplicate submissions or duplicate media records when client identifiers are reused correctly.</li>
+</ul>
+
+<h4>Workflow operating characteristics</h4>
+<ul>
+    <li>Validation actions are explicit: approve, reject, and rework.</li>
+    <li>Status changes are recorded as timeline events.</li>
+    <li>Review decisions generate audit entries and can trigger push notifications.</li>
+    <li>Municipality and role scope continue to apply throughout the full submission lifecycle.</li>
+</ul>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-5">5. Media Handling &amp; Evidence Management</h2>
+<h3>5.1 Media Upload Design</h3>
+<p>Media is uploaded through dedicated authenticated endpoints. When the active media disk is S3-compatible, the backend creates a media metadata record, returns a time-limited pre-signed upload URL, and later marks the media as uploaded before queueing processing. The database stores metadata only, while binary files remain in object storage.</p>
+
+<table class="table">
+    <tr><th>Design Element</th><th>Current / Target Behavior</th></tr>
+    <tr><td>Authorization</td><td>Upload endpoints require authenticated access and permission checks. Submission visibility rules still apply.</td></tr>
+    <tr><td>Validation</td><td>Server validates type, size, count, and submission ownership or visibility before upload metadata is created.</td></tr>
+    <tr><td>Binary Storage</td><td>Files are stored in private object storage, not on the VPS disk.</td></tr>
+    <tr><td>Metadata Persistence</td><td>Database stores object key, media type, original filename, size, checksum, status, and variant references.</td></tr>
+    <tr><td>Processing</td><td>Completion dispatches a background job onto the <code>media</code> queue and updates status from pending to uploaded to processing to ready.</td></tr>
+ </table>
+
+<h3>5.2 Compression Strategy</h3>
+<p>Media compression follows a hybrid client-plus-backend approach: compress as early as possible on the client to reduce field bandwidth and upload cost, then use background processing on the backend to normalize variants and delivery artifacts.</p>
+
+<h4>Image evidence profile</h4>
+<table class="table tight">
+    <tr><th>Rule</th><th>Value</th></tr>
+    <tr><td>Maximum images per upload set</td><td>10</td></tr>
+    <tr><td>Maximum upload size before compression</td><td>15 MB per image</td></tr>
+    <tr><td>Resize guidance</td><td>Resize if width exceeds 2048 px</td></tr>
+    <tr><td>Target long side</td><td>1600 to 2048 px</td></tr>
+    <tr><td>Target quality</td><td>75 to 85</td></tr>
+    <tr><td>Target post-compression size</td><td>0.8 to 2.0 MB</td></tr>
+    <tr><td>Hard rejection threshold after compression</td><td>Greater than 4 MB</td></tr>
+    <tr><td>Generated variants</td><td>Thumbnail 320 px, medium 1024 px, large 2048 px</td></tr>
+ </table>
+
+<h4>Video evidence profile</h4>
+<table class="table tight">
+    <tr><th>Rule</th><th>Value</th></tr>
+    <tr><td>Maximum videos per upload set</td><td>1</td></tr>
+    <tr><td>Maximum upload size before compression</td><td>300 MB</td></tr>
+    <tr><td>Recommended client compression</td><td>Normalize to 1080p, or 720p for larger sources</td></tr>
+    <tr><td>Target post-compression size</td><td>Up to 200 MB</td></tr>
+    <tr><td>Hard rejection threshold</td><td>Greater than 300 MB after compression</td></tr>
+    <tr><td>Backend processing outputs</td><td>Processed MP4 (H.264 + AAC) plus poster frame thumbnail</td></tr>
+ </table>
+
+<h4>Operational processing note</h4>
+<p>The current repository already models media processing asynchronously through <code>ProcessMediaAssetJob</code>. In production, this queue boundary is the correct location to attach real image resizing, thumbnail generation, video transcoding, and poster extraction workers.</p>
+
+<h3>5.3 Secure transfer controls</h3>
+<ul>
+    <li>Pre-signed upload URLs are time-limited. Current default upload TTL: 900 seconds.</li>
+    <li>Pre-signed download URLs are time-limited. Current default download TTL: 600 seconds.</li>
+    <li>Object storage remains private; no public-read policy is required for evidence.</li>
+    <li>Donor-facing users are prevented from directly receiving raw media URLs in restricted contexts.</li>
+</ul>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-6">6. Audit Logging &amp; Accountability</h2>
+<h3>6.1 Audit Log Coverage</h3>
+<p>The backend logs all sensitive and governance-critical actions, including authentication events, user status changes, role and permission-sensitive actions, submission status transitions, media operations, export events, and settings changes.</p>
+
+<table class="table">
+    <tr><th>Audit Area</th><th>Examples</th></tr>
+    <tr><td>Authentication</td><td>OTP requested, login success, token refreshed, token revoked for disabled user.</td></tr>
+    <tr><td>User governance</td><td>User creation, profile update, role change, status disable or enable actions.</td></tr>
+    <tr><td>Submission workflow</td><td>Submission created, re-submitted, approved, rejected, or returned for rework.</td></tr>
+    <tr><td>Media operations</td><td>Pre-signed upload issued, upload completed, processing ready, download URL issued.</td></tr>
+    <tr><td>Configuration</td><td>Global settings updated, workflow or security settings changed.</td></tr>
+    <tr><td>Reporting</td><td>Export task creation and report access events.</td></tr>
+ </table>
+
+<h3>6.2 Audit Log Design</h3>
+<table class="table tight">
+    <tr><th>Field</th><th>Description</th></tr>
+    <tr><td>Timestamp</td><td>Stored as backend-created event time in UTC-capable datetime handling.</td></tr>
+    <tr><td>Actor</td><td>User identifier and associated role context when available.</td></tr>
+    <tr><td>Action</td><td>Machine-readable action code such as login success, media upload completed, or settings updated.</td></tr>
+    <tr><td>Target</td><td>Entity type and entity ID.</td></tr>
+    <tr><td>Metadata</td><td>Old and new values, request context, scope identifiers, or workflow details.</td></tr>
+    <tr><td>Network context</td><td>IP address and user agent where present.</td></tr>
+ </table>
+
+<div class="callout">
+    The audit model is append-only. In the current codebase, attempts to update or delete audit records throw a logic exception. Audit entries are therefore read-only through normal application behavior.
+</div>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<div class="section-break"></div>
+<h2 id="section-7">7. Web Validation &amp; Oversight Modules</h2>
+<h3>7.1 Validator Worklists</h3>
+<ul>
+    <li>Validator and municipality-scoped worklists return only submissions that fall within the user’s allowed municipality scope.</li>
+    <li>Filtering is indexed and aligned to project, date, and status dimensions.</li>
+    <li>Default sort order favors the most recent operationally relevant records.</li>
+    <li>Shared endpoints remain safe because visibility is rechecked by policy and query scope, not only by route selection.</li>
+</ul>
+
+<h3>7.2 Validation Actions</h3>
+<ul>
+    <li>Validation actions are explicit: approve, reject, or request rework.</li>
+    <li>Comments can be mandated by workflow policy for rejection or rework.</li>
+    <li>Updates should be treated transactionally: status transition, status event append, audit log write, and notification trigger belong to one coherent action boundary.</li>
+    <li>UNDP Admin users can exercise global oversight, while municipality-scoped reviewers remain restricted to their assigned scope.</li>
+</ul>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-8">8. Dashboards, Reporting &amp; Maps</h2>
+<h3>8.1 KPI Aggregation Layer</h3>
+<p>The reporting layer supports municipality-level and national oversight through aggregated queries for submission counts, workflow status distribution, municipality totals, and time-based trends. Aggregation remains RBAC-aware so that donor-facing views receive approved or anonymized slices, while internal administrative users can access the full scoped dataset.</p>
+
+<h3>8.2 Reporting posture</h3>
+<ul>
+    <li>UNDP Admin: full cross-municipality visibility and export rights.</li>
+    <li>Municipality-scoped users: municipality-only worklists and dashboards.</li>
+    <li>Partner / Donor viewers: approved, aggregated, or anonymized reporting only.</li>
+    <li>Auditors: immutable activity review and governance-oriented reporting.</li>
+</ul>
+
+<h3>8.3 Geo-mapping support</h3>
+<ul>
+    <li>Submissions and projects can carry latitude and longitude coordinates.</li>
+    <li>The backend provides map-ready endpoints for filtered datasets and marker display.</li>
+    <li>If no coordinate exists, no marker is rendered. The system fails gracefully rather than fabricating spatial data.</li>
+    <li>Mapping remains scope-aware; only authorized records are returned to the client.</li>
+</ul>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-9">9. Localization (AR / EN)</h2>
+<p>The backend supports bilingual operation by design. Locale resolution considers explicit client preference and persisted user locale, and response headers carry the resolved language context.</p>
+
+<table class="table">
+    <tr><th>Localization Area</th><th>Behavior</th></tr>
+    <tr><td>API responses</td><td>Localized via request locale negotiation and persisted user preference.</td></tr>
+    <tr><td>Validation messages</td><td>Returned in the resolved language.</td></tr>
+    <tr><td>Status labels and options</td><td>Exposed in both Arabic and English variants where relevant.</td></tr>
+    <tr><td>Content-Language headers</td><td>Returned by middleware to make locale resolution explicit.</td></tr>
+    <tr><td>User preference storage</td><td>Persisted as <code>preferred_locale</code> on the user model.</td></tr>
+ </table>
+
+<p class="small">Implementation note: the locale middleware in the current backend already resolves locale from preferred locale headers or persisted user settings and returns the resolved language in response headers.</p>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-10">10. Security &amp; Privacy Controls</h2>
+<h3>10.1 Transport and network security</h3>
+<ul>
+    <li>TLS 1.2 or higher is required for all web, API, and object-storage transfers.</li>
+    <li>HSTS should be enabled at the web tier for production dashboard domains.</li>
+    <li>Secure cookie and secure token handling policies apply to first-party web access patterns.</li>
+</ul>
+
+<h3>10.2 Data protection</h3>
+<ul>
+    <li>Minimal PII collection is preferred and access to sensitive identity fields is restricted to authorized internal roles.</li>
+    <li>Tokens are scoped and revocable.</li>
+    <li>Private evidence media is never exposed through public bucket policy.</li>
+    <li>Secrets remain server-side; no long-lived provider secrets should be stored inside the mobile binary.</li>
+</ul>
+
+<h3>10.3 Compliance readiness</h3>
+<ul>
+    <li>Data minimization and purpose limitation guide the platform design.</li>
+    <li>Retention and archiving policy can be represented through system settings and storage lifecycle rules.</li>
+    <li>Audit logging supports accountability, incident review, and donor-grade traceability.</li>
+    <li>Role-scoped reporting prevents donor-facing visibility from exposing raw personal or unrestricted evidence data.</li>
+</ul>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-11">11. Performance &amp; Scalability</h2>
+<h3>11.1 Target operating posture</h3>
+<ul>
+    <li>API p95 target: 500 ms or better for non-media endpoints.</li>
+    <li>Bulk synchronization is supported through queued background work and retry-safe API contracts.</li>
+    <li>Dashboard and reporting queries should be protected by proper indexes and pre-aggregated where necessary.</li>
+</ul>
+
+<h3>11.2 Scalability strategy</h3>
+<ul>
+    <li>The API is logically stateless and therefore scale-ready beyond a single node.</li>
+    <li>Asynchronous work is separated from request-response paths through Laravel queues.</li>
+    <li>Object storage is decoupled from compute so evidence growth does not directly pressure VPS disk capacity.</li>
+    <li>The current database-queue deployment is suitable for the selected VPS footprint and has a clear upgrade path to dedicated queue infrastructure if throughput increases.</li>
+</ul>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-12">12. Alignment With Backlog &amp; Epics</h2>
+<p>This backend architecture directly supports the program goals that matter for implementation and technical handover.</p>
+<ul>
+    <li>All AUTH and RBAC epics through middleware, policy, and scoped-query enforcement.</li>
+    <li>Offline-first mobile workflows through draft handling, idempotent submission identifiers, and asynchronous media processing.</li>
+    <li>Validation portals through municipality-scoped worklists and workflow transitions.</li>
+    <li>Donor-safe reporting through approved-only and aggregated visibility constraints.</li>
+    <li>Auditability and compliance through immutable audit trails and action logging.</li>
+    <li>Performance and load-readiness through queue offloading and object-storage separation.</li>
+    <li>Full technical handover because the architecture is layered, explicit, and operationally documentable.</li>
+</ul>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-13">13. Hosting &amp; Object Storage Plan (Libyan Spider VPS + AWS S3)</h2>
+<h3>13.1 Compute hosting (Linux VPS)</h3>
+<p>The Laravel backend runs on a dedicated Linux VPS hosted by Libyan Spider as the primary compute node.</p>
+
+<table class="table tight">
+    <tr><th>Selected VPS Specification</th><th>Value</th></tr>
+    <tr><td>CPU</td><td>2 vCPU</td></tr>
+    <tr><td>Memory</td><td>8 GB RAM</td></tr>
+    <tr><td>Disk</td><td>80 GB SSD</td></tr>
+    <tr><td>Bandwidth</td><td>20 TB</td></tr>
+ </table>
+
+<p>The VPS hosts the web server, PHP-FPM, Laravel application, Vue dashboard, MySQL, scheduler, queue workers, runtime logs, and application configuration. This keeps core API logic, RBAC enforcement, validation workflows, and database transactions inside one controlled environment.</p>
+
+<h3>13.2 VPS storage scope</h3>
+<p>The VPS disk is reserved for application code, runtime configuration, MySQL data, logs, and static system assets shipped with the platform. User-uploaded evidence media and generated media variants are excluded from long-term VPS storage to prevent disk exhaustion and I/O contention.</p>
+
+<h3>13.3 Object storage for evidence media</h3>
+<p>All evidence media is stored in AWS S3 or an equivalent S3-compatible private object storage service. The database stores metadata only: object key, size, type, processing status, and variant references. This removes large binary I/O from the application server and allows storage capacity to scale independently from compute.</p>
+
+<h3>13.4 Secure media transfer via pre-signed URLs</h3>
+<ul>
+    <li>Upload flow: the backend issues a time-limited pre-signed upload URL after validating authentication, scope, and media rules.</li>
+    <li>Download flow: the backend issues a time-limited download URL only after RBAC authorization and workflow visibility checks pass.</li>
+    <li>Buckets remain private. There is no public-read requirement.</li>
+    <li>This model reduces server bandwidth pressure because Laravel does not proxy large file transfers.</li>
+</ul>
+
+<h3>13.5 Evidence storage layout</h3>
+<p>The operational storage design should follow a clear object-key convention so evidence remains traceable to submission and media records.</p>
+<pre>evidence/raw/{submission_id}/{media_id}/original.ext
+evidence/derived/{submission_id}/{media_id}/thumb.jpg
+evidence/derived/{submission_id}/{media_id}/medium.jpg
+evidence/derived/{submission_id}/{media_id}/large.jpg
+evidence/video/{submission_id}/{media_id}/source.ext
+evidence/video/{submission_id}/{media_id}/processed.mp4
+evidence/video/{submission_id}/{media_id}/poster.jpg</pre>
+
+<p class="small">Current implementation note: the repository already stores object metadata and derived variant paths. The exact prefix taxonomy can be standardized to the structure above without changing the overall architecture.</p>
+
+<h3>13.6 Access control and security controls</h3>
+<ul>
+    <li>S3 buckets are private with public access blocked.</li>
+    <li>Pre-signed URLs are generated only by backend endpoints protected by middleware, policies, and scoped queries.</li>
+    <li>HTTPS protects both API traffic and storage transfer.</li>
+    <li>Object names should avoid leaking sensitive identifiers in user-visible filenames.</li>
+    <li>Expiring URLs limit the exposure window even after authorization is granted.</li>
+</ul>
+
+<h3>13.7 Operational notes</h3>
+<ul>
+    <li>Queue workers handle variant generation triggers, video-processing triggers, export tasks, and push notification dispatch.</li>
+    <li>Monitoring should cover API health, queue backlog, failed jobs, database performance, OTP delivery errors, and S3 transfer errors.</li>
+    <li>This separation prevents long-running work from blocking API request latency and absorbs bursty sync traffic after offline periods.</li>
+</ul>
+
+<h3>13.8 Selected infrastructure summary</h3>
+<table class="table">
+    <tr><th>Infrastructure Area</th><th>Decision</th><th>Why</th></tr>
+    <tr><td>Compute</td><td>Libyan Spider VPS hosts Laravel API, Vue dashboard, MySQL, scheduler, and queue workers.</td><td>Keeps control, performance, and operational ownership centralized.</td></tr>
+    <tr><td>Storage</td><td>AWS S3 private buckets or S3-compatible equivalent store uploaded media and derived variants.</td><td>Prevents VPS disk growth from evidence media.</td></tr>
+    <tr><td>Delivery</td><td>Pre-signed URLs enable direct secure media transfer.</td><td>Maintains RBAC control while reducing server load.</td></tr>
+    <tr><td>Governance</td><td>Audit logs, scoped reporting, and immutable workflow history.</td><td>Supports donor-grade accountability and incident review.</td></tr>
+ </table>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<div class="section-break"></div>
+<h2 id="section-14">14. Concluding Architecture Position</h2>
+<p>The UNDP Platform backend is structured as a secure, API-first Laravel system optimized for role-aware validation, offline-capable reporting, bilingual operation, and accountable evidence handling. The design keeps compute on the Libyan Spider VPS, protects evidence media in private object storage, and enforces access through a layered combination of authentication, RBAC middleware, policies, and query scoping.</p>
+<p>This combination makes the platform suitable for municipal workflows, donor-safe reporting, and technical handover because the architecture is explicit, modular, auditable, and operationally scalable without changing its core security model.</p>
+<p class="small">End of report.</p>
+</body>
+</html>

@@ -5,8 +5,8 @@ namespace App\Providers;
 use App\Contracts\OtpSender;
 use App\Models\Submission;
 use App\Policies\SubmissionPolicy;
-use App\Services\Otp\ISendlyOtpSender;
 use App\Services\Otp\LogOtpSender;
+use App\Services\Otp\ResalaOtpSender;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -21,8 +21,8 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(OtpSender::class, function () {
-            return (bool) config('services.isendly.enabled')
-                ? app(ISendlyOtpSender::class)
+            return (bool) config('services.resala.enabled')
+                ? app(ResalaOtpSender::class)
                 : app(LogOtpSender::class);
         });
     }

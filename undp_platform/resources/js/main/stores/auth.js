@@ -35,6 +35,7 @@ export const useAuthStore = defineStore('auth', {
             this.otpContext = {
                 ...payload,
                 masked_phone: data.masked_phone,
+                otp_digits: data.code_digits,
                 resend_in: data.resend_in,
             };
             return data;

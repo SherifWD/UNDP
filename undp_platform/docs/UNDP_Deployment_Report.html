@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UNDP Platform Deployment Report</title>
+<style>
+@page {
+    margin: 22mm 18mm 20mm 18mm;
+}
+body {
+    font-family: Helvetica, Arial, sans-serif;
+    line-height: 1.52;
+    margin: 30px;
+    color: #1b2638;
+}
+h1, h2, h3, h4 {
+    color: #12344d;
+}
+h1 {
+    font-size: 28px;
+    margin-bottom: 8px;
+    border-bottom: 2px solid #d7deea;
+    padding-bottom: 10px;
+}
+h2 {
+    font-size: 20px;
+    margin-top: 26px;
+    border-bottom: 1px solid #e3e9f3;
+    padding-bottom: 6px;
+}
+h3 {
+    font-size: 15px;
+    margin-top: 18px;
+    margin-bottom: 6px;
+}
+h4 {
+    font-size: 13px;
+    margin-top: 14px;
+    margin-bottom: 6px;
+}
+p, li, td, th {
+    font-size: 11px;
+}
+ul, ol {
+    margin-top: 6px;
+}
+a {
+    color: #1d4ed8;
+    text-decoration: none;
+}
+.cover {
+    page-break-after: always;
+    border: 1px solid #d8dfeb;
+    border-radius: 16px;
+    padding: 28px 30px;
+    background: #fbfcfe;
+}
+.cover h1 {
+    border-bottom: none;
+    margin-top: 0;
+    padding-bottom: 0;
+}
+.small {
+    font-size: 10px;
+    color: #5d6678;
+}
+.meta, .table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 18px;
+}
+.meta td, .table th, .table td {
+    border: 1px solid #d7deea;
+    padding: 8px;
+    vertical-align: top;
+}
+.meta td:first-child {
+    width: 28%;
+    background: #f4f7fb;
+    font-weight: 700;
+}
+.table th {
+    background: #f2f6fb;
+    text-align: left;
+}
+.notice {
+    border-left: 4px solid #1d4ed8;
+    background: #eef4ff;
+    padding: 10px 12px;
+    margin: 12px 0;
+}
+.warning {
+    border-left: 4px solid #b45309;
+    background: #fff7ed;
+    padding: 10px 12px;
+    margin: 12px 0;
+}
+.callout {
+    border: 1px solid #d7deea;
+    background: #f8fbff;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 12px 0;
+}
+.toc {
+    columns: 2;
+    column-gap: 28px;
+    margin-top: 14px;
+}
+.toc ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 0 0 12px;
+    break-inside: avoid;
+}
+.toc li {
+    margin: 4px 0;
+}
+pre {
+    background: #f4f6fa;
+    border: 1px solid #dde4ef;
+    border-radius: 8px;
+    padding: 12px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    font-size: 10px;
+    line-height: 1.42;
+}
+.diagram {
+    background: #f8fafc;
+    border: 1px solid #d7deea;
+}
+.section-break {
+    page-break-before: always;
+}
+.footer-link {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: 10px;
+}
+.tight td, .tight th {
+    padding: 6px 7px;
+}
+</style>
+</head>
+<body>
+<div class="cover" id="top">
+    <h1>UNDP Platform Deployment Report</h1>
+    <p><strong>Document Type:</strong> Formal deployment report and reusable release template aligned to the approved backend architecture.</p>
+    <p><strong>Deployment Model:</strong> Laravel 12 API-first platform hosted on a Libyan Spider VPS, with AWS S3 or equivalent S3-compatible private object storage used for evidence media and backups only.</p>
+    <p class="small">Updated on 1 April 2026 from the current codebase and the approved architecture brief.</p>
+
+    <table class="meta">
+        <tr><td>Project</td><td>UNDP Platform</td></tr>
+        <tr><td>Environment</td><td>[Production / Staging / UAT]</td></tr>
+        <tr><td>Report ID</td><td>[DEPLOY-REPORT-ID]</td></tr>
+        <tr><td>Release Version</td><td>[Git tag / commit hash / release number]</td></tr>
+        <tr><td>Deployment Window</td><td>[Start date/time] to [End date/time]</td></tr>
+        <tr><td>Hosting Provider</td><td>Libyan Spider VPS</td></tr>
+        <tr><td>Selected VPS Profile</td><td>2 vCPU, 8 GB RAM, 80 GB SSD, 20 TB bandwidth</td></tr>
+        <tr><td>Primary Stack</td><td>Laravel 12, Sanctum, MySQL, Eloquent, Laravel DB queues, Resala OTP, Firebase Cloud Messaging, AR/EN localization, immutable audit logging</td></tr>
+        <tr><td>Prepared By</td><td>[Name / Role]</td></tr>
+        <tr><td>Reviewed By</td><td>[Name / Role]</td></tr>
+        <tr><td>Approved By</td><td>[Name / Role]</td></tr>
+        <tr><td>Application URL</td><td>[https://app.example.com]</td></tr>
+        <tr><td>VPS Hostname / IP</td><td>[Hostname] / [Public IP]</td></tr>
+    </table>
+
+    <div class="notice">
+        This report is architecture-specific. Application compute, PHP runtime, database, scheduler, and queue workers are hosted on the Libyan Spider VPS. AWS S3 is relevant only as private object storage for evidence media and backup retention. This is not an AWS application-hosting report.
+    </div>
+
+    <h2>Contents</h2>
+    <div class="toc">
+        <ul>
+            <li><a href="#section-1">1. Overview</a></li>
+            <li><a href="#section-2">2. Objective</a></li>
+            <li><a href="#section-3">3. Architecture Summary</a></li>
+            <li><a href="#section-4">4. VPS Infrastructure Details</a></li>
+            <li><a href="#section-5">5. Deployment Scope</a></li>
+            <li><a href="#section-6">6. Deployment Steps</a></li>
+            <li><a href="#section-7">7. Database Notes</a></li>
+            <li><a href="#section-8">8. S3 Media Storage Notes</a></li>
+        </ul>
+        <ul>
+            <li><a href="#section-9">9. Rollback Plan</a></li>
+            <li><a href="#section-10">10. Risks and Mitigation</a></li>
+            <li><a href="#section-11">11. Recommendations</a></li>
+        </ul>
+    </div>
+</div>
+
+<h2 id="section-1">1. Overview</h2>
+<p>This deployment report is tailored to the UNDP Platform backend and should be used to govern production or pre-production releases of the actual system architecture in use. The platform is a secure, role-aware, API-first Laravel system serving web oversight users and mobile-connected field reporting workflows, with strict RBAC, offline-tolerant submission handling, bilingual Arabic / English responses, and immutable auditability.</p>
+<p>The deployed platform consists of Laravel 12 running on a Libyan Spider VPS, MySQL as the primary transactional datastore, Eloquent as the ORM, Laravel queues using the database driver, Resala OTP for login delivery, Firebase Cloud Messaging for workflow notifications, and private S3-compatible object storage for evidence media and backup archives. User-uploaded evidence is intentionally excluded from VPS disk storage to protect compute performance and long-term storage stability.</p>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-2">2. Objective</h2>
+<p>This document records and governs deployment of the UNDP Platform according to its approved architecture. It is intended to show exactly what is being deployed, where it is hosted, which services are affected, how the release is executed, how security and RBAC are validated, how post-deployment testing is performed, and how rollback is handled if the release fails or introduces operational risk.</p>
+<p>The deployment objective is to release code, configuration, schema changes, queue behavior, localization assets, object-storage integration, and notification services in a controlled and reversible manner while preserving availability, security, municipal data isolation, donor-safe visibility rules, and evidence integrity.</p>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-3">3. Architecture Summary</h2>
+<p>The deployment must preserve the backend architecture exactly as designed: API-first, permission-driven, municipality-aware, audit-heavy, and resilient to delayed mobile synchronization.</p>
+
+<h3>3.1 High-Level Architecture Principles</h3>
+<ul>
+    <li>RESTful JSON API-first backend.</li>
+    <li>Strict RBAC enforcement at middleware, policy, and query-scoping layers.</li>
+    <li>Sanctum-based token authentication for API clients.</li>
+    <li>Offline-tolerant submission lifecycle with idempotent retry behavior through client UUIDs.</li>
+    <li>Immutable audit logging for governance-critical actions.</li>
+    <li>Private object storage for evidence media, separate from application compute.</li>
+    <li>Bilingual Arabic / English support at API and workflow level.</li>
+</ul>
+
+<h3>3.2 Runtime Deployment Graph</h3>
+<pre class="diagram">                Libyan Spider VPS
+  +------------------------------------------------------+
+  | Nginx / Apache + PHP-FPM + Laravel 12 API            |
+  | Vue dashboard assets + MySQL + Scheduler + Workers   |
+  +----------------------+-------------------------------+
+                         |                    |
+                         | secure API         | signed media access
+                         |                    |
+      +------------------v---+      +--------v------------------------+
+      | Web Admin / Municipal |      | AWS S3 or S3-compatible bucket |
+      | / Donor / Auditor UI  |      | private media + backup storage |
+      +-----------------------+      +--------------------------------+
+                         |
+                         |
+      +------------------v--------------------------------------------+
+      | Mobile reporters: draft, sync, submit, upload, receive push   |
+      +------------------+---------------------------------------------+
+                         |
+           +-------------+--------------+
+           |                            |
+           v                            v
+    Resala OTP                    Firebase Cloud Messaging</pre>
+
+<h3>3.3 Deployment-Critical Component Summary</h3>
+<table class="table">
+    <tr>
+        <th>Layer</th>
+        <th>Technology / Service</th>
+        <th>Deployment Impact</th>
+    </tr>
+    <tr>
+        <td>Backend Core</td>
+        <td>Laravel 12.x</td>
+        <td>All runtime code, middleware, queues, localization, validation, and APIs depend on successful application release and cache rebuild.</td>
+    </tr>
+    <tr>
+        <td>Authentication</td>
+        <td>Laravel Sanctum</td>
+        <td>Access token, refresh token, and current-token revocation behavior must remain intact after deployment.</td>
+    </tr>
+    <tr>
+        <td>Database</td>
+        <td>MySQL + Eloquent</td>
+        <td>Schema migrations and data integrity are release-critical because submissions, audit logs, workflow settings, and queue tables live in MySQL.</td>
+    </tr>
+    <tr>
+        <td>Queue Layer</td>
+        <td>Laravel queues using the database driver</td>
+        <td>Workers must resume processing <code>default</code>, <code>notifications</code>, <code>media</code>, and <code>exports</code> workloads after deployment.</td>
+    </tr>
+    <tr>
+        <td>OTP Service</td>
+        <td>Resala OTP</td>
+        <td>Login and verification fail if provider credentials, connectivity, or timeout settings are broken.</td>
+    </tr>
+    <tr>
+        <td>Push Notifications</td>
+        <td>Firebase Cloud Messaging</td>
+        <td>Status changes and other mobile notifications depend on valid FCM configuration and functioning queue workers.</td>
+    </tr>
+    <tr>
+        <td>Media Storage</td>
+        <td>AWS S3 or S3-compatible private object storage</td>
+        <td>Presigned uploads, download URLs, and media-processing state all depend on valid bucket, endpoint, and credential configuration.</td>
+    </tr>
+    <tr>
+        <td>Localization</td>
+        <td>Arabic / English</td>
+        <td>Locale resolution, validation errors, and workflow labels must continue to render correctly after deployment.</td>
+    </tr>
+    <tr>
+        <td>Auditability</td>
+        <td>Immutable audit logs</td>
+        <td>Sensitive actions must continue to append audit entries and remain non-editable after deployment.</td>
+    </tr>
+</table>
+
+<h3>3.4 RBAC and Data Isolation Summary</h3>
+<p>The deployment must preserve the three-layer authorization model already implemented in the backend:</p>
+<ul>
+    <li><strong>Middleware layer:</strong> request gatekeeping through <code>auth:sanctum</code>, <code>active</code>, <code>permission:*</code>, and <code>any_permission:*</code>.</li>
+    <li><strong>Policy layer:</strong> business-rule enforcement through policies such as <code>SubmissionPolicy</code>.</li>
+    <li><strong>Query scope layer:</strong> data isolation through scoped services such as <code>SubmissionAccessService</code> and <code>ProjectAccessService</code>.</li>
+</ul>
+
+<div class="callout">
+    Deployment implication: a successful release is not just “the site opens.” It must preserve municipality scope, ownership rules, donor-safe visibility, and active-user token revocation behavior.
+</div>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-4">4. VPS Infrastructure Details</h2>
+<table class="table">
+    <tr><th>Infrastructure Item</th><th>Deployment Value</th><th>Notes</th></tr>
+    <tr><td>Hosting Provider</td><td>Libyan Spider VPS</td><td>Primary compute and runtime environment.</td></tr>
+    <tr><td>Selected VPS Capacity</td><td>2 vCPU, 8 GB RAM, 80 GB SSD, 20 TB bandwidth</td><td>Approved deployment baseline for this architecture.</td></tr>
+    <tr><td>Operating System</td><td>[Ubuntu 22.04 LTS / AlmaLinux / Other]</td><td>Record exact OS and patch level for the deployed node.</td></tr>
+    <tr><td>Web Tier</td><td>[Nginx or Apache] + PHP-FPM</td><td>Terminates HTTPS and serves the Laravel/Vue application.</td></tr>
+    <tr><td>Application Runtime</td><td>Laravel 12 + built frontend assets</td><td>Backend APIs and dashboard assets deployed together on the VPS.</td></tr>
+    <tr><td>Database Engine</td><td>MySQL</td><td>Primary datastore for transactional records and queue tables.</td></tr>
+    <tr><td>Queue Supervisor</td><td>[Supervisor / systemd]</td><td>Must keep queue workers active for database queues.</td></tr>
+    <tr><td>Scheduler</td><td>cron calling <code>php artisan schedule:run</code></td><td>Runs every minute.</td></tr>
+    <tr><td>Release Path</td><td>[/var/www/undp-platform/current]</td><td>Recommended symlink-based release target.</td></tr>
+    <tr><td>Shared Path</td><td>[/var/www/undp-platform/shared]</td><td>Recommended location for <code>.env</code>, storage, and persistent files.</td></tr>
+    <tr><td>Static Assets on VPS</td><td>Application code, built frontend files, logs, MySQL data, static UI assets</td><td>Expected local disk usage.</td></tr>
+    <tr><td>Excluded from VPS Disk</td><td>User evidence images, user videos, generated media variants, long-term media archive</td><td>Must remain in private object storage.</td></tr>
+    <tr><td>Domain / FQDN</td><td>[app.example.com]</td><td>Production DNS target.</td></tr>
+    <tr><td>TLS Certificate Source</td><td>[Let's Encrypt / commercial CA]</td><td>Must support TLS 1.2+.</td></tr>
+    <tr><td>Object Storage Endpoint</td><td>[https://s3.amazonaws.com or custom S3-compatible endpoint]</td><td>Used for evidence media and backup archives only.</td></tr>
+</table>
+
+<p>The VPS hosts all core application compute: the Laravel backend, the dashboard build, MySQL, queue workers, scheduler, logs, and runtime configuration. It does not host the growing evidence library. That separation is intentional and must remain true after deployment.</p>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-5">5. Deployment Scope</h2>
+<p><strong>In scope for this deployment:</strong></p>
+<ul>
+    <li>Laravel backend release on the Libyan Spider VPS.</li>
+    <li>Frontend asset build and publication for the dashboard.</li>
+    <li>MySQL schema migrations and supporting data updates required by the release.</li>
+    <li>Sanctum auth flow validation, including OTP request, OTP verification, access tokens, and refresh tokens.</li>
+    <li>Queue worker restart and health verification for <code>default</code>, <code>notifications</code>, <code>media</code>, and <code>exports</code>.</li>
+    <li>Resala OTP and Firebase Cloud Messaging connectivity validation.</li>
+    <li>Private S3-compatible media storage validation, including presigned uploads and download URLs.</li>
+    <li>Localization, audit logging, reporting, and RBAC smoke testing.</li>
+</ul>
+
+<p><strong>Out of scope unless separately approved:</strong></p>
+<ul>
+    <li>Mobile application binary deployment.</li>
+    <li>Hosting provider migration away from Libyan Spider.</li>
+    <li>Major operating system upgrade.</li>
+    <li>Changing the evidence object-key taxonomy as a standalone storage migration.</li>
+    <li>Replacing the current media-processing placeholder boundary with a new transcoding platform.</li>
+    <li>Any non-reversible schema or data migration not already approved for this release.</li>
+</ul>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<div class="section-break"></div>
+<h2 id="section-6">6. Deployment Steps</h2>
+<h3>6.1 Enable maintenance mode</h3>
+<pre><code>cd /var/www/undp-platform/current
+php artisan down --render="errors::503" --retry=60</code></pre>
+
+<h3>6.2 Create and store pre-deployment database backup</h3>
+<pre><code>mkdir -p /var/backups/undp-platform
+mysqldump --single-transaction --routines --triggers \
+  -h [db-host] -u [db-user] -p'[db-password]' [db-name] \
+  &gt; /var/backups/undp-platform/predeploy_[release_id].sql</code></pre>
+
+<p class="small">If backup policy requires off-node retention, upload the dump to the approved S3-compatible backup bucket after creation.</p>
+
+<h3>6.3 Prepare the release directory</h3>
+<pre><code>export RELEASE_ID=[YYYYMMDD_HHMMSS]
+export APP_ROOT=/var/www/undp-platform
+export RELEASE_PATH="$APP_ROOT/releases/$RELEASE_ID"
+
+mkdir -p "$APP_ROOT/releases" "$APP_ROOT/shared"
+git clone --branch [release-tag-or-branch] --depth 1 [repository-url] "$RELEASE_PATH"
+cd "$RELEASE_PATH"
+
+cp "$APP_ROOT/shared/.env" .env
+ln -sfn "$APP_ROOT/shared/storage" storage</code></pre>
+
+<h3>6.4 Install dependencies and build assets</h3>
+<pre><code>cd "$RELEASE_PATH"
+composer install --no-dev --prefer-dist --optimize-autoloader
+npm ci
+npm run build</code></pre>
+
+<h3>6.5 Validate deployment-critical environment settings</h3>
+<pre><code>cd "$RELEASE_PATH"
+php artisan about
+php artisan tinker --execute="dump([
+  'app_env' =&gt; config('app.env'),
+  'queue' =&gt; config('queue.default'),
+  'media_disk' =&gt; config('media.disk'),
+  'media_direct_upload_disk' =&gt; config('media.direct_upload_disk'),
+  'otp_expires_in' =&gt; config('otp.expires_in_seconds'),
+  'otp_cooldown' =&gt; config('otp.resend_cooldown_seconds'),
+  'resala_enabled' =&gt; config('services.resala.enabled'),
+]);"</code></pre>
+
+<h3>6.6 Run Laravel optimization and migrations</h3>
+<pre><code>cd "$RELEASE_PATH"
+php artisan optimize:clear
+php artisan migrate --force
+php artisan storage:link || true
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+php artisan event:cache</code></pre>
+
+<h3>6.7 Switch the live symlink</h3>
+<pre><code>ln -sfn "$RELEASE_PATH" "$APP_ROOT/current"
+cd "$APP_ROOT/current"</code></pre>
+
+<h3>6.8 Restart queues and runtime services</h3>
+<pre><code>cd "$APP_ROOT/current"
+php artisan queue:restart
+
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl restart undp-platform-worker:*
+
+sudo systemctl reload php8.2-fpm
+sudo systemctl reload nginx</code></pre>
+
+<p class="small">If workers are split by queue name instead of a single worker group, ensure separate coverage for <code>default</code>, <code>notifications</code>, <code>media</code>, and <code>exports</code>.</p>
+
+<h3>6.9 Confirm scheduler and reopen traffic</h3>
+<pre><code>crontab -l | grep "schedule:run"
+php artisan up</code></pre>
+
+<h3>6.10 Example queue worker commands for this architecture</h3>
+<pre><code>php artisan queue:work database --queue=default --sleep=3 --tries=3 --timeout=120
+php artisan queue:work database --queue=notifications --sleep=3 --tries=3 --timeout=120
+php artisan queue:work database --queue=media --sleep=3 --tries=3 --timeout=600
+php artisan queue:work database --queue=exports --sleep=3 --tries=3 --timeout=300</code></pre>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-7">7. Database Notes</h2>
+<p>The deployed backend is MySQL-centric. Eloquent models, workflows, audit logs, and queue tables all depend on schema integrity and correct charset configuration.</p>
+
+<h3>7.1 Key operational tables affected by deployment</h3>
+<table class="table tight">
+    <tr><th>Table / Area</th><th>Purpose</th></tr>
+    <tr><td><code>users</code></td><td>Roles, status, municipality assignment, preferred locale, and device-token context.</td></tr>
+    <tr><td><code>otp_codes</code></td><td>OTP issuance, expiry, and verification-attempt tracking.</td></tr>
+    <tr><td><code>submissions</code></td><td>Primary reporting records, including <code>client_uuid</code> idempotency support.</td></tr>
+    <tr><td><code>submission_status_events</code></td><td>Immutable workflow timeline for status transitions.</td></tr>
+    <tr><td><code>media_assets</code></td><td>Object-storage metadata, checksums, statuses, and variant references.</td></tr>
+    <tr><td><code>audit_logs</code></td><td>Append-only audit trail for sensitive actions.</td></tr>
+    <tr><td><code>workflow_statuses</code> / <code>validation_reasons</code></td><td>Configurable workflow dictionaries.</td></tr>
+    <tr><td><code>jobs</code>, <code>failed_jobs</code>, <code>job_batches</code></td><td>Database queue transport and failed-job tracking.</td></tr>
+    <tr><td><code>system_settings</code></td><td>Persistent settings affecting workflow, localization, security, and reporting.</td></tr>
+</table>
+
+<h3>7.2 Deployment considerations</h3>
+<ul>
+    <li>Use <code>utf8mb4</code> or equivalent full Unicode support so Arabic and English content remains safe across submissions, labels, exports, and audit data.</li>
+    <li>Treat migrations as release-critical because both workflow and queue behavior depend on schema correctness.</li>
+    <li>Because the queue driver is database-backed, queue table health is part of database readiness.</li>
+    <li>Do not assume <code>migrate:rollback</code> is the safest recovery path for production. For irreversible or risky changes, restoring the verified pre-deployment backup may be the correct rollback action.</li>
+    <li>Audit log integrity must be preserved across restore operations; never “clean up” or mutate audit entries as part of deployment troubleshooting.</li>
+</ul>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-8">8. S3 Media Storage Notes</h2>
+<p>User evidence media and backup archives are stored in AWS S3 or an equivalent S3-compatible private object storage service. The application is not hosted on S3. The application is hosted on the Libyan Spider VPS; S3 is used only for storage operations.</p>
+
+<h3>8.1 Expected production settings</h3>
+<pre><code>APP_LOCALE=ar
+APP_FALLBACK_LOCALE=en
+QUEUE_CONNECTION=database
+FILESYSTEM_DISK=local
+
+MEDIA_DISK=s3
+MEDIA_DIRECT_UPLOAD_DISK=s3
+MEDIA_PRESIGNED_UPLOAD_EXPIRY_SECONDS=900
+MEDIA_PRESIGNED_DOWNLOAD_EXPIRY_SECONDS=600
+MEDIA_PROCESSING_QUEUE=media
+
+AWS_ACCESS_KEY_ID=[object-storage-access-key]
+AWS_SECRET_ACCESS_KEY=[object-storage-secret-key]
+AWS_DEFAULT_REGION=[region]
+AWS_BUCKET=[media-bucket]
+AWS_ENDPOINT=[https://object-storage-endpoint]
+AWS_USE_PATH_STYLE_ENDPOINT=[true|false]
+AWS_VISIBILITY=private</code></pre>
+
+<h3>8.2 Evidence handling rules that must be preserved</h3>
+<table class="table tight">
+    <tr><th>Media Type</th><th>Rule</th><th>Current Config</th></tr>
+    <tr><td>Images</td><td>Maximum count per submission</td><td>10</td></tr>
+    <tr><td>Images</td><td>Maximum upload size before compression</td><td>15 MB</td></tr>
+    <tr><td>Images</td><td>Hard reject threshold after compression</td><td>4 MB</td></tr>
+    <tr><td>Images</td><td>Target range after compression</td><td>0.8 MB to 2.0 MB</td></tr>
+    <tr><td>Images</td><td>Maximum long side</td><td>2048 px</td></tr>
+    <tr><td>Videos</td><td>Maximum count per submission</td><td>1</td></tr>
+    <tr><td>Videos</td><td>Maximum upload size</td><td>300 MB</td></tr>
+    <tr><td>Videos</td><td>Target post-compression size</td><td>200 MB</td></tr>
+ </table>
+
+<h3>8.3 Current implementation notes</h3>
+<ul>
+    <li>The current backend already supports authenticated presigned uploads when the media disk driver is S3.</li>
+    <li>Upload completion dispatches a media-processing job onto the <code>media</code> queue.</li>
+    <li>The current application stores media object keys and derived variants in the database and generates temporary download URLs through the storage layer.</li>
+    <li>The current object-key pattern is application-managed. If the platform later standardizes to a stricter evidence prefix layout such as <code>evidence/raw</code> and <code>evidence/derived</code>, that change should be handled as a planned storage migration, not as a routine deployment side-effect.</li>
+</ul>
+
+<h3>8.4 Storage validation points</h3>
+<ul>
+    <li>The bucket remains private and no public-read access is enabled.</li>
+    <li>Presigned upload URLs are issued only after authenticated and authorized requests.</li>
+    <li>Download URLs expire correctly and are never handed to unauthorized roles.</li>
+    <li>Donor or partner-facing views do not expose unrestricted raw media access.</li>
+    <li>Object-storage latency or signature errors do not block the entire application from starting, but they must fail visibly and be monitored.</li>
+</ul>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<div class="section-break"></div>
+<h2 id="section-9">9. Rollback Plan</h2>
+<ol>
+    <li>Return the application to maintenance mode if user-facing impact or data-risk is confirmed.</li>
+    <li>Switch the live symlink back to the last verified stable release.</li>
+    <li>Clear and rebuild Laravel caches on the restored release.</li>
+    <li>Restart queue workers, reload PHP-FPM, and reload the web server.</li>
+    <li>Evaluate whether database restoration is required. If the release included irreversible schema or data changes, restore the pre-deployment MySQL backup.</li>
+    <li>Validate login, RBAC scoping, object-storage access, audit logging, and queue health before reopening access.</li>
+</ol>
+
+<pre><code>cd /var/www/undp-platform/current
+php artisan down --render="errors::503" --retry=60
+
+ln -sfn /var/www/undp-platform/releases/[previous_release_id] /var/www/undp-platform/current
+cd /var/www/undp-platform/current
+
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+php artisan event:cache
+php artisan queue:restart
+
+sudo supervisorctl restart undp-platform-worker:*
+sudo systemctl reload php8.2-fpm
+sudo systemctl reload nginx
+
+php artisan up</code></pre>
+
+<h3>13.1 Database restore example if required</h3>
+<pre><code>mysql -h [db-host] -u [db-user] -p'[db-password]' [db-name] \
+  &lt; /var/backups/undp-platform/predeploy_[release_id].sql</code></pre>
+
+<div class="warning">
+    Code rollback does not automatically revert changes already written to object storage. If a release changes media key patterns, signed URL behavior, or storage prefixes, the storage impact must be reviewed separately from code rollback.
+</div>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-10">10. Risks and Mitigation</h2>
+<table class="table">
+    <tr><th>Risk</th><th>Potential Impact</th><th>Mitigation</th></tr>
+    <tr><td>Resala OTP outage or rejection</td><td>Users cannot authenticate and the platform becomes effectively unavailable.</td><td>Validate provider connectivity before deployment, confirm credentials, and monitor OTP failures immediately after release.</td></tr>
+    <tr><td>Database queue backlog</td><td>Delayed media processing, exports, and notifications, especially after offline reconnect bursts.</td><td>Review queue depth before deployment, ensure worker coverage by queue, and monitor failed jobs and backlog after release.</td></tr>
+    <tr><td>S3 credential or endpoint misconfiguration</td><td>Evidence upload or download failure and backup write failure.</td><td>Validate bucket, endpoint, private visibility, presigned URL issuance, and access credentials before and after release.</td></tr>
+    <tr><td>FCM configuration failure</td><td>Workflow notifications silently fail or queue jobs error.</td><td>Verify <code>FCM_SERVER_KEY</code>, monitor notification jobs, and confirm device-token update flow.</td></tr>
+    <tr><td>RBAC regression</td><td>Municipality data leaks, donor overexposure, or blocked legitimate access.</td><td>Run explicit role-based smoke tests: reporter own-data only, municipal scope only, donor approved-only, admin global access.</td></tr>
+    <tr><td>Migration failure or lock contention</td><td>Extended downtime or partial deployment state.</td><td>Review migrations in advance, take verified backup, and execute high-risk changes during approved low-traffic windows.</td></tr>
+    <tr><td>Localization regression</td><td>Arabic or English labels, validation, or content headers break after release.</td><td>Test both locales in post-deployment validation and confirm UTF-8 / utf8mb4 continuity.</td></tr>
+    <tr><td>Audit gap</td><td>Sensitive changes occur without traceability.</td><td>Validate audit creation during smoke tests and never bypass audit-sensitive release checks.</td></tr>
+    <tr><td>VPS resource exhaustion</td><td>Slow response times, worker instability, or disk exhaustion from logs and backups.</td><td>Track disk, memory, CPU, log growth, and backup retention on the VPS.</td></tr>
+    <tr><td>Unverified restore process</td><td>Rollback takes too long during incident response.</td><td>Practice restore drills for MySQL backup and document exact rollback steps for code and storage-impacting releases.</td></tr>
+</table>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<h2 id="section-11">11. Recommendations</h2>
+<ul>
+    <li>Retain a symlink-based release model on the Libyan Spider VPS to keep rollback fast and controlled.</li>
+    <li>Keep queue workers separated operationally by queue name or at minimum monitor worker coverage for <code>default</code>, <code>notifications</code>, <code>media</code>, and <code>exports</code>.</li>
+    <li>Automate off-node backup upload and periodic restore drills for MySQL and storage-backed archives.</li>
+    <li>Promote queue backlog, OTP failures, FCM failures, object-storage errors, and audit-write failures to first-class release monitoring signals.</li>
+    <li>Keep production media storage private and preserve short-lived signed URL behavior for all evidence access.</li>
+    <li>Document any role or permission changes as deployment-sensitive changes because they directly affect municipality scope and donor-safe visibility.</li>
+    <li>Use the existing asynchronous media-processing boundary to introduce a full image/video pipeline when production demand requires it, rather than blocking API requests with inline processing.</li>
+</ul>
+<a class="footer-link" href="#top">Back to Contents</a>
+
+<p class="small">End of deployment report.</p>
+</body>
+</html>

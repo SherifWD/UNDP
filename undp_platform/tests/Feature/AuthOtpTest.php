@@ -9,8 +9,10 @@ use App\Models\Municipality;
 use App\Models\OtpCode;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request as HttpClientRequest;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -173,6 +175,72 @@ class AuthOtpTest extends TestCase
             'phone_e164' => '+218911111111',
             'role' => UserRole::REPORTER->value,
             'age' => 27,
+        ]);
+    }
+
+    public function test_request_otp_uses_resala_when_enabled_and_does_not_expose_the_code_by_default(): void
+    {
+        config([
+            'services.resala.enabled' => true,
+            'services.resala.base_url' => 'https://dev.resala.ly/api/v1',
+            'services.resala.token' => 'test-resala-token',
+            'services.resala.service_name' => 'UNDP Platform',
+            'services.resala.test_mode' => true,
+            'services.resala.autofill_signature' => '#APP-SIGNATURE',
+            'otp.code_digits' => 6,
+            'otp.expose_code_in_response' => false,
+        ]);
+
+        Http::fake([
+            'https://dev.resala.ly/api/v1/pins*' => Http::response([
+                'id' => 'b9d70695-9fb0-42ac-afc3-5bcd8f17141e',
+                'pin' => '715157',
+                'code' => '218',
+                'region' => 'LY',
+                'number' => '910024433',
+                'content' => '[Test]Your OTP is: 715157',
+            ], 201),
+        ]);
+
+        User::factory()->create([
+            'country_code' => '+218',
+            'phone' => '910024433',
+            'phone_e164' => '+218910024433',
+            'status' => UserStatus::ACTIVE->value,
+            'role' => UserRole::REPORTER->value,
+        ]);
+
+        $response = $this->withHeaders([
+            'Preferred-Locale' => 'en',
+        ])->postJson('/api/auth/request-otp', [
+            'country_code' => '+218',
+            'phone' => '910024433',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('message', 'Verification code sent successfully.')
+            ->assertJsonPath('masked_phone', '+218 *******33')
+            ->assertJsonPath('user_exists', true)
+            ->assertJsonPath('requires_registration', false);
+
+        $this->assertNull($response->json('otp'));
+        $this->assertNull($response->json('data.otp'));
+
+        Http::assertSent(function (HttpClientRequest $request): bool {
+            $payload = json_decode($request->body(), true);
+
+            return $request->method() === 'POST'
+                && $request->url() === 'https://dev.resala.ly/api/v1/pins?service_name=UNDP+Platform&len=6&autofill=%23APP-SIGNATURE&lang=en&test=test'
+                && $request->hasHeader('Authorization', 'Bearer test-resala-token')
+                && $payload === [
+                    'phone' => '218910024433',
+                ];
+        });
+
+        $this->assertDatabaseHas('otp_codes', [
+            'phone_e164' => '+218910024433',
+            'code' => '715157',
         ]);
     }
 
@@ -379,6 +447,9 @@ class AuthOtpTest extends TestCase
     public function test_verify_otp_bypass_code_allows_seeded_user_login_without_existing_otp_row(): void
     {
         $this->seed(RbacSeeder::class);
+        config([
+            'otp.bypass_code' => '111111',
+        ]);
 
         $focalPoint = User::factory()->create([
             'name' => 'Municipal Focal Point - Tripoli',

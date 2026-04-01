@@ -60,7 +60,7 @@ class AuthController extends Controller
 
         $cooldown = (int) config('otp.resend_cooldown_seconds', 60);
         $expiresIn = (int) config('otp.expires_in_seconds', 300);
-        $digits = (int) config('otp.code_digits', 4);
+        $digits = max(4, min((int) config('otp.code_digits', 6), 6));
 
         $otp = OtpCode::firstOrNew([
             'country_code' => $phoneData['country_code'],
@@ -76,23 +76,14 @@ class AuthController extends Controller
             ], 429);
         }
 
-        $max = (10 ** min($digits, 8)) - 1;
-        $code = str_pad((string) random_int(0, $max), $digits, '0', STR_PAD_LEFT);
-
-        $otp->fill([
-            'phone_e164' => $phoneData['phone_e164'],
-            'code' => $code,
-            'expires_at' => now()->addSeconds($expiresIn),
-            'last_sent_at' => now(),
-            'attempts' => 0,
-            'verified_at' => null,
-        ])->save();
-
         try {
-            $this->otpSender->send(
+            $delivery = $this->otpSender->send(
                 $phoneData['phone_e164'],
-                sprintf('Your UNDP verification code is %s', $code),
-                ['ttl_seconds' => $expiresIn],
+                [
+                    'digits' => $digits,
+                    'ttl_seconds' => $expiresIn,
+                    'locale' => app()->getLocale(),
+                ],
             );
         } catch (Throwable $exception) {
             report($exception);
@@ -102,25 +93,42 @@ class AuthController extends Controller
             ], 503);
         }
 
+        $otp->fill([
+            'phone_e164' => $phoneData['phone_e164'],
+            'code' => $delivery->code,
+            'expires_at' => now()->addSeconds($expiresIn),
+            'last_sent_at' => now(),
+            'attempts' => 0,
+            'verified_at' => null,
+        ])->save();
+
         AuditLogger::log(
             action: 'auth.otp_requested',
             entityType: 'phone',
             entityId: $phoneData['phone_e164'],
             metadata: [
                 'masked_phone' => PhoneNumber::mask($phoneData['country_code'], $phoneData['phone']),
+                'provider' => $delivery->provider,
+                'provider_reference' => $delivery->providerReference,
             ],
             request: $request,
         );
 
-        return response()->json([
+        $payload = [
             'message' => __('Verification code sent successfully.'),
             'masked_phone' => PhoneNumber::mask($phoneData['country_code'], $phoneData['phone']),
-            'otp' => $otp->code,
+            'code_digits' => $digits,
             'resend_in' => $cooldown,
             'expires_in' => $expiresIn,
             'user_exists' => true,
             'requires_registration' => false,
-        ]);
+        ];
+
+        if ((bool) config('otp.expose_code_in_response', false)) {
+            $payload['otp'] = $otp->code;
+        }
+
+        return response()->json($payload);
     }
 
     public function verifyOtp(Request $request): JsonResponse
@@ -153,7 +161,8 @@ class AuthController extends Controller
             ->where('phone', $phoneData['phone'])
             ->latest('id')
             ->first();
-        $isBypassCode = $validated['code'] === '111111';
+        $bypassCode = trim((string) config('otp.bypass_code', ''));
+        $isBypassCode = $bypassCode !== '' && hash_equals($bypassCode, $validated['code']);
 
         if (! $otp && ! $isBypassCode) {
             return response()->json([
